@@ -109,6 +109,11 @@
     body:not(.playing) .hud { z-index: 11; }
     body:not(.playing) #fullscreen { visibility: visible; pointer-events: auto; position: fixed; top: max(22px, env(safe-area-inset-top)); right: 24px; }
     @media (max-width: 600px) { body:not(.playing) #fullscreen { top: max(12px, env(safe-area-inset-top)); right: 12px; } }
+    #heavy-energy { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); width: 42px; height: 5px; appearance: none; border: 0; border-radius: 3px; overflow: hidden; background: #142d45; }
+    #heavy-energy::-webkit-progress-bar { background: #142d45; border-radius: 3px; }
+    #heavy-energy::-webkit-progress-value { background: #38baff; border-radius: 3px; }
+    #heavy-energy::-moz-progress-bar { background: #38baff; border-radius: 3px; }
+    body.celebrating #heavy-energy { display: none; }
     #fullscreen[hidden], #fullscreen .exit-fullscreen { display: none; }
     #fullscreen[aria-pressed="true"] .enter-fullscreen { display: none; }
     #fullscreen[aria-pressed="true"] .exit-fullscreen { display: block; }
@@ -213,6 +218,7 @@
   <div class="reticle">
     <svg class="weapon-ring" viewBox="0 0 48 48" role="progressbar" aria-label="Laserenergie" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="cooldown-track" cx="24" cy="24" r="21"/><circle class="cooldown-fill" cx="24" cy="24" r="21" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>
     <svg class="weapon-lock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m5 5 14 14"/></svg>
+    <progress id="heavy-energy" max="1" value="1" aria-label="Schwerlaser-Ladung" hidden></progress>
   </div>
   <div id="target" hidden aria-hidden="true"><div class="target-brackets"><i></i><i></i><i></i><i></i></div><span id="target-name"></span><div class="health"><i></i><i></i><i></i></div></div>
   <div id="flash" aria-hidden="true"></div>
@@ -748,6 +754,8 @@
         for (const rocket of rockets) scene.remove(rocket.object);
         rockets.length = 0;
         weaponHeat = 0; overheated = false; hitMarker = 0;
+        heavyEnergy = 1;
+        updateHeavyHud();
         shotFlashUntil = 0; emptyFlashUntil = 0;
         updateWeaponHud();
         if (celebrating) ships.forEach(ship => { ship.visible = false; });
@@ -811,6 +819,8 @@
         lastShot = -Infinity; lastEmptyAttempt = -Infinity;
         shotFlashUntil = 0; emptyFlashUntil = 0;
         weaponHeat = 0; overheated = false; lastHeatShot = -Infinity;
+        heavyEnergy = 1;
+        updateHeavyHud();
         updateWeaponHud();
         clearTargetLock();
         updateScore();
@@ -823,8 +833,46 @@
       const rockets = [];
       const rocketGeometry = new THREE.CylinderGeometry(.22, .22, 10, 8);
       rocketGeometry.rotateX(-Math.PI / 2);
+      const heavyRocketGeometry = new THREE.PlaneGeometry(.64, 10);
+      heavyRocketGeometry.rotateX(-Math.PI / 2);
       const rocketMaterial = new THREE.MeshBasicMaterial({ color: 0xffb24d });
       const exhaustMaterial = new THREE.SpriteMaterial({ map: glow, color: 0xff751f, blending: THREE.AdditiveBlending, depthWrite: false });
+      // Crossed light ribbons: soft edges and tapered ends, no solid surface or caps.
+      const heavyRocketMaterial = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        vertexShader: `
+          varying vec2 beamUv;
+          void main() {
+            beamUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec2 beamUv;
+          void main() {
+            float across = (beamUv.x - 0.5) * 2.0;
+            float halo = exp(-5.0 * across * across);
+            float core = exp(-80.0 * across * across);
+            float ends = smoothstep(0.0, 0.22, beamUv.y)
+                       * smoothstep(0.0, 0.22, 1.0 - beamUv.y);
+            float edge = 1.0 - smoothstep(0.65, 1.0, abs(across));
+            vec3 color = mix(vec3(0.08, 0.45, 1.0), vec3(0.8, 0.95, 1.0), core);
+            gl_FragColor = vec4(color, (halo * 0.22 + core * 0.65) * ends * edge);
+          }
+        `
+      });
+      const heavyExhaustMaterial = new THREE.SpriteMaterial({ map: glow, color: 0x38baff, blending: THREE.AdditiveBlending, depthWrite: false });
+      const heavyEnergyBar = document.querySelector('#heavy-energy');
+      let heavyEnergy = 1;
+      const heavyRechargeSeconds = .81;
+      function updateHeavyHud() {
+        heavyEnergyBar.hidden = heavyEnergy === 1;
+        heavyEnergyBar.value = heavyEnergy;
+        heavyEnergyBar.setAttribute('aria-valuetext', heavyEnergy < 1
+          ? `Lädt auf: ${Math.round(heavyEnergy * 100)} Prozent`
+          : 'Schwerlaser bereit');
+      }
       let lastShot = -Infinity;
       let weaponHeat = 0, overheated = false, lastHeatShot = -Infinity;
       let lastEmptyAttempt = -Infinity, shotFlashUntil = 0, emptyFlashUntil = 0;
@@ -866,7 +914,7 @@
         if (depth <= 15) return null;
         const projectedRadius = ship.userData.type.radius * ship.scale.x * innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * depth);
         // Keep tiny silhouettes out of both acquisition and the grace area.
-        if (projectedRadius * 2 < 30) return null;
+        if (projectedRadius * 2 < 20) return null;
         return {
           distance: Math.hypot((projectedShip.x - mouseAim.x) * innerWidth / 2, (projectedShip.y - mouseAim.y) * innerHeight / 2),
           radius: Math.max(32, projectedRadius)
@@ -916,32 +964,46 @@
           if (focusLostTime >= lockGrace) clearTargetLock();
         }
       }
-      function fireRocket(manualAttempt = false) {
+      function fireRocket(manualAttempt = false, heavy = false) {
         const now = performance.now();
         if (!started || paused || roundEnded) return;
-        if (overheated) {
+        if ((heavy && heavyEnergy < 1) || (!heavy && overheated)) {
           // Every fresh press clicks; held fire repeats more slowly, never per frame.
           if (!manualAttempt && (now - lastShot < 100 || now - lastEmptyAttempt < 300)) return;
           lastEmptyAttempt = now;
-          emptyFlashUntil = now + 110; shotFlashUntil = 0;
+          if (!heavy) { emptyFlashUntil = now + 110; shotFlashUntil = 0; }
           playSound('empty');
           return;
         }
-        if (now - lastShot < 100) return;
-        lastShot = now;
+        if (!heavy && now - lastShot < 100) return;
+        if (heavy) {
+          heavyEnergy = 0;
+          updateHeavyHud();
+        } else {
+          lastShot = now;
+          weaponHeat = Math.min(100, weaponHeat + heatPerShot);
+          lastHeatShot = gameTime;
+          if (weaponHeat >= 100) overheated = true;
+        }
         shotFlashUntil = now + 60; emptyFlashUntil = 0;
-        weaponHeat = Math.min(100, weaponHeat + heatPerShot);
-        lastHeatShot = gameTime;
-        if (weaponHeat >= 100) overheated = true;
         updateWeaponHud();
         playSound('shot');
         camera.updateMatrixWorld();
         const rocket = new THREE.Group();
-        rocket.add(new THREE.Mesh(rocketGeometry, rocketMaterial));
-        const exhaust = new THREE.Sprite(exhaustMaterial);
+        if (heavy) {
+          for (let i = 0; i < 3; i++) {
+            const ribbon = new THREE.Mesh(heavyRocketGeometry, heavyRocketMaterial);
+            ribbon.rotation.z = i * Math.PI / 3;
+            rocket.add(ribbon);
+          }
+        } else {
+          rocket.add(new THREE.Mesh(rocketGeometry, rocketMaterial));
+        }
+        const exhaust = new THREE.Sprite(heavy ? heavyExhaustMaterial : exhaustMaterial);
         exhaust.position.z = 3.5;
-        exhaust.scale.set(4, 9, 1);
+        exhaust.scale.set(heavy ? 6 : 4, heavy ? 6 : 9, 1);
         rocket.add(exhaust);
+        if (heavy) rocket.scale.set(8, 8, 1.6);
         rocket.position.set(0, -2, -8).applyMatrix4(camera.matrixWorld);
         rocket.quaternion.copy(camera.quaternion);
         const direction = new THREE.Vector3(mouseAim.x, mouseAim.y, .5)
@@ -954,16 +1016,23 @@
           const relativeVelocity = flightMotion.clone().multiplyScalar(.15);
           relativeVelocity.x += selected.userData.drift * (1 + difficulty * 2 + levelPressure * 2);
           const aim = new THREE.Vector3();
-          const projectileSpeed = flightMotion.length() + 420;
+          const projectileSpeed = (flightMotion.length() + 420) * (heavy ? .8 : 1.2);
           let travelTime = rocket.position.distanceTo(selected.position) / projectileSpeed;
           for (let i = 0; i < 5; i++) {
             aim.copy(selected.position).addScaledVector(relativeVelocity, travelTime);
             travelTime = rocket.position.distanceTo(aim) / projectileSpeed;
           }
           direction.copy(aim).sub(rocket.position).normalize();
+        } else {
+          // Unlocked shots scatter inside a 1.5-degree cone around the aim direction.
+          const angle = random(0, Math.PI * 2);
+          const spread = Math.sqrt(Math.random()) * Math.tan(THREE.MathUtils.degToRad(1.5));
+          const aimRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), direction);
+          direction.set(Math.cos(angle) * spread, Math.sin(angle) * spread, -1)
+            .normalize().applyQuaternion(aimRotation);
         }
         rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), direction);
-        rockets.push({ object: rocket, direction, age: 0 });
+        rockets.push({ object: rocket, exhaust, direction, age: 0, heavy, damage: heavy ? 5 : 1, radius: heavy ? 2.56 : .22 });
         scene.add(rocket);
       }
       function explode(position, count = 65, crashBurst = false) {
@@ -1000,7 +1069,7 @@
             spaceHeld = true;
             sound.resumeAudio().catch(audioError);
             if (celebrating) sprayEmojis((mouseAim.x * .5 + .5) * innerWidth, (-mouseAim.y * .5 + .5) * innerHeight, 10);
-            else fireRocket(true);
+            else fireRocket(true, true);
           }
         } else if (event.code === 'Escape' && !event.repeat) togglePause();
       });
@@ -1146,6 +1215,10 @@
           if (gameTime - lastKill > 1.2) feedback.classList.remove('pop');
           if (combo > 0 && gameTime - lastKill >= comboWindows[combo]) { combo = 0; updateScore(); }
         }
+        if (!paused && !roundEnded && heavyEnergy < 1) {
+          heavyEnergy = Math.min(1, heavyEnergy + elapsed / heavyRechargeSeconds);
+          updateHeavyHud();
+        }
         if (!paused && weaponHeat > 0) {
           const coolingTime = overheated ? elapsed : Math.min(elapsed, Math.max(0, gameTime - lastHeatShot - .2));
           weaponHeat = Math.max(0, weaponHeat - coolingPerSecond * coolingTime);
@@ -1263,7 +1336,10 @@
           flightPath.style.top = `${(-heading.y * .5 + .5) * innerHeight}px`;
         }
         updateTargetLock(dt);
-        if (!paused && !roundEnded && (spaceHeld || pointer)) fireRocket();
+        if (!paused && !roundEnded) {
+          if (pointer) fireRocket();
+          if (spaceHeld && heavyEnergy === 1) fireRocket(false, true);
+        }
         if (celebrating && !paused && (pointer || spaceHeld)) {
           emission += dt * (reducedMotion ? 15 : 30);
           const count = Math.floor(emission);
@@ -1277,19 +1353,23 @@
           if (paused) continue;
           rocket.age += dt;
           const previous = rocket.object.position.clone();
-          rocket.object.position.addScaledVector(rocket.direction, (flightMotion.length() + 420) * dt);
+          rocket.object.position.addScaledVector(rocket.direction, (flightMotion.length() + 420) * (rocket.heavy ? .8 : 1.2) * dt);
           rocket.object.position.add(worldStep);
+          if (rocket.heavy) {
+            const glowSize = 6 * (.4 + .6 * Math.exp(-rocket.age / .25));
+            rocket.exhaust.scale.set(glowSize, glowSize, 1);
+          }
           // Test the entire step so fast rockets cannot skip through a ship.
           const path = new THREE.Line3(previous, rocket.object.position);
           const closest = new THREE.Vector3();
           const hit = ships.find(ship => {
             if (!ship.visible) return false;
             path.closestPointToPoint(ship.position, true, closest);
-            return closest.distanceTo(ship.position) < ship.userData.type.radius * ship.scale.x;
+            return closest.distanceTo(ship.position) < ship.userData.type.radius * ship.scale.x + rocket.radius;
           });
           if (hit) {
             hitMarker = .16;
-            hit.userData.health -= 1;
+            hit.userData.health -= rocket.damage;
             if (hit.userData.health <= 0) {
               playSound('explosion', hit.scale.x);
               award(hit);
