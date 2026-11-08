@@ -1,0 +1,125 @@
+// One decoded buffer per file, one fresh source per sound. No HTML-media autoplay races.
+let context, master, musicGain, musicSource, engineGain, engineOscillator;
+let loading = null, ready = false, muted = false, paused = true;
+let alarmActive = false, alarmGain, alarmSource = null, alarmBuffer;
+const banks = {
+  shot: { files: ['laser-soft.mp3'], volume: .16 },
+  empty: { files: ['empty-click.wav'], volume: .28 },
+  lock: { files: ['lock-on.wav'], volume: .12 },
+  hit: { files: ['impact-1.mp3', 'impact-2.mp3', 'impact-3.mp3'], volume: .42 },
+  explosion: { files: ['blast-1.mp3', 'blast-2.mp3', 'blast-3.mp3'], volume: .55 },
+  reward: { files: ['reward.wav'], volume: .24 }
+};
+const activeSounds = new Set();
+async function decode(file) {
+  const response = await fetch(new URL(`assets/audio/${file}`, import.meta.url));
+  if (!response.ok) throw new Error(`Audio-Datei nicht erreichbar: ${file} (${response.status})`);
+  return context.decodeAudioData(await response.arrayBuffer());
+}
+export async function initAudio() {
+  if (!context) {
+    context = new (window.AudioContext || window.webkitAudioContext)();
+    master = context.createGain();
+    master.gain.value = muted ? 0 : .8;
+    const limiter = context.createDynamicsCompressor();
+    limiter.threshold.value = -8;
+    limiter.ratio.value = 8;
+    master.connect(limiter).connect(context.destination);
+    musicGain = context.createGain();
+    musicGain.gain.value = 0;
+    musicGain.connect(master);
+    engineGain = context.createGain();
+    engineGain.gain.value = 0;
+    engineOscillator = context.createOscillator();
+    engineOscillator.type = 'sine';
+    engineOscillator.frequency.value = 48;
+    engineOscillator.connect(engineGain).connect(master);
+    engineOscillator.start();
+    alarmGain = context.createGain();
+    alarmGain.gain.value = .24;
+    alarmGain.connect(master);
+  }
+  // Invoke resume in the actual click handler, before waiting for network/decoding.
+  await context.resume();
+  if (ready) return;
+  if (!loading) {
+    loading = (async () => {
+      const [musicBuffer, warningBuffer] = await Promise.all([
+        decode('orbit-arcade.mp3'),
+        decode('warning-low.wav'),
+        ...Object.values(banks).map(async bank => {
+          bank.buffers = await Promise.all(bank.files.map(decode));
+          bank.last = -1;
+        })
+      ]);
+      // One low warning pulse, followed by silence. Loop on the audio clock,
+      // not a timer, so repeats stay even and cannot stack on top of each other.
+      alarmBuffer = context.createBuffer(1, Math.ceil(context.sampleRate * .95), context.sampleRate);
+      alarmBuffer.copyToChannel(warningBuffer.getChannelData(0), 0);
+      musicSource = context.createBufferSource();
+      musicSource.buffer = musicBuffer;
+      musicSource.loop = true;
+      musicSource.connect(musicGain);
+      musicSource.start();
+      ready = true;
+      updateMix();
+    })().catch(error => { loading = null; throw error; });
+  }
+  await loading;
+}
+function updateMix() {
+  if (!context) return;
+  master.gain.setTargetAtTime(muted ? 0 : .8, context.currentTime, .03);
+  musicGain.gain.setTargetAtTime(!paused ? .35 : 0, context.currentTime, .1);
+  if (paused) engineGain.gain.setTargetAtTime(0, context.currentTime, .03);
+  const shouldAlarm = alarmActive && ready && !paused && !muted;
+  if (shouldAlarm && !alarmSource) {
+    alarmSource = context.createBufferSource();
+    alarmSource.buffer = alarmBuffer;
+    alarmSource.loop = true;
+    alarmSource.connect(alarmGain);
+    alarmSource.start();
+  } else if (!shouldAlarm && alarmSource) {
+    alarmSource.stop();
+    alarmSource.disconnect();
+    alarmSource = null;
+  }
+}
+export function setAlarm(value) {
+  if (alarmActive === value) return;
+  alarmActive = value;
+  updateMix();
+}
+export function setMuted(value) { muted = value; updateMix(); }
+export function setPaused(value) {
+  paused = value;
+  if (paused) for (const source of activeSounds) source.stop();
+  updateMix();
+}
+export async function resumeAudio() {
+  if (context && context.state !== 'running') await context.resume();
+}
+export async function suspendAudio() { if (context) await context.suspend(); }
+export function updateEngine(speed) {
+  if (!ready || paused) return;
+  engineGain.gain.setTargetAtTime(.018 + speed * .00003, context.currentTime, .15);
+  engineOscillator.frequency.setTargetAtTime(42 + speed * .08, context.currentTime, .2);
+}
+export function playSound(kind, shipScale = 2.4, allowPaused = false) {
+  // The final crash sound may play over the paused result screen.
+  if (!ready || muted || (paused && !allowPaused) || context.state !== 'running') return;
+  const bank = banks[kind];
+  let variant = Math.floor(Math.random() * bank.buffers.length);
+  if (variant === bank.last && bank.buffers.length > 1) variant = (variant + 1 + Math.floor(Math.random() * (bank.buffers.length - 1))) % bank.buffers.length;
+  bank.last = variant;
+  const source = context.createBufferSource();
+  source.buffer = bank.buffers[variant];
+  source.playbackRate.value = kind === 'explosion' ? (1.18 - shipScale * .1) * (.96 + Math.random() * .08)
+    : kind === 'shot' ? .9 : kind === 'reward' || kind === 'empty' || kind === 'lock' ? 1 : .96 + Math.random() * .08;
+  const gain = context.createGain();
+  gain.gain.value = bank.volume;
+  source.connect(gain).connect(master);
+  activeSounds.add(source);
+  source.onended = () => { activeSounds.delete(source); source.disconnect(); gain.disconnect(); };
+  source.start();
+}
