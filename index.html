@@ -340,11 +340,10 @@
         ship.userData.spawn += 1;
         ship.visible = true;
         const angle = initial ? formationSlot * 2.4 : random(0, Math.PI * 2);
-        const radius = formationSlot % 3 === 1 ? random(10, 65) : random(65, 220);
-        // Start small in the distance; replacements enter well beyond the visible combat area.
-        // Keep replacement travel time comparable as later levels get faster.
-        const depth = initial ? -950 - formationSlot * 220
-          : -(1050 + flightMotion.length() * .85 * random(2.5, 3.5));
+        const radius = formationSlot % 3 === 1 ? random(10, 45) : random(45, 150);
+        // Keep arrivals closer and centered, with enough approach time at higher speeds.
+        const depth = initial ? -800 - formationSlot * 180
+          : -(850 + flightMotion.length() * .85 * random(2, 2.8));
         ship.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius * .6, depth);
         // Later arrivals follow our current heading, not the original world axis.
         if (!initial) ship.position.applyEuler(flightOrientation);
@@ -542,10 +541,10 @@
       function setupLevelFleet() {
         ships.forEach(ship => { ship.visible = false; });
         const fleet = fleetOrder.slice(0, Math.min(8, level + 2)).map(index => ships[index]);
-        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 180 + levelPressure * 500;
+        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 180 + levelPressure * 380;
         fleet.slice(0, 2).forEach((ship, slot) => {
           resetShip(ship, true, slot);
-          ship.position.z = -950 - slot * Math.max(450, openingSpeed * .85 * 2);
+          ship.position.z = -800 - slot * Math.max(380, openingSpeed * .85 * 2);
         });
         spawnQueue = fleet.slice(2);
         nextShipTime = 2 * progressionTimeScale;
@@ -1157,7 +1156,7 @@
         const easing = 1 - Math.exp(-3 * dt);
         const cruiseSpeed = celebrating ? (reducedMotion ? 35 : 320)
           : reducedMotion ? 35 + levelPressure * 10 + (8 + levelPressure * 15) * difficulty
-          : 180 + levelPressure * 500 + (180 + levelPressure * 780) * Math.pow(difficulty, 1.6);
+          : 180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(difficulty, 1.6);
         speed = paused ? 0 : speed + (cruiseSpeed - speed) * easing;
         document.querySelector('#flight-state').textContent = !started || crashing || (roundEnded && !celebrating) || (celebrating && !paused) ? '' : paused ? 'PAUSE · KLICK ZUM WEITERFLIEGEN' : speed > 650 ? 'HYPERSPEED · ENDSPURT' : '';
         if (!paused) hitMarker = Math.max(0, hitMarker - dt);
