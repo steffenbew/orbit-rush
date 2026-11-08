@@ -105,6 +105,21 @@ export function updateEngine(speed) {
   engineGain.gain.setTargetAtTime(.018 + speed * .00003, context.currentTime, .15);
   engineOscillator.frequency.setTargetAtTime(42 + speed * .08, context.currentTime, .2);
 }
+export function playCountdownTick() {
+  if (!ready || muted || paused || context.state !== 'running') return;
+  const source = context.createOscillator();
+  const gain = context.createGain();
+  const now = context.currentTime;
+  source.frequency.value = 660;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(.06, now + .01);
+  gain.gain.exponentialRampToValueAtTime(.001, now + .12);
+  source.connect(gain).connect(master);
+  activeSounds.add(source);
+  source.onended = () => { activeSounds.delete(source); source.disconnect(); gain.disconnect(); };
+  source.start(now);
+  source.stop(now + .13);
+}
 export function playSound(kind, shipScale = 2.4, allowPaused = false) {
   // The final crash sound may play over the paused result screen.
   if (!ready || muted || (paused && !allowPaused) || context.state !== 'running') return;
