@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#030511">
   <title>Orbit Rush · Space Arcade</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1630'/%3E%3Cpath d='M32 9 49 49 32 40 15 49Z' fill='%237effd5'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20256%20256%22%3E%3Crect%20width%3D%22256%22%20height%3D%22256%22%20rx%3D%2264%22%20fill%3D%22%230b1630%22%2F%3E%3Cg%20fill%3D%22%237effd5%22%3E%3Cpath%20d%3D%22M223.85%2C47.12a16%2C16%2C0%2C0%2C0-15-15c-12.58-.75-44.73.4-71.41%2C27.07L132.69%2C64H74.36A15.91%2C15.91%2C0%2C0%2C0%2C63%2C68.68L28.7%2C103a16%2C16%2C0%2C0%2C0%2C9.07%2C27.16l38.47%2C5.37%2C44.21%2C44.21%2C5.37%2C38.49a15.94%2C15.94%2C0%2C0%2C0%2C10.78%2C12.92%2C16.11%2C16.11%2C0%2C0%2C0%2C5.1.83A15.91%2C15.91%2C0%2C0%2C0%2C153%2C227.3L187.32%2C193A15.91%2C15.91%2C0%2C0%2C0%2C192%2C181.64V123.31l4.77-4.77C223.45%2C91.86%2C224.6%2C59.71%2C223.85%2C47.12ZM74.36%2C80h42.33L77.16%2C119.52%2C40%2C114.34Zm74.41-9.45a76.65%2C76.65%2C0%2C0%2C1%2C59.11-22.47%2C76.46%2C76.46%2C0%2C0%2C1-22.42%2C59.16L128%2C164.68%2C91.32%2C128ZM176%2C181.64%2C141.67%2C216l-5.19-37.17L176%2C139.31Zm-74.16%2C9.5C97.34%2C201%2C82.29%2C224%2C40%2C224a8%2C8%2C0%2C0%2C1-8-8c0-42.29%2C23-57.34%2C32.86-61.85a8%2C8%2C0%2C0%2C1%2C6.64%2C14.56c-6.43%2C2.93-20.62%2C12.36-23.12%2C38.91%2C26.55-2.5%2C36-16.69%2C38.91-23.12a8%2C8%2C0%2C1%2C1%2C14.56%2C6.64Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #030511; font-family: system-ui, sans-serif; }
@@ -115,6 +115,14 @@
     .intro { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at center, #071329c9, #07132940 58%, #03071133); padding: 24px; }
     .intro-orbit { position: absolute; left: 50%; top: 50%; width: min(120vw, 120vh, 1040px); height: auto; transform: translate(-50%, -50%) rotate(-24deg); fill: none; pointer-events: none; filter: drop-shadow(0 0 12px #55eec744); }
     .intro-card { width: 100%; max-width: 580px; text-align: center; color: #e9f8ff; }
+    .language-picker { display: flex; width: max-content; max-width: 100%; margin: 8px auto 0; padding: 4px; border: 1px solid #7effd533; border-radius: 999px; background: #071629b3; }
+    .language-picker label { position: relative; }
+    .language-picker input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .language-picker span { display: block; min-width: 88px; padding: 9px 16px; border-radius: 999px; color: #a3b8c9; font-size: 12px; font-weight: 650; cursor: pointer; }
+    .language-picker input:checked + span { color: #092438; background: #7effd5; }
+    .language-picker input:focus-visible + span { outline: 2px solid #7effd5; outline-offset: 3px; }
+    .language-picker:disabled { opacity: .5; }
+    .language-picker input:disabled + span { cursor: wait; }
     #intro .intro-card { position: relative; z-index: 1; }
     body:not(.playing) :is(.brand, .hud, .mission, .credits, .reticle, #flight-state, #flight-path, #target, #shield-hud) { visibility: hidden; }
     .eyebrow { color: #7effd5; font-size: 11px; letter-spacing: .32em; text-transform: uppercase; }
@@ -122,8 +130,10 @@
     h1 span { display: block; color: #7effd5; }
     .intro-card p { color: #b8cfde; line-height: 1.7; font-size: 15px; }
     #start, #play-again { width: auto; min-width: 240px; padding: 0 26px; margin: 20px auto 10px; background: #7effd5; color: #092438; font-weight: 800; font-size: 12px; letter-spacing: .16em; box-shadow: 0 8px 40px #55eec733; }
-    #start { width: min(320px, 100%); min-width: 0; height: 52px; }
+    #start { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: min(320px, 100%); min-width: 0; height: 52px; }
+    #start .icon { width: 18px; height: 18px; flex-shrink: 0; }
     #start:disabled { opacity: .6; cursor: wait; }
+    #start:disabled .icon { display: none; }
     #silent-start:disabled { visibility: hidden; }
     #silent-start { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); display: block; width: auto; height: 30px; font-size: 11px; margin: 0; color: #a3b8c9; white-space: nowrap; }
     #audio-notice { position: fixed; z-index: 20; left: 50%; bottom: 110px; transform: translateX(-50%); width: min(90vw, 500px); height: auto; padding: 15px; color: #ffe3aa; background: #32283b; border: 1px solid #eeb16b66; font-size: 13px; }
@@ -136,7 +146,7 @@
     .reticle.overheated { color: #ff3d48; border-color: transparent; box-shadow: 0 0 12px #ff334466; }
     .reticle.overheated::before, .reticle.overheated::after { opacity: 0; }
     .weapon-lock, .weapon-ring { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); fill: none; stroke: currentColor; }
-    .weapon-lock { width: 24px; height: 24px; stroke-width: 2; }
+    .weapon-lock { width: 24px; height: 24px; fill: currentColor; stroke: none; }
     .weapon-ring { width: 48px; height: 48px; stroke-width: 3; color: inherit; }
     .reticle.has-heat .weapon-ring { display: block; }
     .cooldown-track { stroke: currentColor; stroke-opacity: .18; }
@@ -151,7 +161,7 @@
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; } }
     button:hover { background: #b9dfff14; }
     button[aria-pressed="true"] { background: #7effd51b; box-shadow: inset 0 0 0 1px #7effd56b; }
-    .icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .icon { width: 21px; height: 21px; fill: currentColor; stroke: none; }
     .hud-actions button { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; }
     body:not(.playing) .hud { z-index: 11; }
     body:not(.playing) #fullscreen { visibility: visible; pointer-events: auto; position: fixed; top: max(22px, env(safe-area-inset-top)); right: 24px; }
@@ -197,7 +207,7 @@
     #round-end[data-outcome="retry"] { --outcome-color: #ffb15c; }
     #round-end[data-outcome="gameover"] { --outcome-color: #ff6470; }
     #round-end[open] { animation: result-arrive .55s ease-out; }
-    #round-symbol { display: block; width: 76px; height: 76px; margin: 0 auto 10px; color: var(--outcome-color); stroke-width: 1.5; }
+    #round-symbol { display: block; width: 76px; height: 76px; margin: 0 auto 10px; color: var(--outcome-color); }
     #round-end #round-title { display: block; margin: 6px 0 18px; color: var(--outcome-color); font-size: 23px; letter-spacing: .03em; }
     #round-end #round-reason { display: none; }
     #round-end #round-outcome { margin-bottom: 8px; font-size: 10px; }
@@ -206,7 +216,7 @@
     #round-end .retry-icons span { width: 34px; font-size: 28px; line-height: 34px; }
     #round-end .retry-icons .spent::after { font-size: 36px; line-height: 34px; }
     #round-end #play-again { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 14px; min-height: 64px; height: auto; background: var(--outcome-color); letter-spacing: .06em; }
-    #play-again .icon { width: 34px; height: 34px; flex-shrink: 0; stroke-width: 2; }
+    #play-again .icon { width: 34px; height: 34px; flex-shrink: 0; }
     #end-countdown { position: fixed; top: 26%; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none; text-align: center; color: #7effd5; }
     #end-countdown[hidden] { display: none; }
     #countdown-number { display: block; font-size: 48px; font-weight: 800; line-height: 1.1; text-shadow: 0 0 22px #7effd540; }
@@ -257,111 +267,125 @@
   </style>
 </head>
 <body>
+  <!-- Phosphor Icons 2.1.1, regular weight. MIT: assets/vendor/PHOSPHOR-LICENSE.txt -->
   <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
-    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 8 3v6c0 5-4 8-8 11-4-3-8-6-8-11V5l8-3Z"/></symbol>
-    <symbol id="i-volume" viewBox="0 0 24 24"><path d="m11 4-5 4H3v8h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
-    <symbol id="i-muted" viewBox="0 0 24 24"><path d="m11 4-5 4H3v8h3l5 4zM16 9l6 6m0-6-6 6"/></symbol>
-    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></symbol>
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 14 8-14 8z"/></symbol>
-    <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></symbol>
-    <symbol id="i-exit-fullscreen" viewBox="0 0 24 24"><path d="M3 9h6V3m6 0v6h6M9 21v-6H3m18 0h-6v6"/></symbol>
-    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 3h10v6a5 5 0 0 1-10 0V3Zm0 2H3v3a4 4 0 0 0 5 4m9-7h4v3a4 4 0 0 1-5 4m-4 2v5m-4 2h8M9 8l2 2 4-4"/></symbol>
-    <symbol id="i-heart-broken" viewBox="0 0 24 24"><path d="M12 21 3.5 13A6 6 0 0 1 12 4.5 6 6 0 0 1 20.5 13L12 21ZM12 4.5 10 9l4 3-3 4"/></symbol>
-    <symbol id="i-stop" viewBox="0 0 24 24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8L8 2Zm0 6 8 8m0-8-8 8"/></symbol>
-    <symbol id="i-next" viewBox="0 0 24 24"><path d="m4 5 7 7-7 7m9-14 7 7-7 7"/></symbol>
-    <symbol id="i-finish" viewBox="0 0 24 24"><path d="M5 22V3m0 0c5-4 9 4 15 0v12c-6 4-10-4-15 0M10 3v11m5-10v12M5 9c5-4 9 4 15 0"/></symbol>
-    <symbol id="i-restart" viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></symbol>
-    <symbol id="i-mouse-left" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7v2h7V2Z" fill="currentColor" fill-opacity=".55" stroke="none"/><rect x="5" y="2" width="14" height="20" rx="7"/><path d="M12 2v9M5 11h14"/></symbol>
+    <symbol id="i-shield" data-phosphor="shield" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.27,47,25.53a8,8,0,0,0,4.2,0c1-.26,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0Z"/></symbol>
+    <symbol id="i-volume" data-phosphor="speaker-high" viewBox="0 0 256 256"><path d="M155.51,24.81a8,8,0,0,0-8.42.88L77.25,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H77.25l69.84,54.31A8,8,0,0,0,160,224V32A8,8,0,0,0,155.51,24.81ZM32,96H72v64H32ZM144,207.64,88,164.09V91.91l56-43.55Zm54-106.08a40,40,0,0,1,0,52.88,8,8,0,0,1-12-10.58,24,24,0,0,0,0-31.72,8,8,0,0,1,12-10.58ZM248,128a79.9,79.9,0,0,1-20.37,53.34,8,8,0,0,1-11.92-10.67,64,64,0,0,0,0-85.33,8,8,0,1,1,11.92-10.67A79.83,79.83,0,0,1,248,128Z"/></symbol>
+    <symbol id="i-muted" data-phosphor="speaker-slash" viewBox="0 0 256 256"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L73.55,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H77.25l69.84,54.31A8,8,0,0,0,160,224V175.09l42.08,46.29a8,8,0,1,0,11.84-10.76ZM32,96H72v64H32ZM144,207.64,88,164.09V95.89l56,61.6Zm42-63.77a24,24,0,0,0,0-31.72,8,8,0,1,1,12-10.57,40,40,0,0,1,0,52.88,8,8,0,0,1-12-10.59Zm-80.16-76a8,8,0,0,1,1.4-11.23l39.85-31A8,8,0,0,1,160,32v74.83a8,8,0,0,1-16,0V48.36l-26.94,21A8,8,0,0,1,105.84,67.91ZM248,128a79.9,79.9,0,0,1-20.37,53.34,8,8,0,0,1-11.92-10.67,64,64,0,0,0,0-85.33,8,8,0,1,1,11.92-10.67A79.83,79.83,0,0,1,248,128Z"/></symbol>
+    <symbol id="i-pause" data-phosphor="pause" viewBox="0 0 256 256"><path d="M200,32H160a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm0,176H160V48h40ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Zm0,176H56V48H96Z"/></symbol>
+    <symbol id="i-play" data-phosphor="play" viewBox="0 0 256 256"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></symbol>
+    <symbol id="i-fullscreen" data-phosphor="corners-out" viewBox="0 0 256 256"><path d="M216,48V88a8,8,0,0,1-16,0V56H168a8,8,0,0,1,0-16h40A8,8,0,0,1,216,48ZM88,200H56V168a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H88a8,8,0,0,0,0-16Zm120-40a8,8,0,0,0-8,8v32H168a8,8,0,0,0,0,16h40a8,8,0,0,0,8-8V168A8,8,0,0,0,208,160ZM88,40H48a8,8,0,0,0-8,8V88a8,8,0,0,0,16,0V56H88a8,8,0,0,0,0-16Z"/></symbol>
+    <symbol id="i-exit-fullscreen" data-phosphor="corners-in" viewBox="0 0 256 256"><path d="M152,96V48a8,8,0,0,1,16,0V88h40a8,8,0,0,1,0,16H160A8,8,0,0,1,152,96ZM96,152H48a8,8,0,0,0,0,16H88v40a8,8,0,0,0,16,0V160A8,8,0,0,0,96,152Zm112,0H160a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V168h40a8,8,0,0,0,0-16ZM96,40a8,8,0,0,0-8,8V88H48a8,8,0,0,0,0,16H96a8,8,0,0,0,8-8V48A8,8,0,0,0,96,40Z"/></symbol>
+    <symbol id="i-trophy" data-phosphor="trophy" viewBox="0 0 256 256"><path d="M232,64H208V48a8,8,0,0,0-8-8H56a8,8,0,0,0-8,8V64H24A16,16,0,0,0,8,80V96a40,40,0,0,0,40,40h3.65A80.13,80.13,0,0,0,120,191.61V216H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V191.58c31.94-3.23,58.44-25.64,68.08-55.58H208a40,40,0,0,0,40-40V80A16,16,0,0,0,232,64ZM48,120A24,24,0,0,1,24,96V80H48v32q0,4,.39,8Zm144-8.9c0,35.52-29,64.64-64,64.9a64,64,0,0,1-64-64V56H192ZM232,96a24,24,0,0,1-24,24h-.5a81.81,81.81,0,0,0,.5-8.9V80h24Z"/></symbol>
+    <symbol id="i-heart-broken" data-phosphor="heart-break" viewBox="0 0 256 256"><path d="M178,40a61.6,61.6,0,0,0-43.84,18.16L128,64.32l-6.16-6.16A62,62,0,0,0,16,102c0,70,103.79,126.67,108.21,129a8,8,0,0,0,7.58,0C136.21,228.67,240,172,240,102A62.07,62.07,0,0,0,178,40ZM128,214.8C109.74,204.16,32,155.69,32,102a46,46,0,0,1,78.53-32.53l6.16,6.16L106.34,86a8,8,0,0,0,0,11.31l24.53,24.53-16.53,16.52a8,8,0,0,0,11.32,11.32l22.18-22.19a8,8,0,0,0,0-11.31L123.31,91.63l22.16-22.16A46,46,0,0,1,224,102C224,155.61,146.24,204.15,128,214.8Z"/></symbol>
+    <symbol id="i-stop" data-phosphor="warning-octagon" viewBox="0 0 256 256"><path d="M120,136V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0ZM232,91.55v72.9a15.86,15.86,0,0,1-4.69,11.31l-51.55,51.55A15.86,15.86,0,0,1,164.45,232H91.55a15.86,15.86,0,0,1-11.31-4.69L28.69,175.76A15.86,15.86,0,0,1,24,164.45V91.55a15.86,15.86,0,0,1,4.69-11.31L80.24,28.69A15.86,15.86,0,0,1,91.55,24h72.9a15.86,15.86,0,0,1,11.31,4.69l51.55,51.55A15.86,15.86,0,0,1,232,91.55Zm-16,0L164.45,40H91.55L40,91.55v72.9L91.55,216h72.9L216,164.45ZM128,160a12,12,0,1,0,12,12A12,12,0,0,0,128,160Z"/></symbol>
+    <symbol id="i-next" data-phosphor="caret-double-right" viewBox="0 0 256 256"><path d="M141.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L124.69,128,50.34,53.66A8,8,0,0,1,61.66,42.34l80,80A8,8,0,0,1,141.66,133.66Zm80-11.32-80-80a8,8,0,0,0-11.32,11.32L204.69,128l-74.35,74.34a8,8,0,0,0,11.32,11.32l80-80A8,8,0,0,0,221.66,122.34Z"/></symbol>
+    <symbol id="i-finish" data-phosphor="flag-checkered" viewBox="0 0 256 256"><path d="M227.32,48.75A8,8,0,0,0,218.76,50c-28,24.22-51.72,12.48-79.21-1.13C111.07,34.76,78.78,18.79,42.76,50A8,8,0,0,0,40,56V224a8,8,0,0,0,16,0V179.77c26.79-21.16,49.87-9.75,76.45,3.41,28.49,14.09,60.77,30.06,96.79-1.13a8,8,0,0,0,2.76-6V56A8,8,0,0,0,227.32,48.75ZM216,71.6v40.65c-14,11.06-27,13.22-40,10.88V79.34A60.05,60.05,0,0,0,216,71.6Zm-56,3.76v43c-6.66-2.67-13.43-6-20.45-9.48-8.82-4.37-18-8.91-27.55-12.18v-43c6.66,2.66,13.43,6,20.45,9.48C141.27,67.55,150.46,72.09,160,75.36ZM96,48.91V92.69a60.06,60.06,0,0,0-40,7.75V59.78C70,48.72,83,46.57,96,48.91ZM86.58,152A60.06,60.06,0,0,0,56,160.43V119.78c14-11.06,27-13.22,40-10.88v43.8A65.61,65.61,0,0,0,86.58,152ZM112,156.67v-43c6.66,2.66,13.43,6,20.45,9.48,8.82,4.37,18,8.9,27.55,12.17v43c-6.66-2.67-13.43-6-20.45-9.48C130.73,164.47,121.54,159.94,112,156.67Zm64,26.45v-43.8a65.61,65.61,0,0,0,9.42.72A60.11,60.11,0,0,0,216,131.57v40.68C202,183.31,189,185.46,176,183.12Z"/></symbol>
+    <symbol id="i-restart" data-phosphor="arrow-counter-clockwise" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z"/></symbol>
+    <symbol id="i-rocket" data-phosphor="rocket-launch" viewBox="0 0 256 256"><path d="M223.85,47.12a16,16,0,0,0-15-15c-12.58-.75-44.73.4-71.41,27.07L132.69,64H74.36A15.91,15.91,0,0,0,63,68.68L28.7,103a16,16,0,0,0,9.07,27.16l38.47,5.37,44.21,44.21,5.37,38.49a15.94,15.94,0,0,0,10.78,12.92,16.11,16.11,0,0,0,5.1.83A15.91,15.91,0,0,0,153,227.3L187.32,193A15.91,15.91,0,0,0,192,181.64V123.31l4.77-4.77C223.45,91.86,224.6,59.71,223.85,47.12ZM74.36,80h42.33L77.16,119.52,40,114.34Zm74.41-9.45a76.65,76.65,0,0,1,59.11-22.47,76.46,76.46,0,0,1-22.42,59.16L128,164.68,91.32,128ZM176,181.64,141.67,216l-5.19-37.17L176,139.31Zm-74.16,9.5C97.34,201,82.29,224,40,224a8,8,0,0,1-8-8c0-42.29,23-57.34,32.86-61.85a8,8,0,0,1,6.64,14.56c-6.43,2.93-20.62,12.36-23.12,38.91,26.55-2.5,36-16.69,38.91-23.12a8,8,0,1,1,14.56,6.64Z"/></symbol>
+    <symbol id="i-mouse-left" data-phosphor="mouse-left-click" viewBox="0 0 256 256"><path d="M144,16H112A64.07,64.07,0,0,0,48,80v96a64.07,64.07,0,0,0,64,64h32a64.07,64.07,0,0,0,64-64V80A64.07,64.07,0,0,0,144,16Zm48,64v24H136V32h8A48.05,48.05,0,0,1,192,80Zm-76.69,24-46-46A48.49,48.49,0,0,1,80.51,43.82L120,83.31V104ZM64,80c0-1.51.08-3,.22-4.47L92.69,104H64Zm56-48V60.69L94.59,35.28A47.73,47.73,0,0,1,112,32Zm24,192H112a48.05,48.05,0,0,1-48-48V120H192v56A48.05,48.05,0,0,1,144,224Z"/></symbol>
+    <symbol id="i-prohibit" data-phosphor="prohibit" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm88,104a87.56,87.56,0,0,1-20.41,56.28L71.72,60.4A88,88,0,0,1,216,128ZM40,128A87.56,87.56,0,0,1,60.41,71.72L184.28,195.6A88,88,0,0,1,40,128Z"/></symbol>
+    <symbol id="i-close" data-phosphor="x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
   </defs></svg>
-  <canvas id="space" aria-label="3D-Weltraumflug mit Sternen und Raumschiffen"></canvas>
-  <canvas id="effects" aria-label="Mit Maus oder Touch lenken und zielen. Klicken oder gedrückt halten zum Lasern. Leertaste feuert den starken Laser; danach lädt er kurz auf."></canvas>
+  <canvas id="space" data-i18n-aria-label="spaceScene" aria-label="3D-Weltraumflug mit Sternen und Raumschiffen"></canvas>
+  <canvas id="effects" data-i18n-aria-label="controls" aria-label="Mit Maus oder Touch lenken und zielen. Klicken oder gedrückt halten zum Lasern. Leertaste feuert den starken Laser; danach lädt er kurz auf."></canvas>
   <div class="brand"><span>ORBIT RUSH</span><small>SPACE ARCADE</small></div>
-  <section id="intro" class="intro" aria-label="Spiel starten">
+  <section id="intro" class="intro" data-i18n-aria-label="startScreen" aria-label="Spiel starten">
     <svg class="intro-orbit" viewBox="0 0 800 600" aria-hidden="true">
       <ellipse cx="400" cy="300" rx="350" ry="175" stroke="#7effd518" stroke-width="1"/>
       <ellipse cx="400" cy="300" rx="350" ry="175" stroke="#7effd555" stroke-width="1.5" pathLength="100" stroke-dasharray="56 44" stroke-dashoffset="12"/>
     </svg>
     <div class="intro-card">
-      <h1>ORBIT<span>RUSH.</span></h1>
-      <button id="start" disabled>WELTRAUM WIRD GELADEN …</button>
-      <button id="silent-start" disabled>Ohne Ton starten</button>
+      <h1>ORBIT<span>RUSH</span></h1>
+      <button id="start" disabled><span id="start-label" data-i18n="loadingSpace">WELTRAUM WIRD GELADEN …</span><svg class="icon" aria-hidden="true"><use href="#i-rocket"/></svg></button>
+      <fieldset id="language" class="language-picker" data-i18n-aria-label="language" aria-label="Sprache" disabled>
+        <label><input type="radio" name="language" value="en"><span lang="en">English</span></label>
+        <label><input type="radio" name="language" value="de"><span lang="de">Deutsch</span></label>
+      </fieldset>
+      <button id="silent-start" data-i18n="silentStart" disabled>Ohne Ton starten</button>
     </div>
   </section>
-  <button id="audio-notice" hidden role="status"></button>
+  <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
   <div class="mission"><strong id="rank">ROOKIE PILOT</strong><br><span id="mission-progress">0 / 5 Abschüsse bis ACE PILOT</span></div>
   <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
-    <h2 id="control-hints-title">LASER FEUERN</h2>
-    <span id="control-input"><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label">LINKSKLICK</span></span>
+    <h2 id="control-hints-title" data-i18n="laserTitle">LASER FEUERN</h2>
+    <span id="control-input"><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="mouseClick">LINKSKLICK</span></span>
   </aside>
   <div id="flight-state"></div>
-  <div id="end-countdown" role="timer" aria-label="Level endet bald" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
+  <div id="end-countdown" role="timer" data-i18n-aria-label="levelEnding" aria-label="Level endet bald" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
   <div id="success-burst" hidden aria-hidden="true"><span style="--dx:-40vw;--dy:-30vh">✦</span><span style="--dx:-22vw;--dy:-42vh">✦</span><span style="--dx:22vw;--dy:-42vh">✦</span><span style="--dx:40vw;--dy:-30vh">✦</span><span style="--dx:44vw;--dy:5vh">✦</span><span style="--dx:35vw;--dy:35vh">✦</span><span style="--dx:18vw;--dy:43vh">✦</span><span style="--dx:-18vw;--dy:43vh">✦</span><span style="--dx:-35vw;--dy:35vh">✦</span><span style="--dx:-44vw;--dy:5vh">✦</span></div>
   <dialog id="pause-menu" aria-labelledby="pause-title">
     <svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>
-    <h2 id="pause-title">PAUSE</h2>
+    <h2 id="pause-title" data-i18n="pause">PAUSE</h2>
     <div class="pause-actions">
-      <button id="continue-flight" autofocus><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>WEITERFLIEGEN</span></button>
-      <button id="restart" aria-label="Neuer Run ab Level 1, Punkte zurücksetzen"><svg class="icon" aria-hidden="true"><use href="#i-restart"/></svg><span>NEUER RUN<small>Ab Level 1 · Punkte zurücksetzen</small></span></button>
+      <button id="continue-flight" autofocus><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span data-i18n="continueFlight">WEITERFLIEGEN</span></button>
+      <button id="restart" data-i18n-aria-label="restartLabel" aria-label="Neuer Run ab Level 1, Punkte zurücksetzen"><svg class="icon" aria-hidden="true"><use href="#i-restart"/></svg><span><span data-i18n="newRun">NEUER RUN</span><small data-i18n="restartDetail">Ab Level 1 · Punkte zurücksetzen</small></span></button>
     </div>
   </dialog>
   <dialog id="round-end" aria-labelledby="round-title">
     <div class="intro-card">
       <svg id="round-symbol" class="icon" aria-hidden="true"><use href="#i-trophy"/></svg>
-      <div id="round-outcome" class="eyebrow">FLUG ABGESCHLOSSEN</div>
-      <h2 id="round-title">Das war dein Run.</h2>
-      <span class="label">DEINE PUNKTE</span><strong id="final-score">0</strong>
-      <div id="new-record" hidden><svg class="icon" aria-hidden="true"><use href="#i-trophy"/></svg><span>NEUER HIGHSCORE!</span></div>
+      <div id="round-outcome" class="eyebrow" data-i18n="flightComplete">FLUG ABGESCHLOSSEN</div>
+      <h2 id="round-title" data-i18n="runEnded">Das war dein Run.</h2>
+      <span class="label" data-i18n="yourScore">DEINE PUNKTE</span><strong id="final-score">0</strong>
+      <div id="new-record" hidden><svg class="icon" aria-hidden="true"><use href="#i-trophy"/></svg><span data-i18n="newHighscore">NEUER HIGHSCORE!</span></div>
       <div id="retry-result" class="retry-lives" role="img" hidden><div class="retry-icons" aria-hidden="true"><span>🧑‍🚀</span><span>🧑‍🚀</span><span>🧑‍🚀</span></div></div>
-      <button id="play-again"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg><span>WEITERFLIEGEN</span></button>
-      <p id="round-reason">Neue Runde, neue Chance.</p>
+      <button id="play-again"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg><span data-i18n="continueFlight">WEITERFLIEGEN</span></button>
+      <p id="round-reason" data-i18n="newRound">Neue Runde, neue Chance.</p>
     </div>
   </dialog>
   <div id="flight-path" hidden aria-hidden="true"></div>
   <div id="danger-vignette" aria-hidden="true"></div>
-  <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span>ASTEROIDENSCHAUER</div>
-  <div id="collision-alert" hidden role="status">⚠ KOLLISIONSKURS · AUSWEICHEN!</div>
-  <div id="capital-hud" hidden><strong>LEVIATHAN DREADNOUGHT</strong><progress id="capital-health" max="30" value="30" aria-label="Panzerung des Leviathan"></progress><span id="capital-state"></span></div>
+  <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span><span data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span></div>
+  <div id="collision-alert" data-i18n="collisionWarning" hidden role="status">⚠ KOLLISIONSKURS · AUSWEICHEN!</div>
+  <div id="capital-hud" hidden><strong>LEVIATHAN DREADNOUGHT</strong><progress id="capital-health" max="60" value="60" data-i18n-aria-label="capitalArmor" aria-label="Panzerung des Leviathan"></progress><span id="capital-state"></span></div>
   <div id="shield-hit" hidden aria-hidden="true"></div>
   <canvas id="crash-fire" hidden aria-hidden="true"></canvas>
-  <div id="impact-label" hidden role="status">KOLLISION</div>
+  <div id="impact-label" data-i18n="collision" hidden role="status">KOLLISION</div>
   <div id="hit-cross" aria-hidden="true"></div>
   <div class="reticle">
-    <svg class="weapon-ring" viewBox="0 0 48 48" role="progressbar" aria-label="Laserenergie" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="cooldown-track" cx="24" cy="24" r="21"/><circle class="cooldown-fill" cx="24" cy="24" r="21" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>
-    <svg class="weapon-lock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m5 5 14 14"/></svg>
-    <progress id="heavy-energy" max="1" value="1" aria-label="Schwerlaser-Ladung" hidden></progress>
+    <svg class="weapon-ring" viewBox="0 0 48 48" role="progressbar" data-i18n-aria-label="laserEnergy" aria-label="Laserenergie" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="cooldown-track" cx="24" cy="24" r="21"/><circle class="cooldown-fill" cx="24" cy="24" r="21" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>
+    <svg class="weapon-lock" aria-hidden="true"><use href="#i-prohibit"/></svg>
+    <progress id="heavy-energy" max="1" value="1" data-i18n-aria-label="powerCharge" aria-label="Schwerlaser-Ladung" hidden></progress>
   </div>
   <div id="target" hidden aria-hidden="true"><div class="target-brackets"><i></i><i></i><i></i><i></i></div><span id="target-name"></span><div class="health"><i></i><i></i><i></i></div></div>
   <div id="flash" aria-hidden="true"></div>
   <header class="hud">
     <div class="score-panel">
-    <div class="scoreboard" aria-label="Punktestand">
+    <div class="scoreboard" data-i18n-aria-label="scoreboard" aria-label="Punktestand">
       <div>
-        <span class="label">Score</span><span id="score" class="number">000000</span>
-        <div class="personal-best"><span class="label">Highscore</span><span id="best">000000</span></div>
+        <span class="label" data-i18n="score">Score</span><span id="score" class="number">000000</span>
+        <div class="personal-best"><span class="label" data-i18n="highscore">Highscore</span><span id="best">000000</span></div>
       </div>
       <div id="level-panel">
-        <span class="label">Level</span><span id="level-label" class="number">1</span>
+        <span class="label" data-i18n="level">Level</span><span id="level-label" class="number">1</span>
         <div id="retry-hud" class="retry-lives" role="img" aria-label="3 von 3 Leben übrig"><div class="retry-icons" aria-hidden="true"><span>🧑‍🚀</span><span>🧑‍🚀</span><span>🧑‍🚀</span></div></div>
       </div>
-      <div id="round-clock" aria-label="Verbleibende Spielzeit"><span class="label">Zeit</span><span id="performance-hud" aria-live="off" hidden title="Gerenderte Bilder pro Sekunde und mittlere Framezeit, gemittelt über etwa eine Sekunde. Keine Simulationsrate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" aria-label="Levelfortschritt" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
+      <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Verbleibende Spielzeit"><span class="label" data-i18n="time">Zeit</span><span id="performance-hud" aria-live="off" hidden data-i18n-title="frameStats" title="Gerenderte Bilder pro Sekunde und mittlere Framezeit, gemittelt über etwa eine Sekunde. Keine Simulationsrate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Levelfortschritt" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
     </div>
     </div>
     <div class="hud-right">
-      <div class="hud-actions" role="group" aria-label="Ton und Spielsteuerung">
-        <button id="sound" aria-label="Ton ausschalten" title="Ton ausschalten" aria-pressed="true"><svg class="icon audible" aria-hidden="true"><use href="#i-volume"/></svg><svg class="icon muted" aria-hidden="true"><use href="#i-muted"/></svg></button>
-        <button id="pause" aria-label="Flug pausieren" title="Flug pausieren" aria-pressed="false" aria-haspopup="dialog" aria-controls="pause-menu"><svg class="icon pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="icon play" aria-hidden="true"><use href="#i-play"/></svg></button>
-        <button id="fullscreen" aria-label="Vollbild aktivieren" title="Vollbild aktivieren" aria-pressed="false" hidden><svg class="icon enter-fullscreen" aria-hidden="true"><use href="#i-fullscreen"/></svg><svg class="icon exit-fullscreen" aria-hidden="true"><use href="#i-exit-fullscreen"/></svg></button>
+      <div class="hud-actions" role="group" data-i18n-aria-label="gameControls" aria-label="Ton und Spielsteuerung">
+        <button id="sound" data-i18n-aria-label="soundOff" aria-label="Ton ausschalten" data-i18n-title="soundOff" title="Ton ausschalten" aria-pressed="true"><svg class="icon audible" aria-hidden="true"><use href="#i-volume"/></svg><svg class="icon muted" aria-hidden="true"><use href="#i-muted"/></svg></button>
+        <button id="pause" data-i18n-aria-label="pauseFlight" aria-label="Flug pausieren" data-i18n-title="pauseFlight" title="Flug pausieren" aria-pressed="false" aria-haspopup="dialog" aria-controls="pause-menu"><svg class="icon pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="icon play" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button id="fullscreen" data-i18n-aria-label="enterFullscreen" aria-label="Vollbild aktivieren" data-i18n-title="enterFullscreen" title="Vollbild aktivieren" aria-pressed="false" hidden><svg class="icon enter-fullscreen" aria-hidden="true"><use href="#i-fullscreen"/></svg><svg class="icon exit-fullscreen" aria-hidden="true"><use href="#i-exit-fullscreen"/></svg></button>
       </div>
     </div>
   </header>
-  <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" aria-label="Schiffsschild"></progress><span id="shield-value" aria-hidden="true">100%</span></div>
-  <div id="repair-marker" hidden aria-label="Schildreparatur einsammeln">✚ +25</div>
+  <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Schiffsschild"></progress><span id="shield-value" aria-hidden="true">100%</span></div>
+  <div id="repair-marker" hidden data-i18n-aria-label="collectRepair" aria-label="Schildreparatur einsammeln">✚ +25</div>
   <div id="repair-notice" hidden role="status"></div>
   <div id="feedback" aria-live="polite"></div>
-  <a class="credits" href="#audio-credits">Audio-Credits</a>
-  <dialog id="audio-credits"><form method="dialog"><button aria-label="Schließen">×</button></form><h2>Audio-Credits</h2><p>Laser, Leermagazin-Klick, Treffer und Explosionen: <a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe.</p><p>Combo-Sound und Kollisionsalarm: <a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>. Combo-Datei unverändert. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.</p><p>Musik: <a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a> (Lautstärke angeglichen, Höhen leicht abgesenkt), <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p></dialog>
+  <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio-Credits</a>
+  <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><span data-i18n="creditsEffects">Laser, Leermagazin-Klick, Treffer und Explosionen: </span><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a><span data-i18n="creditsEffectsChanges">. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe.</span></p><p><span data-i18n="creditsCombo">Combo-Sound und Kollisionsalarm: </span><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Combo-Datei unverändert. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.</span></p><p><span data-i18n="creditsMusic">Musik: </span><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a><span data-i18n="creditsMusicChanges"> (Lautstärke angeglichen, Höhen leicht abgesenkt), </span><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p></dialog>
   <div id="status" role="status"></div>
   <script type="module">
+    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js';
+
+    setLanguage(detectLanguage(navigator.languages?.[0] || navigator.language));
+    applyTranslations();
+    const languagePicker = document.querySelector('#language');
+    languagePicker.querySelector(`input[value="${language}"]`).checked = true;
     const status = document.querySelector('#status');
     try {
       const THREE = await import('./assets/vendor/three.module.js');
@@ -371,7 +395,8 @@
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
       const scene = new THREE.Scene();
       scene.background = new THREE.Color('#030711');
-      scene.fog = new THREE.FogExp2('#030711', .00065);
+      // A clearer showcase keeps the full-size distant ships readable on the menu.
+      scene.fog = new THREE.FogExp2('#030711', .0003);
       const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .03, 14000);
       scene.add(new THREE.HemisphereLight(0xadcaff, 0x32205c, 3));
       const sun = new THREE.DirectionalLight(0xffddc4, 3);
@@ -609,17 +634,17 @@
       sweptGeometry.rotateX(Math.PI / 2);
       let level = 1, levelPressure = 0, retries = 3;
       const shipTypes = [
-        { name: 'INTERCEPTOR', scale: 1.6, radius: 13, health: 3, points: 100, color: 0x8ea9c7, glow: 0x49dfff },
-        { name: 'NOVA SAUCER', scale: 3.4, radius: 15.5, health: 4, points: 200, color: 0x9877bd, glow: 0xcb7dff },
-        { name: 'TITAN CARRIER', scale: 5, radius: 18, health: 5, points: 350, color: 0x5b7880, glow: 0xffb35b },
-        { name: 'ASTEROID', asteroid: true, scale: 3.2, radius: 16.5, health: 1, points: 600, color: 0xb6ada0, glow: 0x000000 },
-        { name: 'LEVIATHAN DREADNOUGHT', capital: true, scale: 6, radius: 85, health: 30, points: 5000, color: 0x83909e, glow: 0xff4455 }
+        { name: 'INTERCEPTOR', scale: 1.6, radius: 13, health: 3, points: 400, color: 0x8ea9c7, glow: 0x49dfff },
+        { name: 'NOVA SAUCER', scale: 3.4, radius: 15.5, health: 4, points: 600, color: 0x9877bd, glow: 0xcb7dff },
+        { name: 'TITAN CARRIER', scale: 5, radius: 18, health: 5, points: 900, color: 0x5b7880, glow: 0xffb35b },
+        { name: 'ASTEROID', asteroid: true, scale: 3.2, radius: 16.5, health: 1, points: 100, color: 0xb6ada0, glow: 0x000000 },
+        { name: 'LEVIATHAN DREADNOUGHT', capital: true, scale: 6, radius: 85, health: 60, points: 10000, color: 0x83909e, glow: 0xff4455 }
       ];
       const ships = [];
       function fadeAsteroidShader(shader) {
         shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
           // Fog alone still draws an opaque dark silhouette over the stars.
-          diffuseColor.a *= 1.0 - smoothstep(2600.0, 3600.0, length(vViewPosition));
+          diffuseColor.a *= 1.0 - smoothstep(${reducedMotion ? '400.0, 700.0' : '2600.0, 3600.0'}, length(vViewPosition));
           if (diffuseColor.a < 0.003) discard;
         `);
       }
@@ -729,9 +754,8 @@
         data.height = direction.dot(data.courseUp) * clearance;
       }
       function asteroidArrivalDistance(rock) {
-        // Small threats keep their cadence; larger silhouettes need more room to appear.
-        if (rock.userData.asteroidTier === 1) return 0;
-        return rock.userData.type.radius * rock.scale.x * (reducedMotion ? 14 : 36);
+        // Every size starts beyond the shader's fully invisible boundary, including its hull.
+        return (reducedMotion ? 900 : 3800) + rock.userData.type.radius * rock.scale.x;
       }
       function resetShip(ship, initial = false, formationSlot = ship.userData.slot, maxAsteroidTier = 3) {
         ship.userData.spawn += 1;
@@ -752,7 +776,7 @@
         // Still/slow rocks stay off-axis; close asteroid passes get a crossing course below.
         const radius = ship.userData.type.asteroid ? random(100, 260)
           : closeApproach ? random(0, 35) : random(80, 260);
-        // Keep small arrivals close; finish blending larger rocks while still distant.
+        // Finish the spawn blend beyond the distance fade, never in the nearby flight path.
         let depth = initial ? -550 - formationSlot * 180
           : -(500 + flightMotion.length() * .85 * random(1.3, 1.8));
         if (!initial) {
@@ -1139,23 +1163,28 @@
       for (let i = 0; i < 8; i++) createShip(i);
 
       // Reuse one ship of each type for the intro; gameplay unlocks the fleet gradually.
+      createShip(ships.length, 4);
       const introFormation = [
-        { x: -.64, y: .28, mobileX: -.55, mobileY: .60, depth: 360, yaw: .35, pitch: .70 },
-        { x: .65, y: .30, mobileX: .55, mobileY: .47, depth: 460, yaw: .35, pitch: .45 },
-        { x: .60, y: -.48, mobileX: .26, mobileY: -.64, depth: 620, yaw: .70, pitch: .45 }
+        { ship: ships[0], x: -.64, y: .28, mobileX: -.55, mobileY: .60, depth: 360, yaw: .35, pitch: .70 },
+        { ship: ships[1], x: .65, y: .30, mobileX: .50, mobileY: .76, depth: 460, yaw: .35, pitch: .45, mobilePitch: .75 },
+        { ship: ships[2], x: .58, y: -.48, mobileX: .40, mobileY: .48, depth: 620, mobileDepth: 750, yaw: .70, pitch: .45, mobilePitch: .9 },
+        { ship: ships[8], x: -.50, y: -.40, mobileX: -.15, mobileY: -.57, depth: 1450, mobileDepth: 2100, yaw: -.55, pitch: .35 }
       ];
       let introTime = 0;
-      ships.forEach((ship, index) => { ship.visible = index < introFormation.length; });
+      ships.forEach(ship => { ship.visible = introFormation.some(placement => placement.ship === ship); });
       function updateIntroShips(time) {
-        const compact = innerWidth < 600;
+        const compact = innerWidth < 600 || camera.aspect < 1.2;
         introFormation.forEach((placement, index) => {
-          const ship = ships[index];
-          const depth = placement.depth + Math.sin(time * .1 + index) * 18;
+          const ship = placement.ship;
+          // Preserve gameplay proportions; frame the fleet with distance, not per-ship resizing.
+          ship.scale.setScalar(ship.userData.type.scale);
+          const depth = (compact && placement.mobileDepth ? placement.mobileDepth : placement.depth) + Math.sin(time * .1 + index) * 18;
           const halfHeight = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * depth;
           const x = (compact ? placement.mobileX : placement.x) + Math.sin(time * .16 + index * 2.1) * .10;
           const y = (compact ? placement.mobileY : placement.y) + Math.sin(time * .13 + index) * .055;
           ship.position.set(x * halfHeight * camera.aspect, y * halfHeight, -depth);
-          ship.rotation.set(placement.pitch + Math.sin(time * .12 + index) * .08,
+          const pitch = compact ? (placement.mobilePitch ?? placement.pitch) : placement.pitch;
+          ship.rotation.set(pitch + Math.sin(time * .12 + index) * .08,
             placement.yaw + Math.sin(time * .1 + index) * .12,
             Math.sin(time * .14 + index * 2) * .14);
         });
@@ -1335,8 +1364,8 @@
       function resetFrameStats() {
         if (!frameStatsEnabled) return;
         lastRenderTime = null; frameSampleTime = 0; frameSampleCount = 0;
-        const label = document.hidden ? 'INAKTIV' : !started ? 'BEREIT' : crashing ? 'KOLLISION'
-          : roundEnded ? 'ENDE' : paused ? 'PAUSE' : '— FPS · — ms';
+        const label = document.hidden ? t('inactive') : !started ? t('ready') : crashing ? t('collision')
+          : roundEnded ? t('ended') : paused ? t('pause') : '— FPS · — ms';
         if (performanceHud.textContent !== label) performanceHud.textContent = label;
       }
       function updateFrameStats(time) {
@@ -1400,7 +1429,7 @@
         return reducedMotion ? 35 + levelPressure * 10 + (8 + levelPressure * 15) * progress
           : 1.15 * (180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(progress, 1.6));
       }
-      let capitalShip = null, capitalPending = false;
+      let capitalShip = ships.find(ship => ship.userData.type.capital) || null, capitalPending = false;
       const capitalHud = document.querySelector('#capital-hud');
       const capitalHealth = document.querySelector('#capital-health');
       const capitalState = document.querySelector('#capital-state');
@@ -1413,6 +1442,7 @@
       let showerObstacleSpacing = 800, nextShowerObstacle = Infinity;
       const showerOrigin = new THREE.Vector3();
       const showerDirection = new THREE.Vector3();
+      const showerVelocity = new THREE.Vector3();
       const showerRotation = new THREE.Quaternion();
       let showerShape = 0, showerBend = 0;
       function corridorCenter(distance) {
@@ -1530,7 +1560,8 @@
         showerInverse.copy(showerRotation).invert();
         showerQueryStart.copy(camera.position).sub(showerOrigin).applyQuaternion(showerInverse);
         // Notice nearby rocks before contact, even at low frame rates; do not scan the full field.
-        const reach = Math.max(350, flightMotion.length() * .85 * .3 + playerHullRadius);
+        const relativeSpeed = showerRockFuture.copy(flightMotion).multiplyScalar(-.85).add(showerVelocity).length();
+        const reach = Math.max(350, relativeSpeed * .3 + playerHullRadius);
         showerGrit.updateMatrixWorld(true);
         for (const rock of nearbyShowerRocks(showerQueryStart, showerQueryStart, reach)) {
           if (rock.seen) continue;
@@ -1543,7 +1574,8 @@
         if (!started || paused || roundEnded || crashing || !showerCorridor || !showerGrit.visible) return false;
         showerInverse.copy(showerRotation).invert();
         showerQueryStart.copy(camera.position).sub(showerPreviousOrigin).applyQuaternion(showerInverse);
-        showerQueryEnd.copy(camera.position).sub(showerOrigin).addScaledVector(flightMotion, .85 * 1.6).applyQuaternion(showerInverse);
+        showerQueryEnd.copy(camera.position).sub(showerOrigin).addScaledVector(flightMotion, .85 * 1.6)
+          .addScaledVector(showerVelocity, -1.6).applyQuaternion(showerInverse);
         let danger = false, damaged = false;
         // Include the largest stretched boulder, even if its center is outside the flight path.
         for (const rock of nearbyShowerRocks(showerQueryStart, showerQueryEnd, playerHullRadius + maxShowerGritSize * 1.7 + 8)) {
@@ -1556,7 +1588,7 @@
             damaged = true;
             if (crashing) break;
           }
-          showerRockFuture.copy(collider.position).addScaledVector(flightMotion, -.85 * 1.6);
+          showerRockFuture.copy(collider.position).addScaledVector(flightMotion, -.85 * 1.6).addScaledVector(showerVelocity, 1.6);
           if (!danger && !rock.hit && crossesPlayer(collider, collider.position, showerRockFuture, 8)) danger = true;
           if (danger && damaged) break;
         }
@@ -1620,7 +1652,7 @@
         showerGrit.visible = false;
         showerRocks.length = 0; showerRockCells.clear();
         showerWarning.innerHTML = '<span aria-hidden="true">' + '☄️ '.repeat(showerStrength + 1)
-          + '</span>' + (showerCorridor ? 'ASTEROIDENRING · KORRIDOR' : 'ASTEROIDENSCHAUER');
+          + '</span>' + t(showerCorridor ? 'asteroidCorridor' : 'asteroidShower');
         showerWarning.hidden = true;
       }
       function forecastFlightPosition(position, steps) {
@@ -1654,8 +1686,11 @@
           hazardPool.push(rock);
         }
         resetShip(rock, false, rock.userData.slot, reducedMotion ? 1 : 3);
+        // Forecasting can slow an over-speed flight down; do not use that transient speed
+        // to shorten the lead and accidentally place the rock inside the visible field.
+        const approachSpeed = Math.min(-flightMotion.z, cruise) * .85;
         const approachSteps = Math.ceil(Math.max(hazardApproach,
-          asteroidArrivalDistance(rock) / (-flightMotion.z * .85)) / simulationStep);
+          (asteroidArrivalDistance(rock) + flightMotion.length() * .85 * .3) / approachSpeed) / simulationStep);
         const approachTime = approachSteps * simulationStep;
         rock.userData.approachTime = approachTime;
         forecastFlightPosition(rock.position, approachSteps);
@@ -1677,27 +1712,47 @@
         }
         resetShip(rock, false);
         rock.userData.corridorObstacle = false;
-        if (!showerCorridor && Math.random() < .75) {
-          // Free showers drift independently in 3D, fixed to the field's original heading.
-          rock.userData.courseVelocity.set(random(-12, 12), random(-8, 8), random(-5, 5))
-            .multiplyScalar(reducedMotion ? .25 : 1).applyQuaternion(showerRotation);
-        }
+        // Free showers share a stream; the fixed corridor has zero intrinsic velocity.
+        // Copy on every reuse so former rain rocks cannot keep drifting through its gap.
+        rock.userData.courseVelocity.copy(showerVelocity);
+        if (!showerCorridor) rock.userData.courseVelocity.multiplyScalar(random(.9, 1.1));
         return rock;
       }
-      function advanceAsteroidShower() {
+      function advanceAsteroidShower(dt) {
         const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
         if (showerPending) {
           showerPending = false;
           showerRotation.setFromEuler(flightOrientation);
           showerDirection.set(0, 0, -1).applyQuaternion(showerRotation);
-          const approachSpeed = flightMotion.length() * .85;
+          showerVelocity.set(0, 0, 0);
+          const crossingOffset = new THREE.Vector3();
+          let approachSpeed = flightMotion.length() * .85;
+          // The corridor stays a fixed passage; only free showers become directional rain.
+          if (!showerCorridor) {
+            // Front-left/right dominate (80%); the rest approach ahead, slightly above/below.
+            const roll = random(0, 1);
+            const course = roll < .4 ? 0 : roll < .8 ? 1 : roll < .9 ? 2 : 3;
+            if (course < 2) showerVelocity.set(course === 0 ? -1 : 1, random(-.15, .15), random(.4, .7));
+            else showerVelocity.set(0, course === 2 ? .2 : -.2, 1); // About 11° off a frontal approach.
+            // Keep shallow variants near the forward view instead of using the full sideways offset.
+            crossingOffset.set(showerVelocity.x, showerVelocity.y, 0);
+            if (course < 2) crossingOffset.normalize();
+            crossingOffset.multiplyScalar(reducedMotion ? 200 : 600).applyQuaternion(showerRotation);
+            showerVelocity.normalize().multiplyScalar(Math.max(reducedMotion ? 50 : 220, flightMotion.length() * .85 * .9))
+              .applyQuaternion(showerRotation);
+            // Lay the stream upstream so it reaches the view instead of drifting off-screen.
+            showerDirection.copy(flightMotion).multiplyScalar(.85).sub(showerVelocity);
+            approachSpeed = showerDirection.length();
+            showerDirection.normalize();
+            showerRotation.setFromUnitVectors(new THREE.Vector3(0, 0, -1), showerDirection);
+          }
           // Start beyond the distance fade; the field gradually emerges from the sky.
-          const lead = Math.max(reducedMotion ? 700 : 3800, approachSpeed * 5.5);
+          const lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5) + crossingOffset.length();
           showerLength = Math.max(900, approachSpeed * (showerEnd - showerStart));
           showerSpacing = showerCorridor ? Math.max(160, approachSpeed * [1.15, .9, .7][showerStrength])
             : Math.max(120, approachSpeed * [2.5, 1.4, .85][showerStrength]);
           // Leave room for all approach slices, including spacing jitter and gap obstacles.
-          showerSpacing = Math.max(showerSpacing, (lead + 200) * (count + 1) / (maxShowerRocks * .75));
+          showerSpacing = Math.max(showerSpacing, (Math.min(lead, showerLength) + 200) * (count + 1) / (maxShowerRocks * .75));
           showerObstacleSpacing = Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][showerStrength]));
           nextShowerObstacle = showerSpacing; // Keep the entry clear before the first obstacle.
           // A third narrower, while retaining the minimum 54-unit hull-clear passage.
@@ -1705,14 +1760,14 @@
           showerBend *= showerHalfGap;
           // Fixed-width core plus a sparse fringe, never scaled to the viewport.
           showerHalfWidth = showerCorridor ? 900 : 650;
-          showerOrigin.copy(camera.position).addScaledVector(showerDirection, lead);
+          showerOrigin.copy(camera.position).add(crossingOffset).addScaledVector(showerDirection, lead);
           showerPreviousOrigin.copy(showerOrigin);
           seedShowerGrit();
         } else {
-          // Stay in the world: the field does not follow our steering.
+          // Move the instanced backdrop and its collision geometry with the same stream.
           showerPreviousOrigin.copy(showerOrigin);
-          showerOrigin.addScaledVector(worldStep, .85);
-          showerTravel -= worldStep.dot(showerDirection) * .85;
+          showerOrigin.addScaledVector(worldStep, .85).addScaledVector(showerVelocity, dt);
+          showerTravel -= worldStep.dot(showerDirection) * .85 + showerVelocity.dot(showerDirection) * dt;
         }
         showerGrit.position.copy(showerOrigin);
         showerGritMaterial.opacity = THREE.MathUtils.smoothstep(gameTime - showerStart, 0, .3);
@@ -1765,10 +1820,10 @@
           nextShowerSlice += showerSpacing * random(.8, 1.2);
         }
       }
-      function updateAsteroidShower() {
+      function updateAsteroidShower(dt = 0) {
         showerWarning.hidden = paused || roundEnded || !started || gameTime < showerStart - 2 || gameTime > showerStart + 4;
         if (!started || paused || roundEnded) return;
-        if (gameTime >= showerStart) advanceAsteroidShower();
+        if (gameTime >= showerStart) advanceAsteroidShower(dt);
       }
       function queueShip(ship) {
         ship.visible = false;
@@ -1812,8 +1867,8 @@
           }
         }
       }
-      function updateShipArrivals() {
-        updateAsteroidShower();
+      function updateShipArrivals(dt = 0) {
+        updateAsteroidShower(dt);
         // Existing ships and fields keep moving; only reinforcements take a breather.
         if (!started || paused || roundEnded || crashing || encounterRest()) return;
         updateCollisionHazard();
@@ -1830,14 +1885,14 @@
       function updateRetries() {
         for (const id of ['retry-hud', 'retry-result']) {
           const indicator = document.getElementById(id);
-          indicator.setAttribute('aria-label', `${retries} von 3 Leben übrig`);
+          indicator.setAttribute('aria-label', t('lives', { count: retries }));
           indicator.querySelectorAll('.retry-icons span').forEach((icon, index) => icon.classList.toggle('spent', index >= retries));
         }
         document.querySelector('#retry-result').hidden = !roundEnded;
       }
       function updateRank() {
         document.querySelector('#rank').textContent = kills >= 15 ? 'ORBIT LEGEND' : kills >= 5 ? 'ACE PILOT' : 'ROOKIE PILOT';
-        document.querySelector('#mission-progress').textContent = kills >= 15 ? `${kills} Abschüsse · Weiter zum Rekord!` : `${kills} / ${kills >= 5 ? 15 : 5} Abschüsse bis ${kills >= 5 ? 'ORBIT LEGEND' : 'ACE PILOT'}`;
+        document.querySelector('#mission-progress').textContent = kills >= 15 ? t('rankRecord', { kills }) : t('rankProgress', { kills, target: kills >= 5 ? 15 : 5, rank: kills >= 5 ? 'ORBIT LEGEND' : 'ACE PILOT' });
       }
       let roundEnded = false, difficulty = 0;
       let celebrating = false;
@@ -1903,7 +1958,7 @@
           shield += restored;
           updateShield();
           repairPickup.visible = false;
-          repairNotice.textContent = '+' + restored + ' SCHILD';
+          repairNotice.textContent = t('repaired', { amount: restored });
           repairNoticeUntil = gameTime + 1.5;
           repairNotice.hidden = false;
           playSound('reward');
@@ -1966,7 +2021,8 @@
         kills += 1;
         updateRank();
         lastKill = gameTime;
-        const points = ship.userData.type.points * combo;
+        const basePoints = ship.userData.type.points * (ship.userData.type.asteroid ? ship.userData.asteroidTier : 1);
+        const points = basePoints * combo;
         score += points;
         if (score > best) {
           best = score;
@@ -1987,7 +2043,7 @@
       function audioError(error) {
         console.error(error);
         audioNotice.hidden = false;
-        audioNotice.textContent = 'Ton konnte nicht starten. Hier klicken zum erneuten Versuch.';
+        audioNotice.textContent = t('audioError');
       }
       function syncMusic() {
         sound.setPaused(paused || !started || document.hidden);
@@ -2001,18 +2057,22 @@
           });
         }
         const button = document.querySelector('#start');
+        const label = document.querySelector('#start-label');
         button.disabled = true;
-        button.textContent = 'SOUNDS WERDEN GELADEN …';
+        languagePicker.disabled = true;
+        label.dataset.i18n = 'loadingAudio';
+        label.textContent = t('loadingAudio');
         try {
           if (withSound) await sound.initAudio();
           soundEnabled = withSound;
           document.querySelector('#sound').setAttribute('aria-pressed', String(withSound));
-          document.querySelector('#sound').setAttribute('aria-label', withSound ? 'Ton ausschalten' : 'Ton einschalten');
-          document.querySelector('#sound').title = withSound ? 'Ton ausschalten' : 'Ton einschalten';
+          document.querySelector('#sound').setAttribute('aria-label', t(withSound ? 'soundOff' : 'soundOn'));
+          document.querySelector('#sound').title = t(withSound ? 'soundOff' : 'soundOn');
           // Start at the gameplay FOV: widening it over the first frames looks like reversing.
           camera.fov = reducedMotion ? 70 : 90;
           camera.updateProjectionMatrix();
           started = true; paused = false;
+          scene.fog.density = .00065;
           setupLevelFleet();
           resetSimulationClock();
           if (lastPointerPosition) steer(lastPointerPosition);
@@ -2024,9 +2084,10 @@
           document.activeElement.blur();
         } catch (error) {
           audioError(error);
-          button.textContent = 'ERNEUT STARTEN';
+          label.dataset.i18n = 'retryStart';
+          label.textContent = t('retryStart');
           document.querySelector('#silent-start').disabled = false;
-        } finally { button.disabled = false; }
+        } finally { button.disabled = false; languagePicker.disabled = false; }
       }
       document.querySelector('#start').addEventListener('click', () => startGame());
       document.querySelector('#silent-start').addEventListener('click', () => startGame(false));
@@ -2045,8 +2106,8 @@
           catch (error) { audioError(error); soundEnabled = false; }
         }
         button.setAttribute('aria-pressed', String(soundEnabled));
-        button.setAttribute('aria-label', soundEnabled ? 'Ton ausschalten' : 'Ton einschalten');
-        button.title = soundEnabled ? 'Ton ausschalten' : 'Ton einschalten';
+        button.setAttribute('aria-label', t(soundEnabled ? 'soundOff' : 'soundOn'));
+        button.title = t(soundEnabled ? 'soundOff' : 'soundOn');
         syncMusic();
       });
       document.querySelector('.credits').addEventListener('click', event => {
@@ -2072,14 +2133,14 @@
         endCountdown.hidden = !countingDown;
         if (countingDown) {
           document.querySelector('#countdown-number').textContent = remaining;
-          endCountdown.setAttribute('aria-label', `Noch ${remaining} Sekunden bis zum Levelabschluss`);
+          endCountdown.setAttribute('aria-label', t('countdown', { seconds: remaining }));
           endCountdown.querySelectorAll('i').forEach((dot, index) => dot.classList.toggle('spent', index < 5 - remaining));
           if (remaining !== lastCountdownSecond) sound.playCountdownTick();
         }
         lastCountdownSecond = remaining;
         levelProgressFill.style.transform = `scaleX(${elapsed / roundDuration})`;
         levelProgress.setAttribute('aria-valuenow', elapsed.toFixed(1));
-        levelProgress.setAttribute('aria-valuetext', `${Math.round(elapsed / roundDuration * 100)} Prozent abgeschlossen`);
+        levelProgress.setAttribute('aria-valuetext', t('progress', { percent: Math.round(elapsed / roundDuration * 100) }));
       }
       function startCrash(ship) {
         if (crashing || roundEnded) return;
@@ -2102,7 +2163,7 @@
         endCountdown.hidden = true;
         feedback.classList.remove('pop');
         clearTargetLock();
-        document.querySelector('#impact-label').textContent = ship.userData.enemyBolt ? 'BESCHUSS' : 'KOLLISION';
+        document.querySelector('#impact-label').textContent = t(ship.userData.enemyBolt ? 'incomingFire' : 'collision');
         document.querySelector('#impact-label').hidden = false;
         document.querySelector('#flash').classList.add('impact');
         camera.updateMatrixWorld();
@@ -2124,15 +2185,14 @@
         const outcome = crashed ? (retries > 0 ? 'retry' : 'gameover') : 'victory';
         roundDialog.dataset.outcome = outcome;
         document.querySelector('#round-symbol use').setAttribute('href', crashed ? (retries > 0 ? '#i-heart-broken' : '#i-stop') : '#i-trophy');
-        document.querySelector('#round-outcome').textContent = `LEVEL ${level}`;
-        document.querySelector('#round-title').textContent = crashed ? (retries > 0 ? 'LEBEN VERLOREN' : 'GAME OVER') : 'LEVEL GESCHAFFT';
+        document.querySelector('#round-outcome').textContent = t('levelNumber', { level });
+        document.querySelector('#round-title').textContent = t(crashed ? (retries > 0 ? 'lifeLost' : 'gameOver') : 'levelComplete');
         document.querySelector('#play-again use').setAttribute('href', crashed ? (retries > 0 ? '#i-restart' : '#i-play') : '#i-next');
         document.querySelector('#play-again span').textContent = crashed
-          ? (retries > 0 ? `LEVEL ${level} NOCHMAL` : 'NEUER RUN · LEVEL 1')
-          : `WEITER ZU LEVEL ${level + 1}`;
-        document.querySelector('#round-reason').textContent = crashed
-          ? (retries > 0 ? 'Gleiches Level. Punkte und Abschüsse wie zu Levelbeginn.' : 'Alle drei Leben sind verbraucht. Zurück zu Level 1.')
-          : 'Sicher angekommen. Weiter ins nächste Level!';
+          ? (retries > 0 ? t('retryLevel', { level }) : t('newRunLevel'))
+          : t('nextLevel', { level: level + 1 });
+        document.querySelector('#round-reason').textContent = t(crashed
+          ? (retries > 0 ? 'retryReason' : 'gameOverReason') : 'victoryReason');
         collisionAlert.hidden = true;
         flightPath.hidden = true;
         dangerVignette.style.opacity = 0;
@@ -2169,7 +2229,7 @@
         shotFlashUntil = 0; emptyFlashUntil = 0;
         updateWeaponHud();
         if (celebrating) ships.forEach(ship => { ship.visible = false; });
-        document.querySelector('#final-score').textContent = score.toLocaleString('de-DE');
+        document.querySelector('#final-score').textContent = score.toLocaleString(language);
         document.querySelector('#new-record').hidden = !(score > bestAtLevelStart && score >= best);
         syncMusic();
         roundDialog.show();
@@ -2207,8 +2267,8 @@
         if (roundDialog.open) roundDialog.close();
         if (pauseMenu.open) pauseMenu.close();
         document.querySelector('#pause').setAttribute('aria-pressed', 'false');
-        document.querySelector('#pause').setAttribute('aria-label', 'Flug pausieren');
-        document.querySelector('#pause').title = 'Flug pausieren';
+        document.querySelector('#pause').setAttribute('aria-label', t('pauseFlight'));
+        document.querySelector('#pause').title = t('pauseFlight');
         sound.resumeAudio().catch(audioError);
         syncMusic();
         updateRank();
@@ -2393,8 +2453,8 @@
         heavyEnergyBar.hidden = heavyEnergy === 1;
         heavyEnergyBar.value = heavyEnergy;
         heavyEnergyBar.setAttribute('aria-valuetext', heavyEnergy < 1
-          ? `Lädt auf: ${Math.round(heavyEnergy * 100)} Prozent`
-          : 'Schwerlaser bereit');
+          ? t('recharging', { percent: Math.round(heavyEnergy * 100) })
+          : t('powerReady'));
       }
       let lastShot = -Infinity;
       let weaponHeat = 0, overheated = false, lastHeatShot = -Infinity;
@@ -2417,7 +2477,7 @@
         cooldownFill.setAttribute('stroke-dashoffset', weaponHeat.toFixed(2));
         reticle.classList.toggle('overheated', overheated);
         energyRing.setAttribute('aria-valuenow', String(energy));
-        energyRing.setAttribute('aria-valuetext', overheated ? `Überhitzt. Lädt auf: ${energy} Prozent` : `${energy} Prozent Laserenergie`);
+        energyRing.setAttribute('aria-valuetext', t(overheated ? 'overheated' : 'energyPercent', { percent: energy }));
       }
       const targetMarker = document.querySelector('#target');
       const targetHealth = targetMarker.querySelector('.health');
@@ -2432,7 +2492,7 @@
       function targetInfo(ship) {
         if (!ship.visible || ship.userData.health <= 0) return null;
         if (ship.userData.type.asteroid && (ship.userData.hull.opacity < .25
-          || ship.position.distanceToSquared(camera.position) > 2800 * 2800)) return null;
+          || ship.position.distanceToSquared(camera.position) > Math.pow(reducedMotion ? 500 : 2800, 2))) return null;
         // Target brackets must not reveal traffic before its distant arrival fade ends.
         if (!ship.userData.type.asteroid && !ship.userData.type.capital
           && ship.position.distanceToSquared(camera.position) > Math.pow(reducedMotion ? 900 : 2600, 2)) return null;
@@ -2496,14 +2556,14 @@
       const controlTitle = document.querySelector('#control-hints-title');
       const controlInput = document.querySelector('#control-input-label');
       const controlSteps = [
-        { action: 'laser', title: 'LASER FEUERN', input: 'LINKSKLICK' },
-        { action: 'heavy', title: 'POWER-LASER · 3× SCHADEN', input: 'LEERTASTE' }
+        { action: 'laser', title: 'laserTitle', input: 'mouseClick' },
+        { action: 'heavy', title: 'powerLaserTitle', input: 'spaceKey' }
       ];
       let controlStep = 0, controlStepCompletedAt = null;
       function showControlStep() {
         const step = controlSteps[controlStep];
-        controlTitle.textContent = step.title;
-        controlInput.textContent = step.input;
+        controlTitle.textContent = t(step.title);
+        controlInput.textContent = t(step.input);
         controlHints.classList.remove('complete');
         controlHints.classList.toggle('space-key', step.action === 'heavy');
         controlStepCompletedAt = null;
@@ -2846,8 +2906,8 @@
         pointer = null; spaceHeld = false;
         const button = document.querySelector('#pause');
         button.setAttribute('aria-pressed', String(paused));
-        button.setAttribute('aria-label', paused ? 'Flug fortsetzen' : 'Flug pausieren');
-        button.title = paused ? 'Flug fortsetzen' : 'Flug pausieren';
+        button.setAttribute('aria-label', t(paused ? 'resumeFlight' : 'pauseFlight'));
+        button.title = t(paused ? 'resumeFlight' : 'pauseFlight');
         if (paused) {
           pauseMenu.showModal();
           document.querySelector('#continue-flight').focus();
@@ -2875,7 +2935,7 @@
       fullscreenButton.hidden = !document.fullscreenEnabled;
       function syncFullscreen() {
         const active = Boolean(document.fullscreenElement);
-        const label = active ? 'Vollbild verlassen' : 'Vollbild aktivieren';
+        const label = t(active ? 'exitFullscreen' : 'enterFullscreen');
         fullscreenButton.setAttribute('aria-pressed', String(active));
         fullscreenButton.setAttribute('aria-label', label);
         fullscreenButton.title = label;
@@ -2902,7 +2962,22 @@
       resize();
       status.textContent = '';
       document.querySelector('#start').disabled = false;
-      document.querySelector('#start').textContent = 'START FLIGHT ↗';
+      document.querySelector('#start-label').dataset.i18n = 'startFlight';
+      document.querySelector('#start-label').textContent = t('startFlight');
+      updateRank();
+      updateRetries();
+      languagePicker.disabled = false;
+      languagePicker.addEventListener('change', event => {
+        if (started) return;
+        setLanguage(event.target.value);
+        applyTranslations();
+        updateRank();
+        updateRetries();
+        showControlStep();
+        updateHeavyHud();
+        updateWeaponHud();
+        syncFullscreen();
+      });
       let danger = false, incomingFire = false;
       function updateSimulation(dt) {
         if (!started) {
@@ -2976,7 +3051,7 @@
         danger = false;
         camera.updateMatrixWorld();
         viewFrustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-        updateShipArrivals();
+        updateShipArrivals(dt);
         activeAsteroids.length = 0;
         for (const ship of ships) {
           if (!ship.visible) continue;
@@ -3184,7 +3259,7 @@
           if (!ship.visible) continue;
           ship.updateMatrixWorld(true);
           const visibleRock = !ship.userData.type.asteroid || (ship.userData.hull.opacity >= .25
-            && ship.position.distanceToSquared(camera.position) < 2800 * 2800);
+            && ship.position.distanceToSquared(camera.position) < Math.pow(reducedMotion ? 500 : 2800, 2));
           if (visibleRock && viewFrustum.intersectsBox(visibleBox.copy(ship.userData.collisionBox).applyMatrix4(ship.matrixWorld))
             && ship.userData.collisionParts.some(part => viewFrustum.intersectsBox(visibleBox.copy(part.bounds).applyMatrix4(ship.matrixWorld)))) {
             ship.userData.lastVisibleTime = gameTime;
@@ -3208,14 +3283,14 @@
         updateWeaponHud();
         shieldHit.hidden = shieldHitTime === 0;
         shieldHit.style.opacity = reducedMotion ? '.6' : String(shieldHitTime / .55);
-        document.querySelector('#flight-state').textContent = !started || paused || crashing || roundEnded ? '' : speed > 650 ? 'HYPERSPEED · ENDSPURT' : '';
+        document.querySelector('#flight-state').textContent = !started || paused || crashing || roundEnded ? '' : speed > 650 ? t('finalSprint') : '';
         const cross = document.querySelector('#hit-cross');
         cross.style.opacity = hitMarker > 0 ? 1 : 0;
         cross.style.left = reticle.style.left || '50%'; cross.style.top = reticle.style.top || '50%';
         reticle.classList.toggle('hit', hitMarker > 0);
         document.querySelector('#flash').style.opacity = flash;
         sound.updateEngine(speed);
-        collisionAlert.textContent = incomingFire ? '⚠ BESCHUSS · AUSWEICHEN!' : '⚠ KOLLISIONSKURS · AUSWEICHEN!';
+        collisionAlert.textContent = t(incomingFire ? 'incomingWarning' : 'collisionWarning');
         collisionAlert.hidden = !danger || paused || roundEnded;
         feedback.style.visibility = danger && !paused && !roundEnded ? 'hidden' : 'visible';
         dangerVignette.classList.toggle('warning', danger && !paused && !roundEnded);
@@ -3235,7 +3310,7 @@
           capitalHealth.value = Math.max(0, capitalShip.userData.health);
           const charging = capitalShip.userData.gunsCharging;
           capitalHud.classList.toggle('charging', charging);
-          capitalState.textContent = `${capitalShip.userData.health} / ${capitalShip.userData.maxHealth} PANZERUNG · ${charging ? 'GESCHÜTZE LADEN' : 'FEINDLICHES GROSSKAMPFSCHIFF'}`;
+          capitalState.textContent = t('capitalStatus', { health: capitalShip.userData.health, max: capitalShip.userData.maxHealth, state: t(charging ? 'capitalCharging' : 'capitalEnemy') });
         }
         updateTargetLock(0);
         const selected = focusedShip;
@@ -3272,7 +3347,7 @@
       });
     } catch (error) {
       document.querySelector('#intro').hidden = true;
-      status.textContent = 'Der Weltraum konnte nicht geladen werden. Bitte über die von ./run start angezeigte URL öffnen und WebGL-Unterstützung prüfen.';
+      status.textContent = t('loadError');
       console.error(error);
     }
   </script>

@@ -29,14 +29,14 @@ function makeGame(seed = 12345, reducedMotion = false) {
     ${section('      function collideWith(', '      const successBurst =')}
     return {
       camera, scene, flightMotion, playerHullRotation, rocks: showerRocks, cells: showerRockCells,
-      grit: showerGrit, origin: showerOrigin, previousOrigin: showerPreviousOrigin, rotation: showerRotation,
+      grit: showerGrit, origin: showerOrigin, previousOrigin: showerPreviousOrigin, rotation: showerRotation, velocity: showerVelocity,
       hits, prepareShowerRock, nearbyShowerRocks, update: updateShowerRockCollisions, corridorCenter,
       get shield() { return shield; }, setPaused: value => { paused = value; },
       seed: (strength = 2, shape = 0, corridor = true) => {
         showerCorridor = corridor; showerStrength = strength; showerShape = shape;
         showerLength = 3000; showerHalfGap = 27; showerHalfWidth = corridor ? 900 : 650; showerBend = 27 * 1.15;
         showerOrigin.set(0, 0, 0); showerPreviousOrigin.copy(showerOrigin);
-        showerRotation.identity(); showerGrit.position.copy(showerOrigin);
+        showerRotation.identity(); showerGrit.position.copy(showerOrigin); showerVelocity.set(0, 0, 0);
         shield = 100; hits.length = 0; crashing = paused = false; gameTime = 0;
         seedShowerGrit(); showerGritMaterial.opacity = 1;
       },
@@ -97,6 +97,35 @@ boundary.step(new THREE.Vector3(0, 0, 200));
 assert.equal(boundary.hits.length, 1, 'The enlarged query must include the real boulder/wing impact');
 assert.equal(boundary.shield, 85, 'Size variation must not silently change ring collision damage');
 console.log('PASS large-boulder broadphase across cell boundaries, real wing contact and unchanged damage');
+
+// Intrinsic stream motion must warn and collide even without any player travel.
+const drifting = makeGame(); drifting.seed(); drifting.flightMotion.set(0, 0, 0);
+const drifter = drifting.rocks[0];
+transform.position.set(80, 0, 0); transform.rotation.set(0, 0, 0); transform.scale.setScalar(10); transform.updateMatrix();
+drifting.grit.setMatrixAt(drifter.index, transform.matrix);
+drifter.position.copy(transform.position); drifter.seen = true;
+drifting.cells.clear(); drifting.cells.set('0,0,0', [drifter]);
+assert.equal(drifting.update(), false, 'A stationary rock off to the side is not an incoming threat');
+drifting.velocity.set(-55, 0, 0);
+assert.equal(drifting.update(), true, 'Include stream velocity in the real collision warning forecast');
+drifting.setPaused(true); drifting.step(new THREE.Vector3(-110, 0, 0), 2);
+assert.equal(drifting.hits.length, 0);
+drifting.setPaused(false); drifting.step(new THREE.Vector3(-110, 0, 0), 2);
+assert.equal(drifting.hits.length, 1, 'Sweep the moving instance through the stationary player hull');
+const actualDrifter = drifting.prepareShowerRock(drifter).position.clone();
+assert.ok(actualDrifter.equals(drifter.position.clone().add(drifting.grit.position)), 'Collision position follows the visible moving field');
+drifting.step(new THREE.Vector3(), 0);
+assert.equal(drifting.hits.length, 1, 'A drifting boulder can only hit once');
+console.log('PASS stream-aware collision warnings, swept hits, visible/collision alignment and pause');
+
+const fastStream = makeGame(); fastStream.seed(); fastStream.velocity.set(0, 0, 1200);
+const fastRock = fastStream.rocks[0];
+transform.position.set(0, 0, -450); transform.scale.setScalar(10); transform.updateMatrix();
+fastStream.grit.setMatrixAt(fastRock.index, transform.matrix); fastRock.position.copy(transform.position);
+fastStream.cells.clear(); fastStream.cells.set('0,0,-4', [fastRock]);
+fastStream.render();
+assert.equal(fastRock.seen, true, 'Visibility look-ahead includes stream speed so fast rendered rocks are registered before contact');
+console.log('PASS fast-stream visibility look-ahead for low-frame-rate collision eligibility');
 
 for (const reducedMotion of [false, true]) for (const turn of [false, true]) {
   const flight = makeGame(12345, reducedMotion); flight.seed();

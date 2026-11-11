@@ -1,6 +1,8 @@
 // Run from the project root: node tests/pause-menu.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
+import { t, setLanguage } from '../i18n.js';
+setLanguage('de');
 
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const start = source.indexOf('      function togglePause()');
@@ -20,7 +22,7 @@ const body = new Element();
 const elements = new Map(['#pause', '#pause-menu', '#continue-flight'].map(id => [id, new Element()]));
 document.activeElement = body;
 const menu = elements.get('#pause-menu');
-const game = new Function('document', 'pauseMenu', `
+const game = new Function('document', 'pauseMenu', 't', `
   let started = true, paused = false, roundEnded = false, celebrating = false, crashing = false;
   let pointer = {id: 1}, spaceHeld = true, speed = 400, clockResets = 0;
   const resetSimulationClock = () => { clockResets++; };
@@ -39,7 +41,7 @@ const game = new Function('document', 'pauseMenu', `
       roundEnded = value === 'defeat' || value === 'victory'; celebrating = value === 'victory';
     }
   };
-`)(document, menu);
+`)(document, menu, t);
 
 function click(id) { elements.get(id).dispatchEvent(new Event('click')); }
 function key(type, code, repeat = false) {

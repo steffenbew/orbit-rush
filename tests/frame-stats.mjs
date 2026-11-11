@@ -1,6 +1,8 @@
 // Run from the project root: node tests/frame-stats.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
+import { t, setLanguage } from '../i18n.js';
+setLanguage('de');
 
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const section = (start, end) => {
@@ -8,7 +10,7 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
   return source.slice(from, to);
 };
-const makeMonitor = (search = '?test') => new Function('search', `
+const makeMonitor = (search = '?test') => new Function('search', 't', `
   const location = { search };
   let wallTime = 0, frameCallback, renders = 0, steps = 0, writes = 0;
   let text = '— FPS · — ms';
@@ -32,7 +34,7 @@ const makeMonitor = (search = '?test') => new Function('search', `
     },
     state: () => ({ text, hidden: hud.hidden, writes, renders, steps, sampleTime: frameSampleTime, sampleCount: frameSampleCount })
   };
-`)(search);
+`)(search, t);
 
 for (const search of ['', '?mode=test', '?contest=1', '?testing=1']) {
   const monitor = makeMonitor(search); monitor.frame(0);

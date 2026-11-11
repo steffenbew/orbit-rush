@@ -1,6 +1,8 @@
 // Run from the project root: node tests/control-hints.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
+import { t, setLanguage } from '../i18n.js';
+setLanguage('de');
 
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const section = (start, end) => {
@@ -28,7 +30,7 @@ const elements = new Map(['control-hints', 'control-hints-title', 'control-input
 const document = { querySelector: selector => elements.get(selector) };
 const hints = elements.get('#control-hints');
 const title = elements.get('#control-hints-title'), input = elements.get('#control-input-label');
-const game = new Function('document', `
+const game = new Function('document', 't', `
   let started = false, paused = false, crashing = false, roundEnded = false, level = 1, now = 0;
   const performance = {now: () => now};
   const mouseAim = {x: 0, y: 0}, innerWidth = 1000, innerHeight = 800;
@@ -50,7 +52,7 @@ const game = new Function('document', `
     time: value => { now = value; gameTime = value / 1000; },
     weapons: (heat, energy) => { overheated = heat; heavyEnergy = energy; }
   };
-`)(document);
+`)(document, t);
 
 for (const mode of ['intro', 'pause', 'crash', 'result', 'later-level']) {
   game.mode(mode); game.updateControlHints();
@@ -123,7 +125,7 @@ assert.ok(!source.includes('pause-controls'), 'Keep the pause menu free of tutor
 assert.ok(!source.includes('control-check') && !markup.includes('✓'), 'Remove all tutorial checkmark markup, styles and logic');
 assert.ok(markup.includes('id="control-mouse" class="icon" aria-hidden="true"') && markup.includes('href="#i-mouse-left"'),
   'Use the existing inline SVG icon style without duplicating the accessible text');
-assert.ok(source.includes('<symbol id="i-mouse-left"') && source.includes('fill-opacity=".55"'), 'Highlight the mouse’s left button');
+assert.ok(source.includes('<symbol id="i-mouse-left" data-phosphor="mouse-left-click"'), 'Use Phosphor’s left-click mouse icon');
 assert.match(source, /#control-hints\.space-key #control-mouse \{ display: none; \}/);
 assert.ok(source.includes("const controlInput = document.querySelector('#control-input-label')"),
   'Update only the label so changing tutorial steps preserves the mouse icon');

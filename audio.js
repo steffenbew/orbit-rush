@@ -13,7 +13,7 @@ const banks = {
 const activeSounds = new Set();
 async function decode(file) {
   const response = await fetch(new URL(`assets/audio/${file}`, import.meta.url));
-  if (!response.ok) throw new Error(`Audio-Datei nicht erreichbar: ${file} (${response.status})`);
+  if (!response.ok) throw new Error(`Audio file unavailable: ${file} (${response.status})`);
   return context.decodeAudioData(await response.arrayBuffer());
 }
 export async function initAudio() {

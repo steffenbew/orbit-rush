@@ -65,6 +65,14 @@ Die Audiodateien werden lokal aus `assets/audio/` abgespielt; es gibt keine Audi
 
 Die Quellen und Lizenzlinks der aktiven Sounds sind zusätzlich im Spiel über „Audio-Credits“ zugänglich.
 
+## Phosphor Icons
+
+- Phosphor Icons (`@phosphor-icons/core` 2.1.1), https://phosphoricons.com/
+- Originalpaket: https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz
+- Regular-SVGs für die Oberfläche, einschließlich Rakete, Maus, Ton, Pause, Vollbild und Ergebnissymbole. Die Rakete wird auch als Favicon verwendet.
+- Unveränderte SVG-Pfade als lokaler Symbol-Satz in `index.html`; keine Bibliothek, Webfont oder CDN-Anfrage zur Laufzeit.
+- MIT-Lizenz: `assets/vendor/PHOSPHOR-LICENSE.txt`
+
 ## Three.js
 
 - Three.js 0.170.0, https://threejs.org/
