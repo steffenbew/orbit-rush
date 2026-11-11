@@ -128,3 +128,25 @@ assert.equal(freshRock.userData.lastVisibleTime, -Infinity);
 unseen.render(); unseen.step(1 / 60, false);
 assert.ok(unseen.hits.includes(freshRock), 'The same fragment becomes a real hazard after it has been shown');
 console.log('PASS render-only visibility: no unseen fragment hits during a catch-up frame');
+
+for (const reducedMotion of [false, true]) for (const side of [-1, 1]) {
+  const wings = makeGame(reducedMotion);
+  wings.shatterAsteroid({scale: {x: 3.2}, position: new THREE.Vector3(0, 0, -100)});
+  for (const p of wings.particles) {
+    p.vx = p.vy = p.vz = p.spin = 0; p.age = 1;
+    p.object.position.set(10000, 0, -100);
+  }
+  const fragment = wings.particles[0];
+  fragment.object.scale.setScalar(.5);
+  fragment.object.position.set(side * 19, 0, -100);
+  wings.step(0); // Draw it before the swept wing contact.
+  wings.camera.rotation.y = Math.PI;
+  wings.step(1); // An old sighting must not expire while the solid rock is still beside us.
+  assert.equal(fragment.object.userData.lastVisibleTime, 0);
+  fragment.vz = 12000;
+  wings.step(1 / 60);
+  assert.deepEqual(wings.hits, [fragment.object], 'A visible fragment crossing either wing must hit once, even though it misses the camera');
+  wings.step(1 / 60);
+  assert.equal(wings.hits.length, 1, 'Overlapping hull probes must not multiply shield damage');
+}
+console.log('PASS real off-screen fragment wing contacts after one second, reduced motion and single-hit damage');

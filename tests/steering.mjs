@@ -15,9 +15,9 @@ const makeFlight = reducedMotion => new Function('THREE', 'reducedMotion', `
   const target = new THREE.Vector2(), flightVelocity = new THREE.Vector2();
   const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3();
   const flightHeading = new THREE.Vector2(), flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler();
-  const camera = new THREE.PerspectiveCamera();
+  const camera = new THREE.PerspectiveCamera(), playerHullRotation = new THREE.Quaternion();
   let paused = false, speed = 400;
-  return { target, flightVelocity, flightMotion, camera,
+  return { target, flightVelocity, flightMotion, camera, playerHullRotation,
     setPaused: value => { paused = value; }, step: dt => { ${flightCode} }
   };
 `)(THREE, reducedMotion);
@@ -42,9 +42,13 @@ for (const reducedMotion of [false, true]) {
     assert.ok(Math.abs(flight.flightVelocity.y - 400 * movement) < .001, 'Vertical speed should match forward speed, up from 78%');
     assert.ok(Math.abs(flight.flightVelocity.x - sideways) < .001, 'Keep sideways top speed unchanged');
     assert.equal(flight.flightMotion.z, -400, 'Do not alter forward speed');
+    assert.ok(flight.playerHullRotation.equals(flight.camera.quaternion), 'The collision hull must follow pitch, yaw and bank');
     const velocity = flight.flightVelocity.clone(), rotation = flight.camera.quaternion.clone();
     flight.setPaused(true); flight.target.set(-1, -1); flight.step(1);
     assert.ok(flight.flightVelocity.equals(velocity)); assert.ok(flight.camera.quaternion.equals(rotation));
+    assert.ok(flight.playerHullRotation.equals(rotation), 'Pause freezes the collision hull too');
+    flight.camera.rotation.x += .05;
+    assert.ok(flight.playerHullRotation.equals(rotation), 'Cosmetic camera shake must not move the collision hull');
   }
 }
 console.log('PASS tighter acceleration, braking/reversal, vertical authority, frame-rate independence and pause/reduced motion');

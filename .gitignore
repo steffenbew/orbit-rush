@@ -4,6 +4,8 @@
 # Local dependencies and logs
 node_modules/
 *.log
+.run/
+__pycache__/
 
 # Local secrets
 .env

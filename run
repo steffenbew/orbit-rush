@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")"
+
+start() {
+  exec python3 "$PWD/scripts/dev-server.py" start
+}
+
+stop() {
+  exec python3 "$PWD/scripts/dev-server.py" stop
+}
+
+test() {
+  python3 tests/dev-server.py
+  local test_file
+  for test_file in tests/*.mjs; do
+    printf '\n→ %s\n' "$test_file"
+    node "$test_file"
+  done
+}
+
+usage() {
+  printf '%s\n' \
+    'Usage: ./run {start|dev|stop|test|help}' \
+    '' \
+    '  start, dev  Serve locally in the foreground (Python 3)' \
+    '  stop        Stop only this checkout’s tracked server' \
+    '  test        Run all test suites (Python 3 and Node.js)' \
+    '  help        Show this help' \
+    '' \
+    'Default: port 8080, or a free port if occupied; prints the actual URL.' \
+    'Custom port: PORT=8082 ./run start (fails if that port is occupied)' \
+    'Stop with Ctrl+C or ./run stop in another terminal.'
+}
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+case "${1:-help}" in
+  start|dev) start ;;
+  stop) stop ;;
+  test) test ;;
+  help|--help|-h) usage ;;
+  *) usage >&2; exit 1 ;;
+esac

@@ -19,12 +19,14 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 'reducedMotion
   const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3(), worldStep = new THREE.Vector3();
   const flightHeading = new THREE.Vector2(), flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler();
   const camera = new THREE.PerspectiveCamera(), distance = new THREE.Vector3();
+  const playerHullRotation = new THREE.Quaternion();
   const roundDuration = 45, levelPressure = .8;
   let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
   let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0;
   let normalHeld = false, heavyHeld = false;
   const comboWindows = [], feedback = {classList: {remove() {}}};
   const updateScore = () => {}, updateWeaponHud = () => {}, updateHeavyHud = () => {};
+  const markControlUsed = () => {}; // Tutorial behavior is covered by control-hints.mjs.
   const shots = [];
   let firingHeavy = false;
   const playSound = name => { if (name === 'shot') shots.push({heavy: firingHeavy, time: gameTime}); };
