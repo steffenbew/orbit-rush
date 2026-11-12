@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
 const source = readFileSync(new URL('index.html', root), 'utf8');
-const from = source.indexOf('          showerPending = false;');
-const to = source.indexOf('          seedShowerGrit();', from);
+const from = source.indexOf('      function planAsteroidShower() {') + '      function planAsteroidShower() {'.length;
+const to = source.indexOf('\n      }\n      function advanceAsteroidShower', from);
 assert.ok(from > 0 && to > from);
 const initialize = source.slice(from, to);
 const selection = initialize.match(/const roll = random\(0, 1\);\s*const course = [^;]+;/);
@@ -26,10 +26,13 @@ function field(course, speed, reducedMotion, width = 1280, height = 720, yaw = 0
     const flightMotion = new THREE.Vector3(0, 0, -speed).applyEuler(flightOrientation);
     // Simulate velocity left over from a previous rain event.
     const showerVelocity = new THREE.Vector3(99, -22, 33), showerDirection = new THREE.Vector3(), showerOrigin = new THREE.Vector3();
-    const showerRotation = new THREE.Quaternion(), showerPreviousOrigin = new THREE.Vector3();
-    const level = 1, count = 9, maxShowerRocks = 144, showerStart = 0, showerEnd = 18, showerStrength = 2;
+    const showerRotation = new THREE.Quaternion(), showerCourseOrigin = new THREE.Vector3(), courseOrigin = camera.position.clone();
+    const courseStartTime = 0;
+    const levelFlightSpeed = () => speed, flightDistanceAt = time => time * speed * .85;
+    const level = 1, roundDuration = 45, maxShowerRocks = 144, showerStart = 0, showerEnd = 18, showerStrength = 2;
     let showerPending = true, showerLength, showerSpacing, showerObstacleSpacing, nextShowerObstacle, showerHalfGap, showerHalfWidth, showerBend = 1.15;
     ${initialize}
+    showerOrigin.copy(showerCourseOrigin);
     camera.rotation.copy(flightOrientation); camera.updateMatrixWorld();
     return {camera, velocity: showerVelocity, direction: showerDirection, origin: showerOrigin,
       rotation: showerRotation, heading: new THREE.Quaternion().setFromEuler(flightOrientation), flightMotion, lead, approachSpeed};
@@ -38,8 +41,8 @@ function field(course, speed, reducedMotion, width = 1280, height = 720, yaw = 0
 for (const reduced of [false, true]) for (const speed of [35, 300, 1100]) for (let course = 0; course < 4; course++) {
   const fixed = field(course, speed, reduced, 1280, 720, -.7, .3, true);
   assert.equal(fixed.velocity.lengthSq(), 0, 'The corridor clears any previous rain velocity');
-  assert.ok(fixed.rotation.angleTo(fixed.heading) < 1e-7, 'Keep the corridor aligned with the deployment heading, not a rain direction');
-  assert.ok(fixed.direction.distanceTo(new THREE.Vector3(0, 0, -1).applyQuaternion(fixed.heading)) < 1e-8);
+  assert.ok(fixed.rotation.angleTo(new THREE.Quaternion()) < 1e-7, 'Corridor stays aligned with the fixed course, not the current player heading');
+  assert.ok(fixed.direction.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-8);
   assert.ok(fixed.origin.distanceTo(fixed.direction.clone().multiplyScalar(fixed.lead)) < 1e-8,
     'The fixed passage has no sideways rain crossing offset');
   assert.ok(Math.abs(fixed.approachSpeed - speed * .85) < 1e-8, 'Corridor pacing depends on player travel only');
@@ -89,9 +92,9 @@ for (const reduced of [false, true]) for (const speed of reduced ? [35, 60] : [2
       assert.ok(point.distanceTo(stream.origin.clone().addScaledVector(relative, 12)) < 1e-7);
     }
     const rotated = field(course, speed, reduced, width, height, -.7, .3);
-    assert.ok(rotated.velocity.clone().applyQuaternion(rotated.heading.clone().invert()).distanceTo(velocity) < 1e-8,
-      'Directions are relative to the deployment heading, not hard-coded world axes');
+    assert.ok(rotated.velocity.distanceTo(velocity) < 1e-8 && rotated.origin.distanceTo(stream.origin) < 1e-8,
+      'Turning the aircraft must not relocate or rotate the preplanned shower');
   }
 }
-console.log('PASS unchanged side streams, shallow frontal above/below approaches, distant deployment and rotated headings');
+console.log('PASS unchanged side streams, shallow frontal above/below approaches, distant deployment and heading-independent course placement');
 console.log(`PASS visible directional screen-space travel in portrait/landscape and reduced motion, 5–144 FPS (${Math.min(...measured).toFixed(0)}+ px/s)`);

@@ -24,6 +24,7 @@ function makeGame(seed = 12345, reducedMotion = false) {
     const shieldHit = {hidden: true, style: {}}, hits = [];
     const updateShield = () => hits.push({index: showerRockCollider.userData.instanceIndex, shield});
     const startCrash = () => { crashing = true; }, playSound = () => {};
+    const showFeedback = () => {}, t = () => ''; // Feedback rendering is covered by scoring.mjs.
     ${section('      const inverseRotation =', '      const mouseAim =')}
     ${section('      const showerPool =', '      let spawnQueue =')}
     ${section('      function collideWith(', '      const successBurst =')}
@@ -80,6 +81,41 @@ const nearby = game.nearbyShowerRocks(new THREE.Vector3(0, 0, -1500), new THREE.
 assert.ok(nearby.length > 0 && nearby.length < game.rocks.length * .1, 'Only a small nearby subset should need triangle checks');
 console.log('PASS all ring instances indexed once, bounded nearby queries and exact rendered collision geometry');
 
+// Free showers use the same real-geometry collision index, including the smallest instanced rocks.
+for (const strength of [0, 1, 2]) {
+  const free = makeGame(); free.seed(strength, 0, false);
+  const count = [300, 900, 1800][strength];
+  assert.equal(free.rocks.length, count); assert.equal(free.grit.count, count);
+  assert.equal(new Set([...free.cells.values()].flat()).size, count, 'Every visible instance has exactly one spatial-index record');
+  assert.equal(free.scene.children.length, 1, 'Reuse the existing instanced mesh');
+  free.rocks.forEach((record, index) => assert.equal(record.index, index));
+}
+for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) for (const strength of [0, 1, 2]) {
+  for (const turn of [false, true]) for (const hit of [false, true]) {
+    const free = makeGame(7123 + strength, reducedMotion); free.seed(strength, 0, false);
+    const record = free.rocks[0];
+    for (const other of free.rocks) if (other !== record) other.hit = true;
+    if (turn) free.rotation.setFromEuler(new THREE.Euler(.3, -.6, .2));
+    free.playerHullRotation.copy(free.rotation); free.camera.quaternion.copy(free.rotation);
+    const center = record.position.clone().applyQuaternion(free.rotation).add(free.origin);
+    free.camera.position.copy(center).add(new THREE.Vector3(hit ? -18 : -28, 0, 80).applyQuaternion(free.rotation));
+    free.flightMotion.set(0, 0, 0); // The stream alone carries this small, unmodified instance into the wing.
+    free.velocity.set(0, 0, 160).applyQuaternion(free.rotation);
+    free.render(); assert.equal(record.seen, true);
+    if (hit) assert.equal(free.update(), true, 'Warn before even a small free-shower rock reaches the hull');
+    const delta = free.velocity.clone().divideScalar(fps);
+    for (let frame = 0; frame < fps; frame++) { free.step(delta, 1 / fps); free.render(); }
+    assert.equal(free.hits.length, hit ? 1 : 0, 'Real small-asteroid contact, not a forced collision course or an invisible solid field');
+    assert.equal(free.shield, hit ? 85 : 100);
+    const collider = free.prepareShowerRock(record);
+    assert.ok(collider.position.distanceTo(record.position.clone().applyQuaternion(free.rotation).add(free.grit.position)) < 1e-8,
+      'Collision geometry stays aligned with the moving, rotated visual stream');
+    free.step(delta.clone().multiplyScalar(-fps)); free.step(delta.clone().multiplyScalar(fps));
+    assert.equal(free.hits.length, hit ? 1 : 0, 'The same shower rock cannot damage twice');
+  }
+}
+console.log('PASS every free-shower instance indexed, real tiny-rock wing hits, misses, rotated stream motion and single-hit damage at 5–144 FPS');
+
 // A large boulder can reach a wing across a cell boundary that the old 17-unit query missed.
 const boundary = makeGame(); boundary.seed();
 const boulder = boundary.rocks[0], transform = new THREE.Object3D();
@@ -127,8 +163,8 @@ fastStream.render();
 assert.equal(fastRock.seen, true, 'Visibility look-ahead includes stream speed so fast rendered rocks are registered before contact');
 console.log('PASS fast-stream visibility look-ahead for low-frame-rate collision eligibility');
 
-for (const reducedMotion of [false, true]) for (const turn of [false, true]) {
-  const flight = makeGame(12345, reducedMotion); flight.seed();
+for (const reducedMotion of [false, true]) for (const turn of [false, true]) for (const corridor of [false, true]) {
+  const flight = makeGame(12345, reducedMotion); flight.seed(2, 0, corridor);
   const record = flight.rocks.find(rock => Math.abs(rock.position.x) < 200 && rock.position.z < -800 && rock.position.z > -2200);
   for (const other of flight.rocks) if (other !== record) other.hit = true; // Isolate one real instance.
   if (turn) flight.rotation.setFromEuler(new THREE.Euler(.2, -.5, .3));
@@ -160,8 +196,10 @@ for (const reducedMotion of [false, true]) for (const turn of [false, true]) {
   assert.equal(flight.hits.length, 1, 'The same instance must not damage repeatedly');
   flight.seed(); assert.ok(flight.rocks.every(rock => !rock.seen && !rock.hit));
   flight.seed(0, 0, false);
-  assert.equal(flight.rocks.length, 0); assert.equal(flight.cells.size, 0);
-  assert.equal(flight.update(), false, 'Free-shower grit stays decorative and cannot retain old ring colliders');
+  assert.equal(flight.rocks.length, 300);
+  assert.equal([...flight.cells.values()].reduce((count, cell) => count + cell.length, 0), 300);
+  assert.ok(flight.rocks.every(rock => !rock.hit && !rock.seen), 'Switching to a free shower rebuilds only its own collision records');
+  assert.equal(flight.update(), false, 'New, never-rendered shower instances must not hit yet');
 }
 console.log('PASS actual shield loss on off-screen wing contacts, no unseen hits, pause, one hit per rock and reset');
 

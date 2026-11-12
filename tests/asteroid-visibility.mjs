@@ -52,7 +52,7 @@ game.camera.rotation.y = -.7; game.camera.updateMatrixWorld();
 assert.equal(game.hasPassedCamera(hull), false, 'Turning must not recycle a still-visible object using world Z');
 game.camera.position.set(100, 50, 20); hull.position.add(game.camera.position); game.camera.updateMatrixWorld();
 assert.equal(game.hasPassedCamera(hull), false, 'Cleanup must also account for camera translation');
-assert.ok(source.includes('if (hasPassedCamera(ship)) queueShip(ship);'));
+assert.ok(source.includes('if (!ship.userData.tutorialTarget && hasPassedCamera(ship)) queueShip(ship);'));
 console.log('PASS whole-hull recycling, camera turns and camera translation');
 
 for (const reducedMotion of [false, true]) {

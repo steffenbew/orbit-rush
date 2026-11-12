@@ -57,6 +57,12 @@
     #repair-marker { transform: translate(-50%, -50%); }
     #repair-notice { bottom: max(88px, calc(env(safe-area-inset-bottom) + 88px)); left: 50%; transform: translateX(-50%); }
     #repair-marker[hidden], #repair-notice[hidden] { display: none; }
+    #flight-boundary-notice { position: fixed; bottom: max(174px, calc(env(safe-area-inset-bottom) + 174px)); left: 50%; transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100% - 32px); text-align: center; pointer-events: none; color: #b4f7ff; background: #091629de; border: 1px solid #36dbff66; border-radius: 12px; padding: 7px 12px; font-size: 12px; letter-spacing: .05em; }
+    #flight-boundary-notice.contact { color: #ff938c; border-color: #ff493e99; }
+    #flight-ring-wash { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, #6ef5ff29 0%, #33d9ff52 55%, #138dd499 100%); }
+    #flight-ring-wash.missed { background: radial-gradient(ellipse at center, #ff493e14 0%, #ff493e33 55%, #c6233066 100%); }
+    #flight-ring-guide { position: fixed; z-index: 3; color: #82efff; font-size: 30px; text-shadow: 0 0 14px #36dbff; pointer-events: none; }
+    #shield-hud.hit { color: #ff938c; border-color: #ff493e; box-shadow: 0 0 22px #ff493e66; }
     #capital-hud { position: fixed; bottom: max(82px, calc(env(safe-area-inset-bottom) + 66px)); left: 50%; transform: translateX(-50%); z-index: 3; width: min(320px, calc(100vw - 40px)); padding: 10px 14px; border: 1px solid #ff626677; border-radius: 12px; background: #25131ee8; color: #ffb2a8; font-size: 10px; letter-spacing: .08em; text-align: center; pointer-events: none; }
     #capital-hud strong, #capital-state { display: block; }
     #capital-health { width: 100%; height: 5px; margin: 7px 0; accent-color: #ff6266; }
@@ -80,6 +86,7 @@
     .hud-actions button { background: #10172ca6; border: 1px solid #ffffff20; font-size: 21px; width: 42px; height: 42px; border-radius: 14px; }
     #feedback { position: fixed; top: 25%; left: 50%; transform: translateX(-50%); color: #aaffdf; text-align: center; pointer-events: none; font-size: 24px; font-weight: 700; text-shadow: 0 0 25px #3bffc9; opacity: 0; }
     #feedback.pop { animation: reward .9s ease-out; }
+    #feedback.negative { color: #ff7b86; text-shadow: 0 0 25px #ff344f80; }
     @keyframes reward { 0% { opacity: 0; translate: 0 14px; } 15%, 65% { opacity: 1; } 100% { opacity: 0; translate: 0 -25px; } }
     #flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse, #ffb65e18, transparent 75%); opacity: 0; }
     #target .health { position: absolute; left: 8px; right: 8px; bottom: -24px; display: flex; gap: 4px; }
@@ -102,8 +109,11 @@
     #control-hints { position: fixed; left: 50%; top: 50%; transform: translateX(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 6px; width: max-content; max-width: calc(100vw - 24px); color: #e6f1ff; pointer-events: none; transition: opacity .6s; }
     #control-hints h2 { margin: 0; padding: 5px 8px; border-radius: 6px; background: #071629d9; font-size: 12px; font-weight: 750; letter-spacing: .06em; text-align: center; }
     #control-input { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; border-radius: 6px; background: #071629d9; font-size: 11px; font-weight: 750; letter-spacing: .06em; text-align: center; }
-    #control-mouse { flex-shrink: 0; width: 28px; height: 32px; color: #7effd5; }
+    #control-mouse, #control-cursor { flex-shrink: 0; width: 28px; height: 32px; color: #7effd5; }
+    #control-cursor { display: none; }
+    #control-hints.checkpoint-step #control-cursor { display: block; }
     #control-hints.space-key #control-mouse { display: none; }
+    #control-hints.checkpoint-step #control-mouse { display: none; }
     #control-hints.complete { color: #7effd5; }
     #control-hints.space-key #control-input { min-width: 170px; padding: 7px 22px 8px; border: 1px solid #b9dfff99; border-bottom-width: 4px; border-radius: 6px; background: #13273deb; box-shadow: inset 0 1px #ffffff20, 0 2px 8px #0005; }
     #control-hints.complete.space-key #control-input { border-color: #7effd5; }
@@ -283,6 +293,7 @@
     <symbol id="i-finish" data-phosphor="flag-checkered" viewBox="0 0 256 256"><path d="M227.32,48.75A8,8,0,0,0,218.76,50c-28,24.22-51.72,12.48-79.21-1.13C111.07,34.76,78.78,18.79,42.76,50A8,8,0,0,0,40,56V224a8,8,0,0,0,16,0V179.77c26.79-21.16,49.87-9.75,76.45,3.41,28.49,14.09,60.77,30.06,96.79-1.13a8,8,0,0,0,2.76-6V56A8,8,0,0,0,227.32,48.75ZM216,71.6v40.65c-14,11.06-27,13.22-40,10.88V79.34A60.05,60.05,0,0,0,216,71.6Zm-56,3.76v43c-6.66-2.67-13.43-6-20.45-9.48-8.82-4.37-18-8.91-27.55-12.18v-43c6.66,2.66,13.43,6,20.45,9.48C141.27,67.55,150.46,72.09,160,75.36ZM96,48.91V92.69a60.06,60.06,0,0,0-40,7.75V59.78C70,48.72,83,46.57,96,48.91ZM86.58,152A60.06,60.06,0,0,0,56,160.43V119.78c14-11.06,27-13.22,40-10.88v43.8A65.61,65.61,0,0,0,86.58,152ZM112,156.67v-43c6.66,2.66,13.43,6,20.45,9.48,8.82,4.37,18,8.9,27.55,12.17v43c-6.66-2.67-13.43-6-20.45-9.48C130.73,164.47,121.54,159.94,112,156.67Zm64,26.45v-43.8a65.61,65.61,0,0,0,9.42.72A60.11,60.11,0,0,0,216,131.57v40.68C202,183.31,189,185.46,176,183.12Z"/></symbol>
     <symbol id="i-restart" data-phosphor="arrow-counter-clockwise" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z"/></symbol>
     <symbol id="i-rocket" data-phosphor="rocket-launch" viewBox="0 0 256 256"><path d="M223.85,47.12a16,16,0,0,0-15-15c-12.58-.75-44.73.4-71.41,27.07L132.69,64H74.36A15.91,15.91,0,0,0,63,68.68L28.7,103a16,16,0,0,0,9.07,27.16l38.47,5.37,44.21,44.21,5.37,38.49a15.94,15.94,0,0,0,10.78,12.92,16.11,16.11,0,0,0,5.1.83A15.91,15.91,0,0,0,153,227.3L187.32,193A15.91,15.91,0,0,0,192,181.64V123.31l4.77-4.77C223.45,91.86,224.6,59.71,223.85,47.12ZM74.36,80h42.33L77.16,119.52,40,114.34Zm74.41-9.45a76.65,76.65,0,0,1,59.11-22.47,76.46,76.46,0,0,1-22.42,59.16L128,164.68,91.32,128ZM176,181.64,141.67,216l-5.19-37.17L176,139.31Zm-74.16,9.5C97.34,201,82.29,224,40,224a8,8,0,0,1-8-8c0-42.29,23-57.34,32.86-61.85a8,8,0,0,1,6.64,14.56c-6.43,2.93-20.62,12.36-23.12,38.91,26.55-2.5,36-16.69,38.91-23.12a8,8,0,1,1,14.56,6.64Z"/></symbol>
+    <symbol id="i-cursor-click" data-phosphor="cursor-click" viewBox="0 0 256 256"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></symbol>
     <symbol id="i-mouse-left" data-phosphor="mouse-left-click" viewBox="0 0 256 256"><path d="M144,16H112A64.07,64.07,0,0,0,48,80v96a64.07,64.07,0,0,0,64,64h32a64.07,64.07,0,0,0,64-64V80A64.07,64.07,0,0,0,144,16Zm48,64v24H136V32h8A48.05,48.05,0,0,1,192,80Zm-76.69,24-46-46A48.49,48.49,0,0,1,80.51,43.82L120,83.31V104ZM64,80c0-1.51.08-3,.22-4.47L92.69,104H64Zm56-48V60.69L94.59,35.28A47.73,47.73,0,0,1,112,32Zm24,192H112a48.05,48.05,0,0,1-48-48V120H192v56A48.05,48.05,0,0,1,144,224Z"/></symbol>
     <symbol id="i-prohibit" data-phosphor="prohibit" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm88,104a87.56,87.56,0,0,1-20.41,56.28L71.72,60.4A88,88,0,0,1,216,128ZM40,128A87.56,87.56,0,0,1,60.41,71.72L184.28,195.6A88,88,0,0,1,40,128Z"/></symbol>
     <symbol id="i-close" data-phosphor="x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
@@ -308,8 +319,8 @@
   <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
   <div class="mission"><strong id="rank">ROOKIE PILOT</strong><br><span id="mission-progress">0 / 5 Abschüsse bis ACE PILOT</span></div>
   <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
-    <h2 id="control-hints-title" data-i18n="laserTitle">LASER FEUERN</h2>
-    <span id="control-input"><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="mouseClick">LINKSKLICK</span></span>
+    <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
+    <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS / TOUCH LENKEN</span></span>
   </aside>
   <div id="flight-state"></div>
   <div id="end-countdown" role="timer" data-i18n-aria-label="levelEnding" aria-label="Level endet bald" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
@@ -375,6 +386,9 @@
   <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Schiffsschild"></progress><span id="shield-value" aria-hidden="true">100%</span></div>
   <div id="repair-marker" hidden data-i18n-aria-label="collectRepair" aria-label="Schildreparatur einsammeln">✚ +25</div>
   <div id="repair-notice" hidden role="status"></div>
+  <div id="flight-boundary-notice" hidden role="status"></div>
+  <div id="flight-ring-wash" aria-hidden="true"></div>
+  <div id="flight-ring-guide" hidden aria-hidden="true">➤</div>
   <div id="feedback" aria-live="polite"></div>
   <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio-Credits</a>
   <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><span data-i18n="creditsEffects">Laser, Leermagazin-Klick, Treffer und Explosionen: </span><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a><span data-i18n="creditsEffectsChanges">. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe.</span></p><p><span data-i18n="creditsCombo">Combo-Sound und Kollisionsalarm: </span><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Combo-Datei unverändert. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.</span></p><p><span data-i18n="creditsMusic">Musik: </span><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a><span data-i18n="creditsMusicChanges"> (Lautstärke angeglichen, Höhen leicht abgesenkt), </span><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p></dialog>
@@ -706,14 +720,14 @@
       function updateEngineVisuals(ship) {
         const thrust = ship.userData.engineThrust;
         const movement = reducedMotion ? .25 : 1;
-        const visibility = ship.userData.type.capital ? 1 : 1 - THREE.MathUtils.smoothstep(
-          ship.position.distanceTo(camera.position), reducedMotion ? 900 : 2600, reducedMotion ? 1200 : 3600);
+        const visibility = (ship.userData.type.capital ? 1 : 1 - THREE.MathUtils.smoothstep(
+          ship.position.distanceTo(camera.position), reducedMotion ? 900 : 2600, reducedMotion ? 1200 : 3600)) * (ship.userData.arrivalOpacity ?? 1);
         for (const flame of ship.userData.flames) {
           const { core, plume, radius, baseSize } = flame.userData;
           const size = baseSize * (1 + thrust * .9 * movement);
           flame.scale.set(size, size, 1);
           flame.material.opacity = (.4 + thrust * .6) * visibility;
-          core.material.emissiveIntensity = 2.4 + thrust * 5 + (ship.userData.hitFlash > 0 ? 2 : 0);
+          core.material.emissiveIntensity = 2.4 + thrust * 5 + Math.min(1, ship.userData.hitFlash / .22) * .25;
           const width = radius * (1.2 + thrust * .6);
           const length = radius * (3 + thrust * (ship.userData.type.capital ? 8 : 12) * movement);
           plume.scale.set(width, width, length);
@@ -764,12 +778,13 @@
         ship.userData.dangerousCrossing = false;
         ship.userData.approachTime = 0;
         ship.visible = true;
+        if (ship.userData.arrivalOpacity < 1) setShipOpacity(ship, 1);
         const asteroidTier = ship.userData.type.asteroid ? Math.floor(random(1, Math.min(maxAsteroidTier, level) + 1)) : 0;
         ship.userData.asteroidTier = asteroidTier;
         ship.scale.setScalar(ship.userData.type.asteroid ? [.35, 1.3, 2.8][asteroidTier - 1] : ship.userData.type.scale);
         ship.userData.maxHealth = ship.userData.type.asteroid ? asteroidTier : ship.userData.type.health;
         const angle = initial ? formationSlot * 2.4 : random(0, Math.PI * 2);
-        const closeApproach = Math.random() < (ship.userData.type.asteroid ? .55 : .25);
+        const closeApproach = Math.random() < (ship.userData.type.asteroid ? .55 : .25) && !ship.userData.stationary;
         ship.userData.courseAge = 0;
         if (ship.userData.type.asteroid) ship.userData.hull.opacity = 0;
         ship.userData.courseVelocity = new THREE.Vector3();
@@ -811,7 +826,7 @@
         ship.userData.throttleTime = random(3.5, 6.5);
         ship.userData.dodgeSkill = random(.65, 1.15);
         if (!ship.userData.type.asteroid) {
-          const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.15 * (180 + levelPressure * 380);
+          const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (180 + levelPressure * 380);
           ship.userData.courseVelocity.copy(ship.userData.cruiseDirection)
             .multiplyScalar(initial ? openingSpeed * .85 * ship.userData.cruiseRatio : 0);
         }
@@ -825,7 +840,7 @@
           ship.userData.gunsCharging = false;
           for (const muzzle of ship.userData.muzzles) muzzle.scale.setScalar(3);
         }
-        if (ship.userData.type.asteroid && !initial && !ship.userData.shower && !ship.userData.scheduledHazard) {
+        if (ship.userData.type.asteroid && !initial && !ship.userData.shower && !ship.userData.scheduledHazard && !ship.userData.stationary) {
           const approachTime = -depth / Math.max(1, flightMotion.length() * .85);
           if (closeApproach) {
             ship.position.addScaledVector(ship.userData.courseRight, -ship.userData.lane)
@@ -840,20 +855,22 @@
         ship.userData.hull.emissive.setHex(0);
         updateShipHitFlash(ship);
       }
+      const shipHitTint = new THREE.Color(0xff344f);
       function updateShipHitFlash(ship) {
+        // A fading red tint over the original surface, not an opaque red silhouette.
+        const amount = THREE.MathUtils.clamp(ship.userData.hitFlash / .22, 0, 1) * (reducedMotion ? .16 : .28);
         if (!ship.userData.flashMaterials) {
-          ship.userData.hull.emissive.setHex(ship.userData.hitFlash > 0 ? 0xff4433 : 0x000000);
+          ship.userData.hull.emissive.copy(shipHitTint).multiplyScalar(amount * .5);
           updateEngineVisuals(ship);
           return;
         }
         // Every capital-ship material is private, including engine cores and sprites.
-        const amount = ship.userData.hitFlash > 0 ? (reducedMotion ? .55 : 1) : 0;
         for (const entry of ship.userData.flashMaterials) {
           const { material, color, emissive, intensity } = entry;
-          material.color.copy(color).lerp(new THREE.Color(0xff172d), amount);
+          material.color.copy(color).lerp(shipHitTint, amount);
           if (emissive) {
-            material.emissive.copy(emissive).lerp(new THREE.Color(0xff0018), amount);
-            material.emissiveIntensity = intensity + amount * 2;
+            material.emissive.copy(emissive).lerp(shipHitTint, amount * .5);
+            material.emissiveIntensity = intensity + amount * .25;
           }
         }
         updateEngineVisuals(ship);
@@ -886,11 +903,27 @@
       function updateShipCourse(ship, dt) {
         const data = ship.userData;
         data.courseAge += dt;
+        if (data.tutorialTarget) {
+          // A short, gentle approach near the flight path, not a sweep across the screen.
+          const duration = reducedMotion ? 3 : 2.4;
+          const before = THREE.MathUtils.smoothstep(data.courseAge - dt, 0, duration);
+          const after = THREE.MathUtils.smoothstep(data.courseAge, 0, duration);
+          data.courseVelocity.copy(flightMotion).multiplyScalar(.85)
+            .addScaledVector(data.tutorialEntry, (before - after) / dt);
+          if (data.type.asteroid) data.hull.opacity = THREE.MathUtils.smoothstep(data.courseAge, 0, .3);
+          else if (data.arrivalOpacity < 1) setShipOpacity(ship, THREE.MathUtils.smoothstep(data.courseAge, 0, .5));
+          return;
+        }
         if (data.type.asteroid) {
           // A brief spawn blend, completed before the rock becomes visually large.
           data.hull.opacity = THREE.MathUtils.smoothstep(data.courseAge, 0, .3);
           return;
         }
+        if (data.ringRoute) {
+          updateRingShipCourse(ship, dt);
+          return;
+        }
+        if (data.arrivalOpacity < 1) setShipOpacity(ship, THREE.MathUtils.smoothstep(data.courseAge, 0, 1.2));
         data.throttleTime -= dt;
         if (data.throttleTime <= 0) {
           data.throttleTime = random(3.5, 6.5);
@@ -1263,9 +1296,10 @@
       let particles = [], pointer = null, emission = 0, spaceHeld = false;
       let paused = true, speed = 0;
       const target = new THREE.Vector2();
-      const flightVelocity = new THREE.Vector2();
+      const flightVelocity = new THREE.Vector2(); // Temporary world-space impact drift.
+      const flightTurn = new THREE.Vector2(); // Inertial yaw/pitch rates, not lateral speed.
       const flightTilt = new THREE.Vector3();
-      const flightHeading = new THREE.Vector2(); // yaw and pitch derived from actual movement
+      const flightViewOffset = new THREE.Vector2(); // Smooth camera recovery after a barrier rebound.
       const flightMotion = new THREE.Vector3();
       const flightDirection = new THREE.Vector3(0, 0, -1);
       const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -1419,7 +1453,7 @@
       const bonusAsteroids = [];
       const bonusShips = [];
       const hazardPool = [];
-      function encounterRest(time = gameTime) {
+      function encounterRest(time = gameTime - courseStartTime) {
         return (time >= 10 && time < 15) || (time >= 28 && time < 33);
       }
       // 25% fewer side crossings, with the same opening delay and approach time.
@@ -1427,8 +1461,19 @@
       let nextHazardTime = hazardStartDelay;
       function levelFlightSpeed(progress) {
         return reducedMotion ? 35 + levelPressure * 10 + (8 + levelPressure * 15) * progress
-          : 1.15 * (180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(progress, 1.6));
+          : 1.86 * (180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(progress, 1.6));
       }
+      function flightDistanceAt(time) {
+        let forward = 0, distance = 0;
+        for (let step = 1; step * simulationStep <= time + 1e-8; step++) {
+          forward += (levelFlightSpeed(step * simulationStep / roundDuration) - forward) * (1 - Math.exp(-3 * simulationStep));
+          distance += forward * .85 * simulationStep;
+        }
+        return distance;
+      }
+      const firstCheckpointTime = 5;
+      const courseWorldOffset = new THREE.Vector3(), showerCourseOrigin = new THREE.Vector3(), courseOrigin = new THREE.Vector3();
+      let courseStartTime = 0;
       let capitalShip = ships.find(ship => ship.userData.type.capital) || null, capitalPending = false;
       const capitalHud = document.querySelector('#capital-hud');
       const capitalHealth = document.querySelector('#capital-health');
@@ -1491,13 +1536,11 @@
           transform.scale.set(size, size * random(.4, .9), size * random(1, 1.7));
           transform.updateMatrix();
           showerGrit.setMatrixAt(i, transform.matrix);
-          if (showerCorridor) {
-            const rock = { index: i, position: transform.position.clone(), seen: false, hit: false };
-            showerRocks.push(rock);
-            const key = `${Math.floor(rock.position.x / 128)},${Math.floor(rock.position.y / 128)},${Math.floor(rock.position.z / 128)}`;
-            if (!showerRockCells.has(key)) showerRockCells.set(key, []);
-            showerRockCells.get(key).push(rock);
-          }
+          const rock = { index: i, position: transform.position.clone(), seen: false, hit: false };
+          showerRocks.push(rock);
+          const key = `${Math.floor(rock.position.x / 128)},${Math.floor(rock.position.y / 128)},${Math.floor(rock.position.z / 128)}`;
+          if (!showerRockCells.has(key)) showerRockCells.set(key, []);
+          showerRockCells.get(key).push(rock);
         }
         showerGrit.instanceMatrix.needsUpdate = true;
         showerGrit.computeBoundingBox();
@@ -1505,7 +1548,7 @@
         showerGrit.quaternion.copy(showerRotation);
         showerGrit.visible = true;
       }
-      // Spatially query the rendered ring instances; no extra scene meshes or invisible walls.
+      // Every rendered shower instance is solid; spatial queries avoid extra meshes or invisible walls.
       const showerRocks = [], showerRockCells = new Map(), showerCandidates = [];
       const showerPreviousOrigin = new THREE.Vector3(), showerInverse = new THREE.Quaternion();
       const showerQueryStart = new THREE.Vector3(), showerQueryEnd = new THREE.Vector3();
@@ -1556,7 +1599,7 @@
         return showerRockCollider;
       }
       function recordVisibleShowerRocks() {
-        if (!showerCorridor || !showerGrit.visible || showerGritMaterial.opacity < .25) return;
+        if (!showerGrit.visible || showerGritMaterial.opacity < .25) return;
         showerInverse.copy(showerRotation).invert();
         showerQueryStart.copy(camera.position).sub(showerOrigin).applyQuaternion(showerInverse);
         // Notice nearby rocks before contact, even at low frame rates; do not scan the full field.
@@ -1571,7 +1614,7 @@
         }
       }
       function updateShowerRockCollisions() {
-        if (!started || paused || roundEnded || crashing || !showerCorridor || !showerGrit.visible) return false;
+        if (!started || paused || roundEnded || crashing || !showerGrit.visible) return false;
         showerInverse.copy(showerRotation).invert();
         showerQueryStart.copy(camera.position).sub(showerPreviousOrigin).applyQuaternion(showerInverse);
         showerQueryEnd.copy(camera.position).sub(showerOrigin).addScaledVector(flightMotion, .85 * 1.6)
@@ -1594,7 +1637,69 @@
         }
         return danger;
       }
-      let spawnQueue = [], nextShipTime = 2 * progressionTimeScale;
+      let spawnQueue = [], nextShipTime = 2 * progressionTimeScale, tutorialReinforcements = 0;
+      let tutorialStage = 3, tutorialCompleted = false, tutorialStepCompletedAt = null, tutorialRetryAt = 0;
+      function beginFlightTutorial() {
+        if (level !== 1 || tutorialCompleted) return;
+        tutorialStage = 0; tutorialStepCompletedAt = null; tutorialRetryAt = 0;
+        // Save the opening fleet for gradual reinforcements after the lesson, not a second near-camera formation.
+        spawnQueue = [...ships.filter(ship => ship.visible && !ship.userData.ringRoute), ...spawnQueue];
+        ships.forEach(ship => { ship.visible = false; delete ship.userData.tutorialTarget; delete ship.userData.tutorialEntry; });
+        flightRings.slice(1).forEach(gate => { gate.visible = false; gate.userData.resolved = true; });
+        repairPickup.visible = false;
+        showControlStep();
+      }
+      function completeTutorialStep(action) {
+        if (!started || paused || crashing || roundEnded || tutorialStage >= 3 || tutorialStepCompletedAt !== null
+          || ['checkpoint', 'laser', 'heavy'][tutorialStage] !== action) return;
+        tutorialStepCompletedAt = gameTime;
+      }
+      function spawnTutorialTarget() {
+        const ship = ships[tutorialStage === 1 ? 0 : 4];
+        resetShip(ship, true);
+        ship.userData.tutorialTarget = tutorialStage === 1 ? 'laser' : 'heavy';
+        if (tutorialStage === 2) {
+          ship.userData.asteroidTier = 2; ship.scale.setScalar(1.3);
+          ship.userData.health = ship.userData.maxHealth = 2;
+        }
+        ship.position.set(0, 0, reducedMotion ? -110 : -200).applyEuler(flightOrientation).add(camera.position);
+        // The ship gently descends into the path; the closer asteroid approaches straight along it.
+        const offset = reducedMotion ? 7 : 28;
+        ship.userData.tutorialEntry = new THREE.Vector3(0, tutorialStage === 1 ? offset : 0, -offset * 1.5)
+          .applyEuler(flightOrientation);
+        ship.position.add(ship.userData.tutorialEntry);
+        if (tutorialStage === 1) setShipOpacity(ship, 0);
+        ship.userData.previousPosition.copy(ship.position);
+        ship.userData.courseVelocity.copy(flightMotion).multiplyScalar(.85);
+      }
+      function updateFlightTutorial() {
+        if (!started || paused || crashing || roundEnded || tutorialStage >= 3) return;
+        if (tutorialStage === 0 && tutorialStepCompletedAt === null && flightRings[0].userData.resolved && gameTime >= tutorialRetryAt) {
+          // A missed practice checkpoint gets a new attempt on the fixed course axis, not on the pointer's heading.
+          const gate = flightRings[0];
+          gate.position.copy(camera.position).add(courseWorldOffset);
+          gate.position.z = camera.position.z - flightDistanceAt(firstCheckpointTime);
+          gate.userData.previous.copy(gate.position);
+          gate.userData.resolved = false; gate.visible = true; gate.userData.fadeStart = gameTime;
+        }
+        if (tutorialStepCompletedAt === null || gameTime - tutorialStepCompletedAt < (tutorialStage === 2 ? 1.4 : .7)) return;
+        tutorialStage++; tutorialStepCompletedAt = null;
+        if (tutorialStage < 3) { spawnTutorialTarget(); showControlStep(); return; }
+        tutorialCompleted = true;
+        ships.forEach(ship => { delete ship.userData.tutorialTarget; delete ship.userData.tutorialEntry; });
+        // Continue this flight: no clock, motion, weapon, particle or world-offset reset.
+        courseStartTime = gameTime;
+        nextShipTime = gameTime + .5;
+        tutorialReinforcements = 2;
+        nextHazardTime = gameTime + hazardStartDelay;
+        showerStart += gameTime; showerEnd += gameTime;
+        // Only the still-hidden encounter and remaining checkpoints are laid out ahead of the ongoing flight.
+        const depthShift = camera.position.z - courseWorldOffset.z - courseOrigin.z;
+        courseOrigin.z += depthShift; showerCourseOrigin.z += depthShift;
+        resetFlightRing(true);
+        // Let the two staggered ships arrive first; route traffic follows after six course seconds.
+        ringShipsPending = true;
+      }
       function setupLevelFleet() {
         const fleetSize = level + 2;
         while (fleetOrder.length < fleetSize) {
@@ -1602,10 +1707,14 @@
           createShip(index, [3, 0, 1, 3, 2][(fleetOrder.length - 8) % 5]);
           fleetOrder.push(index);
         }
-        const bonusCount = Math.ceil(level / 2);
+        const order = fleetOrder.slice(0, fleetSize);
+        const baseAsteroids = order.filter(index => ships[index].userData.type.asteroid).length;
+        const bonusCount = Math.round((baseAsteroids + Math.ceil(level / 2) + 3) * 1.3) - baseAsteroids;
         while (bonusAsteroids.length < bonusCount) {
           const index = ships.length;
           createShip(index, 3);
+          // Three regular arrivals are genuinely stationary rocks, not another moving shower.
+          ships[index].userData.stationary = bonusAsteroids.length < 3;
           bonusAsteroids.push(index);
         }
         const capitalLevel = level >= 4 && level % 4 === 0;
@@ -1616,28 +1725,32 @@
         capitalPending = capitalLevel;
         capitalHud.hidden = true;
         clearEnemyBolts();
-        const order = fleetOrder.slice(0, fleetSize);
         // Distribute extra rocks through the arrivals rather than saving them for last.
         bonusAsteroids.slice(0, bonusCount).forEach((index, slot) => {
           order.splice(Math.min(3 + slot * 2, order.length), 0, index);
         });
-        // Add ~20% more regular ships without increasing rocks or capital encounters.
+        // About 30% more than the existing population, still arriving gradually after a two-ship opening.
         const regularShips = order.filter(index => !ships[index].userData.type.asteroid);
-        const extraShipCount = Math.round(regularShips.length * .2);
+        const previousShipCount = regularShips.length + Math.round(regularShips.length * .2) + 3;
+        const extraShipCount = Math.round(previousShipCount * 1.3) - regularShips.length;
         while (bonusShips.length < extraShipCount) {
           const index = ships.length;
           const template = ships[regularShips[bonusShips.length % regularShips.length]];
           createShip(index, shipTypes.indexOf(template.userData.type));
           bonusShips.push(index);
         }
-        const fleet = [...order, ...bonusShips.slice(0, extraShipCount)].map(index => ships[index]);
+        bonusShips.slice(0, extraShipCount).forEach((index, slot) => {
+          order.splice(Math.min(3 + slot * 3, order.length), 0, index);
+        });
+        const fleet = order.map(index => ships[index]);
         ships.forEach(ship => { ship.visible = false; });
-        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.15 * (180 + levelPressure * 380);
+        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (180 + levelPressure * 380);
         fleet.slice(0, 2).forEach((ship, slot) => {
           resetShip(ship, true, slot);
           ship.position.z = -550 - slot * Math.max(280, openingSpeed * .85 * 1.5);
         });
         spawnQueue = fleet.slice(2);
+        tutorialReinforcements = 0;
         nextShipTime = 2 * progressionTimeScale;
         nextHazardTime = hazardStartDelay;
         showerStrength = Math.floor(random(0, 3));
@@ -1647,35 +1760,62 @@
         resetRepairPickup();
         showerStart = random(8, 11);
         showerEnd = showerStart + Math.min(20, 14 + showerStrength * 2 + (level - 1) * .3);
+        courseWorldOffset.set(0, 0, 0); courseOrigin.copy(camera.position); courseStartTime = 0;
+        planAsteroidShower();
+        resetFlightRing();
+        resetRingShips();
+        // Only the two ordinary ships open a level; course traffic joins later from a distance.
+        ringShips.forEach(ship => { ship.visible = false; });
+        ringShipsPending = true;
+        resetFlightBoundary();
         showerPending = true;
-        showerTravel = 0; nextShowerSlice = 0; showerLength = 0; nextShowerObstacle = Infinity;
+        showerTravel = 0; nextShowerSlice = 0;
         showerGrit.visible = false;
         showerRocks.length = 0; showerRockCells.clear();
         showerWarning.innerHTML = '<span aria-hidden="true">' + '☄️ '.repeat(showerStrength + 1)
           + '</span>' + t(showerCorridor ? 'asteroidCorridor' : 'asteroidShower');
         showerWarning.hidden = true;
       }
+      function advanceFlightHeading(orientation, turn, dt) {
+        // Exact exponential integration: neutral controls stop turning, never reset the heading.
+        const response = 1 - Math.exp(-4 * dt), motion = reducedMotion ? .5 : 1;
+        const yawLimit = 65 * Math.PI / 180, pitchLimit = Math.PI / 4;
+        let yaw = -target.x * .9 * motion, pitch = target.y * .65 * motion;
+        // Ease outward input over the last 30% of the cone. Turning inward stays responsive.
+        if (orientation.y * yaw > 0) yaw *= 1 - THREE.MathUtils.smoothstep(Math.abs(orientation.y), yawLimit * .7, yawLimit);
+        if (orientation.x * pitch > 0) pitch *= 1 - THREE.MathUtils.smoothstep(Math.abs(orientation.x), pitchLimit * .7, pitchLimit);
+        orientation.y += yaw * dt + (turn.x - yaw) * response / 4;
+        orientation.x += pitch * dt + (turn.y - pitch) * response / 4;
+        turn.x += (yaw - turn.x) * response;
+        turn.y += (pitch - turn.y) * response;
+        // Stop any residual outward inertia at the edge; never pull the nose back to center.
+        orientation.y = THREE.MathUtils.clamp(orientation.y, -yawLimit, yawLimit);
+        orientation.x = THREE.MathUtils.clamp(orientation.x, -pitchLimit, pitchLimit);
+        if (Math.abs(orientation.y) === yawLimit && Math.sign(turn.x) === Math.sign(orientation.y)) turn.x = 0;
+        if (Math.abs(orientation.x) === pitchLimit && Math.sign(turn.y) === Math.sign(orientation.x)) turn.y = 0;
+      }
       function forecastFlightPosition(position, steps) {
-        // Place close crossings ahead of held controls using the real fixed-step inertia.
-        const step = simulationStep, motion = reducedMotion ? .35 : 1;
-        const response = 1 - Math.exp(-3 * step);
-        let forward = -flightMotion.z, vx = flightMotion.x, vy = flightMotion.y;
+        const step = simulationStep, acceleration = 1 - Math.exp(-3 * step);
+        const orientation = flightOrientation.clone(), turn = flightTurn.clone(), drift = flightVelocity.clone();
+        const velocity = flightMotion.clone();
+        const direction = new THREE.Vector3(0, 0, -1).applyEuler(orientation);
+        let forward = Math.max(0, velocity.dot(direction) - drift.x * direction.x - drift.y * direction.y);
         position.copy(camera.position);
         for (let i = 0; i < steps; i++) {
-          position.x += vx * .85 * step;
-          position.y += vy * .85 * step;
-          position.z -= forward * .85 * step;
-          const progress = Math.min(1, (gameTime + (i + 1) * step) / roundDuration);
-          forward += (levelFlightSpeed(progress) - forward) * response;
-          vx += (target.x * forward * 1.15 * motion - vx) * response;
-          vy += (target.y * forward * motion - vy) * response;
+          position.addScaledVector(velocity, .85 * step);
+          const progress = Math.min(1, (gameTime - courseStartTime + (i + 1) * step) / roundDuration);
+          forward += (levelFlightSpeed(progress) - forward) * acceleration;
+          advanceFlightHeading(orientation, turn, step);
+          drift.multiplyScalar(Math.exp(-2 * step));
+          velocity.set(0, 0, -forward).applyEuler(orientation);
+          velocity.x += drift.x; velocity.y += drift.y;
         }
       }
       function updateCollisionHazard() {
         if (!started || paused || roundEnded || crashing || encounterRest() || gameTime < nextHazardTime) return;
         const cruise = levelFlightSpeed(difficulty);
         // After resuming, let speed recover before placing an approach of at least three seconds.
-        if (-flightMotion.z < cruise * .9) return;
+        if (flightMotion.length() < cruise * .9) return;
         let rock = hazardPool.find(ship => !ship.visible);
         if (!rock) {
           // Two reusable rocks cover slow fly-bys without growing the asteroid field.
@@ -1688,7 +1828,7 @@
         resetShip(rock, false, rock.userData.slot, reducedMotion ? 1 : 3);
         // Forecasting can slow an over-speed flight down; do not use that transient speed
         // to shorten the lead and accidentally place the rock inside the visible field.
-        const approachSpeed = Math.min(-flightMotion.z, cruise) * .85;
+        const approachSpeed = Math.min(flightMotion.length(), cruise) * .85;
         const approachSteps = Math.ceil(Math.max(hazardApproach,
           (asteroidArrivalDistance(rock) + flightMotion.length() * .85 * .3) / approachSpeed) / simulationStep);
         const approachTime = approachSteps * simulationStep;
@@ -1718,49 +1858,61 @@
         if (!showerCorridor) rock.userData.courseVelocity.multiplyScalar(random(.9, 1.1));
         return rock;
       }
+      function planAsteroidShower() {
+        const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
+        showerRotation.identity();
+        showerDirection.set(0, 0, -1).applyQuaternion(showerRotation);
+        showerVelocity.set(0, 0, 0);
+        const crossingOffset = new THREE.Vector3();
+        const showerTime = showerStart - courseStartTime;
+        const courseSpeed = levelFlightSpeed(showerTime / roundDuration) * .85;
+        let approachSpeed = courseSpeed;
+        // The corridor stays a fixed passage; only free showers become directional rain.
+        if (!showerCorridor) {
+          // Front-left/right dominate (80%); the rest approach ahead, slightly above/below.
+          const roll = random(0, 1);
+          const course = roll < .4 ? 0 : roll < .8 ? 1 : roll < .9 ? 2 : 3;
+          if (course < 2) showerVelocity.set(course === 0 ? -1 : 1, random(-.15, .15), random(.4, .7));
+          else showerVelocity.set(0, course === 2 ? .2 : -.2, 1); // About 11° off a frontal approach.
+          // Keep shallow variants near the forward view instead of using the full sideways offset.
+          crossingOffset.set(showerVelocity.x, showerVelocity.y, 0);
+          if (course < 2) crossingOffset.normalize();
+          crossingOffset.multiplyScalar(reducedMotion ? 200 : 600).applyQuaternion(showerRotation);
+          showerVelocity.normalize().multiplyScalar(Math.max(reducedMotion ? 50 : 220, courseSpeed * .9))
+            .applyQuaternion(showerRotation);
+          // Lay the stream upstream so it reaches the view instead of drifting off-screen.
+          showerDirection.set(0, 0, -courseSpeed).sub(showerVelocity);
+          approachSpeed = showerDirection.length();
+          showerDirection.normalize();
+          showerRotation.setFromUnitVectors(new THREE.Vector3(0, 0, -1), showerDirection);
+        }
+        // Start beyond the distance fade; the field gradually emerges from the sky.
+        const lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5) + crossingOffset.length();
+        showerLength = Math.max(900, approachSpeed * (showerEnd - showerStart));
+        showerSpacing = showerCorridor ? Math.max(160, approachSpeed * [1.15, .9, .7][showerStrength])
+          : Math.max(120, approachSpeed * [2.5, 1.4, .85][showerStrength]);
+        // Leave room for all approach slices, including spacing jitter and gap obstacles.
+        showerSpacing = Math.max(showerSpacing, (Math.min(lead, showerLength) + 200) * (count + 1) / (maxShowerRocks * .75));
+        showerObstacleSpacing = Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][showerStrength]));
+        nextShowerObstacle = showerSpacing; // Keep the entry clear before the first obstacle.
+        // Preserve the original narrow corridor; energy gates stay outside it.
+        showerHalfGap = Math.max(27, .4 * (130 - showerStrength * 22 - (level - 1) * 3));
+        showerBend *= showerHalfGap;
+        // Fixed-width core plus a sparse fringe, never scaled to the viewport.
+        showerHalfWidth = showerCorridor ? 900 : 650;
+        showerCourseOrigin.copy(courseOrigin).add(crossingOffset).addScaledVector(showerDirection, lead);
+        showerCourseOrigin.z -= flightDistanceAt(showerTime);
+        if (showerCorridor) {
+          // Leave a clear finish checkpoint after the passage, including at reduced-motion speeds.
+          const finishClearance = (reducedMotion ? 14 : 80) * 3 + levelFlightSpeed(1) * .85 * .75;
+          showerLength = Math.min(showerLength, flightDistanceAt(42) + showerCourseOrigin.z - courseOrigin.z - finishClearance);
+        }
+      }
       function advanceAsteroidShower(dt) {
         const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
         if (showerPending) {
           showerPending = false;
-          showerRotation.setFromEuler(flightOrientation);
-          showerDirection.set(0, 0, -1).applyQuaternion(showerRotation);
-          showerVelocity.set(0, 0, 0);
-          const crossingOffset = new THREE.Vector3();
-          let approachSpeed = flightMotion.length() * .85;
-          // The corridor stays a fixed passage; only free showers become directional rain.
-          if (!showerCorridor) {
-            // Front-left/right dominate (80%); the rest approach ahead, slightly above/below.
-            const roll = random(0, 1);
-            const course = roll < .4 ? 0 : roll < .8 ? 1 : roll < .9 ? 2 : 3;
-            if (course < 2) showerVelocity.set(course === 0 ? -1 : 1, random(-.15, .15), random(.4, .7));
-            else showerVelocity.set(0, course === 2 ? .2 : -.2, 1); // About 11° off a frontal approach.
-            // Keep shallow variants near the forward view instead of using the full sideways offset.
-            crossingOffset.set(showerVelocity.x, showerVelocity.y, 0);
-            if (course < 2) crossingOffset.normalize();
-            crossingOffset.multiplyScalar(reducedMotion ? 200 : 600).applyQuaternion(showerRotation);
-            showerVelocity.normalize().multiplyScalar(Math.max(reducedMotion ? 50 : 220, flightMotion.length() * .85 * .9))
-              .applyQuaternion(showerRotation);
-            // Lay the stream upstream so it reaches the view instead of drifting off-screen.
-            showerDirection.copy(flightMotion).multiplyScalar(.85).sub(showerVelocity);
-            approachSpeed = showerDirection.length();
-            showerDirection.normalize();
-            showerRotation.setFromUnitVectors(new THREE.Vector3(0, 0, -1), showerDirection);
-          }
-          // Start beyond the distance fade; the field gradually emerges from the sky.
-          const lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5) + crossingOffset.length();
-          showerLength = Math.max(900, approachSpeed * (showerEnd - showerStart));
-          showerSpacing = showerCorridor ? Math.max(160, approachSpeed * [1.15, .9, .7][showerStrength])
-            : Math.max(120, approachSpeed * [2.5, 1.4, .85][showerStrength]);
-          // Leave room for all approach slices, including spacing jitter and gap obstacles.
-          showerSpacing = Math.max(showerSpacing, (Math.min(lead, showerLength) + 200) * (count + 1) / (maxShowerRocks * .75));
-          showerObstacleSpacing = Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][showerStrength]));
-          nextShowerObstacle = showerSpacing; // Keep the entry clear before the first obstacle.
-          // A third narrower, while retaining the minimum 54-unit hull-clear passage.
-          showerHalfGap = Math.max(27, .4 * (130 - showerStrength * 22 - (level - 1) * 3));
-          showerBend *= showerHalfGap;
-          // Fixed-width core plus a sparse fringe, never scaled to the viewport.
-          showerHalfWidth = showerCorridor ? 900 : 650;
-          showerOrigin.copy(camera.position).add(crossingOffset).addScaledVector(showerDirection, lead);
+          showerOrigin.copy(showerCourseOrigin).add(courseWorldOffset);
           showerPreviousOrigin.copy(showerOrigin);
           seedShowerGrit();
         } else {
@@ -1827,7 +1979,7 @@
       }
       function queueShip(ship) {
         ship.visible = false;
-        if (!ship.userData.shower && !ship.userData.scheduledHazard && !ship.userData.type.capital) spawnQueue.push(ship);
+        if (!ship.userData.shower && !ship.userData.scheduledHazard && !ship.userData.type.capital && !ship.userData.ringRoute && !ship.userData.tutorialTarget) spawnQueue.push(ship);
       }
       const asteroidCollisionPrevious = new THREE.Vector3(), asteroidCollisionClosest = new THREE.Vector3();
       const asteroidCollisionPath = new THREE.Line3();
@@ -1868,18 +2020,46 @@
         }
       }
       function updateShipArrivals(dt = 0) {
+        if (tutorialStage < 3) return;
         updateAsteroidShower(dt);
         // Existing ships and fields keep moving; only reinforcements take a breather.
         if (!started || paused || roundEnded || crashing || encounterRest()) return;
         updateCollisionHazard();
-        if (capitalPending && gameTime >= 6) {
+        if (capitalPending && gameTime - courseStartTime >= 6) {
           capitalPending = false;
           resetShip(capitalShip);
         }
         if (!spawnQueue.length || gameTime < nextShipTime) return;
-        resetShip(spawnQueue.shift());
+        const index = tutorialReinforcements > 0 ? spawnQueue.findIndex(ship => !ship.userData.type.asteroid) : 0;
+        const ship = spawnQueue.splice(index, 1)[0];
+        resetShip(ship);
+        if (tutorialReinforcements > 0) {
+          // First a close shooting target before the gate, then a separate arrival near the checkpoint.
+          const gate = flightRings.find(gate => !gate.userData.resolved), data = ship.userData;
+          data.baseRotation.copy(gate.quaternion); ship.quaternion.copy(data.baseRotation);
+          data.cruiseDirection.copy(gate.userData.normal).negate();
+          data.courseRight.set(1, 0, 0).applyQuaternion(data.baseRotation);
+          data.courseUp.set(0, 1, 0).applyQuaternion(data.baseRotation);
+          if (tutorialReinforcements === 2) {
+            const fraction = Math.min(.4, (reducedMotion ? 160 : 550) / camera.position.distanceTo(gate.position));
+            ship.position.copy(camera.position).lerp(gate.position, fraction)
+              .addScaledVector(data.courseRight, reducedMotion ? -18 : -60)
+              .addScaledVector(data.courseUp, reducedMotion ? 4 : 10);
+          } else {
+            ship.position.copy(gate.position).addScaledVector(gate.userData.normal, reducedMotion ? 70 : 450)
+              .addScaledVector(data.courseRight, reducedMotion ? 50 : 180)
+              .addScaledVector(data.courseUp, reducedMotion ? 8 : 25);
+          }
+          const offset = ship.position.clone().sub(camera.position);
+          data.lane = offset.dot(data.courseRight); data.height = offset.dot(data.courseUp);
+          data.previousPosition.copy(ship.position);
+          data.courseVelocity.copy(data.cruiseDirection)
+            .multiplyScalar(Math.max(0, flightMotion.dot(data.cruiseDirection)) * .85 * data.cruiseRatio);
+          setShipOpacity(ship, 0);
+          tutorialReinforcements--;
+        }
         // No catch-up batches after a slow frame or pause.
-        const spacing = Math.max(.2, 2 - (level - 1) * .25) * progressionTimeScale;
+        const spacing = tutorialReinforcements > 0 ? 3 : Math.max(.2, 2 - (level - 1) * .25) * progressionTimeScale;
         nextShipTime = gameTime + spacing;
       }
       function updateRetries() {
@@ -1902,7 +2082,7 @@
       const shieldHit = document.querySelector('#shield-hit');
       function updateShield() {
         document.querySelector('#shield-energy').value = shield;
-        document.querySelector('#shield-value').textContent = `${shield}%`;
+        document.querySelector('#shield-value').textContent = `${Math.ceil(shield)}%`;
         document.querySelector('#shield-hud').classList.toggle('low', shield <= 30);
       }
       const repairMarker = document.querySelector('#repair-marker');
@@ -1972,6 +2152,511 @@
           repairMarker.style.top = `${(-repairProjected.y * .5 + .5) * innerHeight + 26}px`;
         }
       }
+      // A single upcoming gate keeps the route readable without cluttering combat.
+      const flightRingWash = document.querySelector('#flight-ring-wash');
+      const flightRing = new THREE.Group();
+      flightRing.userData.flightRing = true;
+      const flightRingCore = new THREE.MeshBasicMaterial({ color: 0xc0faff, transparent: true,
+        opacity: 1, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+      flightRing.add(new THREE.Mesh(new THREE.TorusGeometry(1, .075, 12, 192), flightRingCore));
+      const flightRingHalo = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+        uniforms: { tint: { value: new THREE.Color(0x36dbff) }, pulse: { value: 1 }, phase: { value: 0 }, brightness: { value: 1 } },
+        vertexShader: `varying vec2 ringUv;
+          void main() { ringUv = uv * 3.0 - 1.5; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `varying vec2 ringUv;
+          uniform vec3 tint; uniform float pulse; uniform float phase; uniform float brightness;
+          void main() {
+            float angle = atan(ringUv.y, ringUv.x);
+            float radius = length(ringUv);
+            // Tiny surface irregularities, not the large whole-ring wobble.
+            float roughness = .004 * sin(angle * 11.0 + phase * 3.0) + .002 * sin(angle * 23.0 - phase * 5.0);
+            float grain = .65 * sin(angle * 29.0 + phase * 13.0) + .35 * sin(angle * 71.0 - phase * 17.0);
+            float distanceToRim = abs(radius - 1.0 - roughness);
+            float pixel = fwidth(distanceToRim);
+            float coreWidth = max(.075 * (1.0 + grain * .12), pixel * 1.5);
+            float glowWidth = max(.21, pixel * 3.5);
+            float core = 1.0 - smoothstep(coreWidth * .5, coreWidth, distanceToRim);
+            float glow = exp(-pow(distanceToRim / glowWidth, 2.0));
+            float highlight = pow(.5 + .5 * cos(angle - phase), 10.0);
+            float filamentRadius = 1.115 + roughness + .012 * sin(angle * 31.0 - phase * 17.0)
+              + .006 * sin(angle * 73.0 + phase * 23.0);
+            float filament = exp(-pow((radius - filamentRadius) / max(.005, pixel * .6), 2.0));
+            float arc = pow(.5 + .5 * sin(angle * 5.0 - phase * 4.0), 6.0);
+            float sparks = pow(.5 + .5 * sin(angle * 43.0 + phase * 19.0), 16.0);
+            gl_FragColor = vec4(mix(tint, vec3(.78, 1.0, 1.0), max(core, filament * arc)),
+              min(1.0, core + glow * pulse * (.55 + highlight * .35)
+                + filament * (arc * .8 + sparks * .3)) * brightness);
+          }`
+      });
+      flightRing.add(new THREE.Mesh(new THREE.PlaneGeometry(3, 3), flightRingHalo));
+      const flightRingGuide = document.querySelector('#flight-ring-guide');
+      const flightRings = Array.from({ length: 5 }, (_, index) => {
+        const gate = index === 0 ? flightRing : flightRing.clone();
+        if (index > 0) {
+          gate.children[0].material = flightRingCore.clone();
+          gate.children[1].material = flightRingHalo.clone();
+        }
+        gate.children[0].material.onBeforeCompile = shader => {
+          shader.uniforms.ringPhase = gate.children[1].material.uniforms.phase;
+          shader.vertexShader = 'uniform float ringPhase;\n' + shader.vertexShader;
+          shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+            #include <begin_vertex>
+            float angle = atan(position.y, position.x);
+            float roughness = .004 * sin(angle * 11.0 + ringPhase * 3.0) + .002 * sin(angle * 23.0 - ringPhase * 5.0);
+            float grain = .65 * sin(angle * 29.0 + ringPhase * 13.0) + .35 * sin(angle * 71.0 - ringPhase * 17.0);
+            transformed.xy += normalize(position.xy) * (roughness + (length(position.xy) - 1.0) * grain * .12);
+            transformed.z *= 1.0 + grain * .12;
+          `);
+        };
+        gate.userData = { flightRing: true, normal: new THREE.Vector3(), previous: new THREE.Vector3(), radius: reducedMotion ? 14 : 80 };
+        gate.visible = false;
+        scene.add(gate);
+        return gate;
+      });
+      const flightRingCrossing = new THREE.Vector3(), flightRingProjected = new THREE.Vector3();
+      let flightRingWashUntil = 0, flightRingWashStrength = 0;
+      function flightRingOpacity(gate) {
+        return (1 - THREE.MathUtils.smoothstep(gate.position.distanceTo(camera.position),
+          reducedMotion ? 400 : 2600, reducedMotion ? 700 : 3600))
+          * THREE.MathUtils.smoothstep(gameTime - gate.userData.fadeStart, 0, .4);
+      }
+      function resetFlightRing(openingComplete = false) {
+        // Five fixed checkpoints; redistribute intermediate gates around, never inside, a corridor.
+        const radius = reducedMotion ? 14 : 80;
+        let depths = [firstCheckpointTime, 12, 22, 32, 42].map(flightDistanceAt);
+        let approachDepth, exitDepth;
+        if (showerCorridor) {
+          const entranceDepth = courseOrigin.z - showerCourseOrigin.z;
+          const approachGap = Math.max(radius * 3, reducedMotion ? 120 : levelFlightSpeed((showerStart - courseStartTime) / roundDuration) * .85 * 1.5);
+          approachDepth = entranceDepth - approachGap;
+          exitDepth = entranceDepth + showerLength;
+          depths = [depths[0], approachDepth, depths[4]];
+          const gaps = [[depths[0], approachDepth], [exitDepth + radius * 2, depths[2]]];
+          while (depths.length < flightRings.length) {
+            gaps.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
+            const [from, to] = gaps.shift(), middle = (from + to) / 2;
+            depths.push(middle);
+            gaps.push([from, middle], [middle, to]);
+          }
+          depths.sort((a, b) => a - b);
+        }
+        // Preserve the corridor/intermediate layout; reach the finish in the final second.
+        depths[depths.length - 1] = flightDistanceAt(roundDuration - .5);
+        flightRings.forEach((gate, index) => {
+          if (openingComplete && index === 0) return; // Leave the passed opening checkpoint behind.
+          const depth = depths[index], y = showerCorridor && depth > exitDepth ? corridorCenter(showerLength) : 0;
+          gate.position.set(0, y, -depth).add(courseOrigin).add(courseWorldOffset);
+          gate.userData.kind = index === 0 ? 'start' : index === flightRings.length - 1 ? 'finish'
+            : depth === approachDepth ? 'approach' : 'course';
+          gate.userData.radius = radius;
+          gate.scale.setScalar(radius);
+          gate.userData.normal.set(0, 0, 1); gate.quaternion.identity();
+          gate.userData.previous.copy(gate.position);
+          gate.visible = true;
+          gate.userData.resolved = false; gate.userData.fadeStart = gameTime;
+          const brightness = (index === (openingComplete ? 1 : 0) ? 1 : .3) * flightRingOpacity(gate);
+          gate.children[0].material.opacity = brightness;
+          gate.children[1].material.uniforms.brightness.value = brightness;
+        });
+        flightRingWashUntil = 0; flightRingWashStrength = 0;
+        flightRingGuide.hidden = true;
+        flightRingWash.style.opacity = '0';
+        flightRingWash.classList.remove('missed');
+      }
+      function renderFlightRingFeedback() {
+        const active = started && !paused && !roundEnded && !crashing;
+        flightRingWash.style.opacity = String(active ? flightRingWashStrength * (reducedMotion ? .25 : 1) : 0);
+        flightRingGuide.hidden = true;
+        if (roundEnded || crashing) flightRings.forEach(gate => { gate.visible = false; });
+        const next = flightRings.find(gate => !gate.userData.resolved);
+        if (!active || !next || flightRingOpacity(next) === 0) return;
+        flightRingGuide.style.opacity = String(flightRingOpacity(next));
+        // A distant checkpoint straight ahead needs no sideways arrow, even beyond the camera's far plane.
+        flightRingProjected.copy(next.position).sub(camera.position).applyQuaternion(camera.quaternion.clone().invert());
+        const halfHeight = -flightRingProjected.z * Math.tan(camera.fov * Math.PI / 360);
+        if (flightRingProjected.z < 0 && Math.abs(flightRingProjected.x) < halfHeight * camera.aspect * .85
+          && Math.abs(flightRingProjected.y) < halfHeight * .8) return;
+        // An off-screen guide makes it possible to find the fixed course after a turn.
+        let x = flightRingProjected.x, y = -flightRingProjected.y;
+        if (Math.hypot(x, y) < .01) x = 1;
+        const angle = Math.atan2(y, x), edgeX = Math.cos(angle), edgeY = Math.sin(angle);
+        flightRingGuide.style.left = `${innerWidth / 2 + edgeX * (innerWidth / 2 - 44)}px`;
+        flightRingGuide.style.top = `${innerHeight / 2 + edgeY * (innerHeight / 2 - 100)}px`;
+        flightRingGuide.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+        flightRingGuide.hidden = false;
+      }
+      function resolveFlightRing(gate, passed) {
+        gate.userData.resolved = true;
+        gate.visible = false;
+        flightRingWashUntil = gameTime + .35; flightRingWashStrength = 1;
+        flightRingWash.classList.toggle('missed', !passed);
+        if (passed) {
+          if (gate.userData.kind === 'start') completeTutorialStep('checkpoint');
+          score += 100;
+          if (score > best) {
+            best = score;
+            try { localStorage.setItem('sternflug-highscore', String(best)); } catch {}
+          }
+          updateScore();
+          showFeedback(t('ringPassed'));
+          playSound('reward');
+        } else {
+          if (tutorialStage === 0) tutorialRetryAt = gameTime + 1.2;
+          shield = Math.max(0, shield - 10);
+          updateShield();
+          showFeedback(t('ringMissed'), true);
+          shieldHitTime = .55; shieldHit.hidden = false; shieldHit.style.opacity = '1';
+          playSound('hit');
+          if (shield === 0) startCrash(gate);
+        }
+      }
+      function updateFlightRing() {
+        if (!started || paused || roundEnded || crashing) return;
+        flightRingWashStrength = Math.max(0, (flightRingWashUntil - gameTime) / .35);
+        const next = flightRings.find(gate => !gate.userData.resolved);
+        for (const gate of flightRings) {
+          const data = gate.userData;
+          data.previous.copy(gate.position);
+          gate.position.addScaledVector(worldStep, .85);
+          if (data.resolved || crashing) continue;
+          const halo = gate.children[1].material;
+          const brightness = (gate === next ? 1 : .3) * flightRingOpacity(gate);
+          gate.children[0].material.opacity = brightness * (reducedMotion ? 1 : .9 + .1 * Math.sin(gameTime * 2.7));
+          halo.uniforms.brightness.value = brightness;
+          halo.uniforms.pulse.value = reducedMotion ? 1 : 1 + .12 * Math.sin(gameTime * 2.7);
+          halo.uniforms.phase.value = reducedMotion ? 0 : gameTime * .5;
+          const before = flightRingCrossing.copy(data.previous).sub(camera.position).dot(data.normal);
+          const after = flightRingCrossing.copy(gate.position).sub(camera.position).dot(data.normal);
+          const closingSpeed = -flightMotion.dot(data.normal) * .85;
+          const timeToPlane = closingSpeed > 0 ? -after / closingSpeed : Infinity;
+          if (gate === next && timeToPlane > 0 && timeToPlane < .2) {
+            flightRingCrossing.copy(gate.position).addScaledVector(flightMotion, -.85 * timeToPlane).sub(camera.position);
+            if (flightRingCrossing.length() <= data.radius) {
+              flightRingWashStrength = 1 - timeToPlane / .2;
+              flightRingWash.classList.remove('missed');
+              halo.uniforms.pulse.value += reducedMotion ? 0 : flightRingWashStrength;
+            }
+          }
+          if (before < 0 && after >= 0) {
+            flightRingCrossing.lerpVectors(data.previous, gate.position, -before / (after - before)).sub(camera.position);
+            resolveFlightRing(gate, flightRingCrossing.length() <= data.radius + 1e-6);
+          }
+        }
+      }
+      const ringShips = [], ringShipPoint = new THREE.Vector3(), ringShipForward = new THREE.Vector3(0, 0, -1);
+      let ringShipsPending = false;
+      function updateRingShipArrivals() {
+        if (!started || paused || roundEnded || crashing || tutorialStage < 3 || !ringShipsPending
+          || gameTime - courseStartTime < 6) return;
+        resetRingShips(true);
+      }
+      function resetRingShips(distant = false) {
+        ringShipsPending = false;
+        ringShips.forEach(ship => { ship.visible = false; });
+        const gates = flightRings.filter(gate => !gate.userData.resolved);
+        if (!gates.length) return;
+        // A small, reusable flight follows the actual openings, not the player's heading.
+        while (ringShips.length < 3) {
+          createShip(ships.length, 0);
+          ringShips.push(ships[ships.length - 1]);
+        }
+        const clearance = Math.min(...gates.map(gate => gate.userData.radius));
+        const firstDistance = Math.min(gates[0].position.distanceTo(camera.position), flightDistanceAt(firstCheckpointTime));
+        const arrivalDistance = Math.max(reducedMotion ? 600 : 3800, levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 7);
+        ringShips.forEach((ship, index) => {
+          resetShip(ship, true);
+          const lane = [-.32, .32, -.1][index];
+          const points = gates.flatMap(gate => {
+            const center = gate.position.clone().sub(courseWorldOffset).add(
+              new THREE.Vector3(lane * gate.userData.radius, 0, 0).applyQuaternion(gate.quaternion));
+            // Approach each opening along its normal, rather than cutting across the rim.
+            return [center.clone().addScaledVector(gate.userData.normal, gate.userData.radius * .75), center,
+              center.clone().addScaledVector(gate.userData.normal, -gate.userData.radius * .75)];
+          });
+          points.push(camera.position.clone().sub(courseWorldOffset).add(new THREE.Vector3(lane * clearance, 0, 0)));
+          points.sort((a, b) => b.z - a.z);
+          // Follow the narrow passage between gates, without adding any gates inside it.
+          if (showerCorridor) {
+            const entry = points.filter(point => point.z > showerCourseOrigin.z).pop();
+            const exit = points.find(point => point.z < showerCourseOrigin.z - showerLength);
+            const entryPadding = Math.min(200, (entry.z - showerCourseOrigin.z) / 2);
+            const exitPadding = exit ? Math.min(200, (showerCourseOrigin.z - showerLength - exit.z) / 2) : 200;
+            for (let step = -1; step <= 9; step++) {
+              const depth = step < 0 ? -entryPadding : step > 8 ? showerLength + exitPadding : showerLength * step / 8;
+              const x = THREE.MathUtils.lerp(entry.x, exit ? exit.x : entry.x, THREE.MathUtils.clamp(depth / showerLength, 0, 1));
+              points.push(new THREE.Vector3(x - showerCourseOrigin.x, corridorCenter(THREE.MathUtils.clamp(depth, 0, showerLength)), -depth)
+                .applyQuaternion(showerRotation).add(showerCourseOrigin));
+            }
+          }
+          points.sort((a, b) => b.z - a.z);
+          points.push(points[points.length - 1].clone().add(new THREE.Vector3(0, 0, -flightDistanceAt(8))));
+          const curve = new THREE.CatmullRomCurve3(points);
+          curve.arcLengthDivisions = 512; // Keep distance-based arrivals accurate with the extra checkpoint knots.
+          const length = curve.getLength();
+          const distance = distant ? arrivalDistance + index * (reducedMotion ? 80 : 350) : firstDistance * (.3 + index * .2);
+          const data = ship.userData;
+          data.ringRoute = { curve, length, distance, distant, position: curve.getPointAt(distance / length), exit: curve.getTangentAt(1) };
+          setShipOpacity(ship, distant ? 0 : 1);
+          // Fit the complete hull even when turning through the smaller reduced-motion openings.
+          const bounds = data.collisionBox.getBoundingSphere(new THREE.Sphere());
+          const hullRadius = bounds.radius + bounds.center.length();
+          ship.scale.setScalar(Math.min(data.type.scale, clearance * .55 / hullRadius));
+          ship.position.copy(data.ringRoute.position).add(courseWorldOffset);
+          data.previousPosition.copy(ship.position);
+          curve.getTangentAt(distance / length, data.cruiseDirection);
+          data.baseRotation.setFromUnitVectors(ringShipForward, data.cruiseDirection);
+          ship.quaternion.copy(data.baseRotation);
+          data.courseRight.set(1, 0, 0).applyQuaternion(data.baseRotation);
+          data.courseUp.set(0, 1, 0).applyQuaternion(data.baseRotation);
+          data.courseVelocity.copy(data.cruiseDirection).multiplyScalar(levelFlightSpeed(0) * .85);
+        });
+      }
+      function setShipOpacity(ship, opacity) {
+        ship.userData.arrivalOpacity = opacity;
+        ship.traverse(part => {
+          if (part.isMesh && !part.userData.engineExhaust) part.material.opacity = opacity;
+        });
+      }
+      function updateRingShipCourse(ship, dt) {
+        if (!started || paused || roundEnded || crashing || !ship.visible || dt <= 0) return;
+        const data = ship.userData, route = data.ringRoute;
+        const previousSpeed = data.courseVelocity.length();
+        // New course traffic approaches from the distance before matching cruise speed.
+        const arrival = route.distant ? .25 + .75 * THREE.MathUtils.smoothstep(data.courseAge, 0, 12) : 1;
+        if (data.arrivalOpacity < 1) setShipOpacity(ship, Math.min(1, data.arrivalOpacity + dt / 1.2));
+        route.distance += levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * arrival * dt;
+        route.curve.getPointAt(Math.min(1, route.distance / route.length), ringShipPoint);
+        if (route.distance > route.length) ringShipPoint.addScaledVector(route.exit, route.distance - route.length);
+        // Only intrinsic motion here; the regular fleet loop adds the shared world step once.
+        data.courseVelocity.subVectors(ringShipPoint, route.position).divideScalar(dt);
+        route.position.copy(ringShipPoint);
+        data.cruiseDirection.copy(data.courseVelocity).normalize();
+        data.baseRotation.setFromUnitVectors(ringShipForward, data.cruiseDirection);
+        ship.quaternion.slerp(data.baseRotation, 1 - Math.exp(-4 * dt));
+        data.courseRight.set(1, 0, 0).applyQuaternion(data.baseRotation);
+        data.courseUp.set(0, 1, 0).applyQuaternion(data.baseRotation);
+        updateEngineThrust(ship, previousSpeed, dt);
+      }
+      const flightBoundaryNotice = document.querySelector('#flight-boundary-notice');
+      const flightBoundaryRadii = new THREE.Vector2(reducedMotion ? 600 : 1800, reducedMotion ? 360 : 1100);
+      const flightBoundaryOrigin = new THREE.Vector3(), flightBoundaryPrevious = new THREE.Vector3();
+      const flightBoundaryLocal = new THREE.Vector3(), flightBoundaryAim = new THREE.Vector3();
+      const flightBoundaryNormal = new THREE.Vector3(), flightBoundaryImpact = new THREE.Vector3();
+      const flightBoundaryMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          strength: { value: 0 }, phase: { value: 0 }, contact: { value: 0 }, motion: { value: reducedMotion ? 0 : 1 },
+          warningPoint: { value: new THREE.Vector3() }, patchSize: { value: reducedMotion ? 260 : 1100 }, gridScale: { value: new THREE.Vector2() }, gridOffset: { value: 0 },
+          impactPoint: { value: new THREE.Vector3() }, impactNormal: { value: new THREE.Vector3(1, 0, 0) }, impactAge: { value: 10 }
+        },
+        vertexShader: `
+          varying vec2 shieldUv;
+          varying vec3 shieldWorldPosition, shieldNormal, shieldViewPosition;
+          void main() {
+            shieldUv = uv;
+            vec4 world = modelMatrix * vec4(position, 1.0);
+            shieldWorldPosition = world.xyz;
+            shieldNormal = normalMatrix * normal;
+            shieldViewPosition = (viewMatrix * world).xyz;
+            gl_Position = projectionMatrix * vec4(shieldViewPosition, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform float strength, phase, contact, motion, patchSize, impactAge, gridOffset;
+          uniform vec2 gridScale;
+          uniform vec3 warningPoint, impactPoint, impactNormal;
+          varying vec2 shieldUv;
+          varying vec3 shieldWorldPosition, shieldNormal, shieldViewPosition;
+          void main() {
+            // A soft localized approach glow; the larger cells emerge as the surface gets close.
+            vec2 p = shieldUv * gridScale;
+            p.y += gridOffset;
+            vec2 repeat = vec2(1.0, 1.7320508);
+            vec2 a = mod(p, repeat) - repeat * 0.5;
+            vec2 b = mod(p - repeat * 0.5, repeat) - repeat * 0.5;
+            vec2 cell = dot(a, a) < dot(b, b) ? a : b;
+            float hexDistance = max(abs(cell.x), dot(abs(cell), vec2(0.5, 0.8660254)));
+            float edgeDistance = abs(0.5 - hexDistance);
+            float edge = 1.0 - smoothstep(0.012, 0.025 + fwidth(hexDistance), edgeDistance);
+            float corona = exp(-edgeDistance * 16.0);
+            // Long, softly fading coverage from the outset, rather than a speed-expanding horizon.
+            vec3 fieldOffset = shieldWorldPosition - warningPoint;
+            fieldOffset.z *= 0.15;
+            float fieldGlow = exp(-pow(length(fieldOffset) / patchSize, 2.0));
+            float fresnel = pow(1.0 - abs(dot(normalize(shieldNormal), normalize(-shieldViewPosition))), 2.0);
+            float sheen = 0.5 + 0.5 * sin(shieldUv.x * 6.2831853 * 6.0 + p.y * 0.6 - phase * 0.7);
+            float reveal = smoothstep(0.2, 0.85, strength);
+            float alpha = strength * fieldGlow * (0.025 + fresnel * 0.08 + sheen * 0.02
+              + reveal * (edge * 0.10 + corona * 0.025));
+            vec3 delta = shieldWorldPosition - impactPoint;
+            float impactScale = mix(60.0, 150.0, motion);
+            float distanceToContact = length(delta) / impactScale;
+            float impactGlow = contact * exp(-pow(distanceToContact / 0.35, 2.0));
+            // Fast travelling waves disperse within about a second, without a lingering ripple.
+            float ripple = 0.0;
+            for (int wave = 0; wave < 3; wave++) {
+              float waveAge = impactAge - float(wave) * 0.12;
+              float waveRadius = 12.0 + max(0.0, waveAge) * 1100.0;
+              float band = exp(-pow((length(delta) - waveRadius) / 16.0, 2.0));
+              float fade = 1.0 - smoothstep(0.08, 0.8, waveAge);
+              ripple += step(0.0, waveAge) * band * fade * (1.0 - float(wave) * 0.23);
+            }
+            ripple *= motion;
+            vec2 impactUv = vec2(dot(delta, vec3(-impactNormal.y, impactNormal.x, 0.0)), delta.z) / impactScale;
+            float angle = atan(impactUv.y, impactUv.x);
+            float sparks = pow(max(0.0, sin(angle * 5.0 + 1.7)), 64.0)
+              * exp(-pow((length(impactUv) - (0.08 + impactAge * 0.9) * (1.0 + 0.25 * sin(angle * 3.0 + 0.6))) / 0.012, 2.0))
+              * exp(-impactAge * 9.0) * contact * motion;
+            alpha += impactGlow * (0.12 + edge * 0.075 + corona * 0.015)
+              + ripple * (0.24 + edge * 0.14) + sparks * 0.35;
+            vec3 color = mix(vec3(0.08, 0.6, 1.0), vec3(0.7, 1.0, 1.0), clamp(impactGlow + ripple + sparks, 0.0, 1.0));
+            gl_FragColor = vec4(color, alpha * (motion > 0.0 ? 1.0 : 0.55));
+          }
+        `,
+        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, toneMapped: false
+      });
+      const flightBoundaryGeometry = new THREE.CylinderGeometry(1, 1, 1, 96, 1, true);
+      flightBoundaryGeometry.rotateX(Math.PI / 2);
+      const flightBoundary = new THREE.Mesh(flightBoundaryGeometry, flightBoundaryMaterial);
+      flightBoundary.visible = false;
+      scene.add(flightBoundary);
+      let flightBoundaryDamageAt = 0, flightBoundaryImpactAt = -Infinity;
+      let flightBoundaryTouching = false;
+      function resetFlightBoundary() {
+        // Keep both open ends well beyond the visible glow, even on slow or long training flights.
+        const length = camera.far * 4;
+        flightBoundaryOrigin.copy(camera.position);
+        flightBoundaryPrevious.set(0, 0, 0);
+        flightBoundary.scale.set(flightBoundaryRadii.x, flightBoundaryRadii.y, length);
+        flightBoundary.position.copy(flightBoundaryOrigin).add(courseWorldOffset);
+        flightBoundary.position.z = camera.position.z;
+        const circumference = 2 * Math.PI * Math.hypot(flightBoundaryRadii.x, flightBoundaryRadii.y) / Math.SQRT2;
+        const cellSize = reducedMotion ? 40 : 95;
+        const uniforms = flightBoundaryMaterial.uniforms;
+        uniforms.gridScale.value.set(Math.round(circumference / cellSize), length / cellSize);
+        uniforms.strength.value = 0; uniforms.phase.value = 0; uniforms.contact.value = 0; uniforms.impactAge.value = 10;
+        uniforms.gridOffset.value = 0;
+        flightBoundaryDamageAt = 0; flightBoundaryImpactAt = -Infinity; flightBoundaryTouching = false;
+        flightBoundaryImpact.set(0, 0, 0); flightViewOffset.set(0, 0);
+        flightBoundary.visible = false; flightBoundaryNotice.hidden = true;
+        flightBoundaryNotice.classList.remove('contact');
+      }
+      function renderFlightBoundaryFeedback() {
+        if (!started || paused || roundEnded || crashing) flightBoundaryNotice.hidden = true;
+        if (!started || roundEnded || crashing) flightBoundary.visible = false;
+      }
+      function constrainFlightToBoundary() {
+        if (!started || paused || roundEnded || crashing) return;
+        // Resolve the proposed world step BEFORE any scenery, gates or enemies move.
+        flightBoundaryPrevious.copy(camera.position).sub(flightBoundaryOrigin).sub(courseWorldOffset);
+        flightBoundaryLocal.copy(flightBoundaryPrevious).addScaledVector(worldStep, -.85);
+        const rx = flightBoundaryRadii.x - playerHullRadius, ry = flightBoundaryRadii.y - playerHullRadius;
+        if (Math.hypot(flightBoundaryLocal.x / rx, flightBoundaryLocal.y / ry) < 1) {
+          flightBoundaryTouching = false;
+          return;
+        }
+        flightBoundaryAim.copy(flightBoundaryLocal).sub(flightBoundaryPrevious);
+        const x = flightBoundaryPrevious.x / rx, y = flightBoundaryPrevious.y / ry;
+        const dx = flightBoundaryAim.x / rx, dy = flightBoundaryAim.y / ry;
+        const a = dx * dx + dy * dy, b = 2 * (x * dx + y * dy), c = x * x + y * y - 1;
+        const hitTime = c < 0 && a > 1e-16
+          ? THREE.MathUtils.clamp((-b + Math.sqrt(Math.max(0, b * b - 4 * a * c))) / (2 * a), 0, 1) : 0;
+        flightBoundaryLocal.copy(flightBoundaryPrevious).addScaledVector(flightBoundaryAim, hitTime);
+        const radius = Math.hypot(flightBoundaryLocal.x / rx, flightBoundaryLocal.y / ry);
+        flightBoundaryLocal.x /= radius; flightBoundaryLocal.y /= radius;
+        flightBoundaryNormal.set(flightBoundaryLocal.x / (rx * rx), flightBoundaryLocal.y / (ry * ry), 0).normalize();
+        const outward = flightMotion.dot(flightBoundaryNormal);
+        const impact = outward > 1e-6 && !flightBoundaryTouching && gameTime >= flightBoundaryDamageAt;
+        flightBoundaryTouching = true;
+        if (impact) {
+          flightBoundaryImpact.copy(flightBoundaryLocal);
+          const wallRadius = Math.hypot(flightBoundaryImpact.x / flightBoundaryRadii.x, flightBoundaryImpact.y / flightBoundaryRadii.y);
+          flightBoundaryImpact.x /= wallRadius; flightBoundaryImpact.y /= wallRadius;
+          flightBoundaryMaterial.uniforms.impactNormal.value.set(
+            flightBoundaryImpact.x / (flightBoundaryRadii.x * flightBoundaryRadii.x),
+            flightBoundaryImpact.y / (flightBoundaryRadii.y * flightBoundaryRadii.y), 0).normalize();
+        }
+        // Stop at the first contact, leaving a tiny skin gap. Forward travel is untouched.
+        flightBoundaryLocal.addScaledVector(flightBoundaryNormal, -.5);
+        worldStep.x = (flightBoundaryPrevious.x - flightBoundaryLocal.x) / .85;
+        worldStep.y = (flightBoundaryPrevious.y - flightBoundaryLocal.y) / .85;
+        if (outward > 0) {
+          // Retain tangential/forward momentum; rebound with 30% of the outward speed.
+          flightMotion.addScaledVector(flightBoundaryNormal, -1.3 * outward);
+          const forwardSpeed = -flightMotion.z;
+          // Scale both lateral axes together: separate angle clamps can turn a grazing rebound outward.
+          const yawMax = forwardSpeed * Math.tan(65 * Math.PI / 180);
+          const pitchExcess = flightMotion.y * flightMotion.y - flightMotion.x * flightMotion.x;
+          let lateralScale = 1;
+          if (Math.abs(flightMotion.x) > yawMax) lateralScale = yawMax / Math.abs(flightMotion.x);
+          if (pitchExcess > forwardSpeed * forwardSpeed) lateralScale = Math.min(lateralScale, forwardSpeed / Math.sqrt(pitchExcess));
+          flightMotion.x *= lateralScale; flightMotion.y *= lateralScale;
+          flightBoundaryAim.copy(flightMotion).normalize();
+          const pitch = THREE.MathUtils.clamp(Math.asin(flightBoundaryAim.y), -Math.PI / 4, Math.PI / 4);
+          const yaw = THREE.MathUtils.clamp(Math.atan2(-flightBoundaryAim.x, -flightBoundaryAim.z), -65 * Math.PI / 180, 65 * Math.PI / 180);
+          flightViewOffset.x += flightOrientation.x - pitch;
+          flightViewOffset.y += flightOrientation.y - yaw;
+          flightOrientation.set(pitch, yaw, 0, 'YXZ');
+          flightDirection.set(0, 0, -1).applyEuler(flightOrientation);
+          speed = forwardSpeed / -flightDirection.z;
+          flightMotion.copy(flightDirection).multiplyScalar(speed);
+          flightVelocity.set(0, 0); flightTurn.set(0, 0);
+        }
+        if (!impact) return;
+        flightBoundaryImpactAt = gameTime; flightBoundaryDamageAt = gameTime + .75;
+        shield = Math.max(0, shield - 10); updateShield();
+        showFeedback(t('shieldLost', { amount: 10 }), true);
+        if (shield === 0) {
+          flightBoundaryNotice.hidden = true;
+          startCrash(flightBoundary);
+          return;
+        }
+        shieldHitTime = .55; shieldHit.hidden = false;
+        if (!reducedMotion) shake = Math.max(shake, .45);
+        playSound('hit');
+      }
+      function updateFlightBoundary(dt) {
+        if (!started || roundEnded || crashing) {
+          flightBoundary.visible = false; flightBoundaryNotice.hidden = true;
+          return;
+        }
+        if (paused) { flightBoundaryNotice.hidden = true; return; }
+        if (dt <= 0) return;
+        flightBoundary.position.copy(flightBoundaryOrigin).add(courseWorldOffset);
+        // Recenter only the open tube's geometry; its cells and impact points remain world-anchored.
+        flightBoundary.position.z = camera.position.z;
+        flightBoundaryLocal.copy(camera.position).sub(flightBoundaryOrigin).sub(courseWorldOffset);
+        const rx = flightBoundaryRadii.x - playerHullRadius, ry = flightBoundaryRadii.y - playerHullRadius;
+        const x = flightBoundaryLocal.x / rx, y = flightBoundaryLocal.y / ry;
+        const vx = flightMotion.x * .85 / rx, vy = flightMotion.y * .85 / ry;
+        const radius = Math.hypot(x, y), a = vx * vx + vy * vy, b = 2 * (x * vx + y * vy), c = radius * radius - 1;
+        const impactTime = c >= 0 ? 0 : a > 1e-16 ? (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a) : Infinity;
+        const clearance = (1 - radius) * Math.min(rx, ry);
+        const proximity = 1 - THREE.MathUtils.smoothstep(clearance, 0, reducedMotion ? 90 : 400);
+        const predicted = 1 - THREE.MathUtils.smoothstep(impactTime, 0, 2.5);
+        const impactAge = Math.min(10, gameTime - flightBoundaryImpactAt);
+        const contact = 1 - THREE.MathUtils.smoothstep(impactAge, 0, .75);
+        const intensity = Math.max(proximity, predicted, contact);
+        const uniforms = flightBoundaryMaterial.uniforms;
+        uniforms.gridOffset.value = (flightBoundary.position.z - flightBoundaryOrigin.z - courseWorldOffset.z)
+          / flightBoundary.scale.z * uniforms.gridScale.value.y;
+        uniforms.strength.value += (intensity - uniforms.strength.value) * (1 - Math.exp(-8 * dt));
+        uniforms.phase.value = reducedMotion ? 0 : gameTime;
+        uniforms.contact.value = contact; uniforms.impactAge.value = impactAge;
+        uniforms.impactPoint.value.copy(flightBoundaryImpact).add(flightBoundaryOrigin).add(courseWorldOffset);
+        flightBoundaryAim.copy(flightBoundaryLocal);
+        // Ease the look-ahead in: crossing the prediction threshold must not jump the visible horizon.
+        if (impactTime > 0 && impactTime < 2.5) flightBoundaryAim.addScaledVector(flightMotion, .85 * impactTime * predicted);
+        const aimRadius = Math.hypot(flightBoundaryAim.x / flightBoundaryRadii.x, flightBoundaryAim.y / flightBoundaryRadii.y);
+        if (aimRadius > 1e-8) { flightBoundaryAim.x /= aimRadius; flightBoundaryAim.y /= aimRadius; }
+        uniforms.warningPoint.value.copy(flightBoundaryAim).add(flightBoundaryOrigin).add(courseWorldOffset);
+        flightBoundary.visible = uniforms.strength.value > .005 || contact > .005 || (!reducedMotion && impactAge < 1.1);
+        flightBoundaryNotice.hidden = intensity < .03;
+        const touching = contact > .05;
+        const message = t(touching ? 'boundaryContact' : 'boundaryWarning');
+        if (flightBoundaryNotice.textContent !== message) flightBoundaryNotice.textContent = message;
+        flightBoundaryNotice.classList.toggle('contact', touching);
+      }
       function collideWith(object) {
         if (paused || roundEnded || crashing || object.userData.collisionHandled) return;
         object.userData.collisionHandled = true;
@@ -1982,6 +2667,7 @@
           : type.capital ? 85 : type.name === 'INTERCEPTOR' ? 30 : type.name === 'NOVA SAUCER' ? 45 : 60;
         shield = Math.max(0, shield - damage);
         updateShield();
+        showFeedback(t('shieldLost', { amount: damage }), true);
         if (shield === 0) {
           startCrash(object);
           return;
@@ -2008,6 +2694,15 @@
       let bestAtLevelStart = best;
       const bestLabel = document.querySelector('#best');
       const feedback = document.querySelector('#feedback');
+      let feedbackUntil = 0;
+      function showFeedback(message, negative = false) {
+        feedback.textContent = message;
+        feedbackUntil = gameTime + 1.2;
+        feedback.classList.toggle('negative', negative);
+        feedback.classList.remove('pop');
+        void feedback.offsetWidth;
+        feedback.classList.add('pop');
+      }
       const shockwaves = [];
       const shockGeometry = new THREE.RingGeometry(.85, 1, 64);
       const capitalShockGeometry = new THREE.RingGeometry(.97, 1, 96);
@@ -2028,10 +2723,7 @@
           best = score;
           try { localStorage.setItem('sternflug-highscore', String(best)); } catch {}
         }
-        feedback.textContent = '+' + points + (combo > 1 ? ' · COMBO ×' + combo : ' · ' + ship.userData.type.name);
-        feedback.classList.remove('pop');
-        void feedback.offsetWidth;
-        feedback.classList.add('pop');
+        showFeedback('+' + points + (combo > 1 ? ' · COMBO ×' + combo : ' · ' + ship.userData.type.name));
         updateScore();
         if (combo > 1) playSound('reward');
       }
@@ -2074,8 +2766,10 @@
           started = true; paused = false;
           scene.fog.density = .00065;
           setupLevelFleet();
+          beginFlightTutorial();
           resetSimulationClock();
-          if (lastPointerPosition) steer(lastPointerPosition);
+          // Menu clicks and fullscreen/audio-loading pointer positions must not start a turn.
+          steer({ clientX: innerWidth / 2, clientY: innerHeight / 2 });
           document.body.classList.add('playing');
           document.querySelector('#intro').hidden = true;
           audioNotice.hidden = true;
@@ -2124,9 +2818,10 @@
       const endCountdown = document.querySelector('#end-countdown');
       let lastCountdownSecond = null;
       function updateClock() {
-        const elapsed = Math.min(roundDuration, Math.max(0, gameTime));
+        const elapsed = tutorialStage < 3 ? 0 : Math.min(roundDuration, Math.max(0, gameTime - courseStartTime));
         const remaining = Math.ceil(roundDuration - elapsed);
-        document.querySelector('#time-left').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+        document.querySelector('#time-left').textContent = tutorialStage < 3 ? t('training')
+          : `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
         document.querySelector('#level-label').textContent = String(level);
         clock.classList.toggle('urgent', remaining <= roundDuration / 3 && !celebrating);
         const countingDown = started && !paused && !crashing && !roundEnded && remaining > 0 && remaining <= 5;
@@ -2163,7 +2858,7 @@
         endCountdown.hidden = true;
         feedback.classList.remove('pop');
         clearTargetLock();
-        document.querySelector('#impact-label').textContent = t(ship.userData.enemyBolt ? 'incomingFire' : 'collision');
+        document.querySelector('#impact-label').textContent = t(ship.userData.flightRing ? 'shieldDepleted' : ship.userData.enemyBolt ? 'incomingFire' : 'collision');
         document.querySelector('#impact-label').hidden = false;
         document.querySelector('#flash').classList.add('impact');
         camera.updateMatrixWorld();
@@ -2179,7 +2874,7 @@
         if (roundEnded) return;
         if (pauseMenu.open) pauseMenu.close();
         const crashed = reason === 'collision';
-        if (!crashed) gameTime = roundDuration;
+        if (!crashed) gameTime = courseStartTime + roundDuration;
         // Actual impacts already consumed a life; direct round completion does so here.
         if (crashed && !crashing) retries = Math.max(0, retries - 1);
         const outcome = crashed ? (retries > 0 ? 'retry' : 'gameover') : 'victory';
@@ -2254,7 +2949,7 @@
         }
         bestAtLevelStart = best;
         // Higher levels stay progressively harder without unbounded flight speeds.
-        levelPressure = 1 - Math.exp(-(level - 1) / 4);
+        levelPressure = 1 - Math.exp(-(level - 1) / 6);
         combo = 0; lastKill = -Infinity; gameTime = 0;
         roundEnded = false; celebrating = false; emission = 0;
         document.body.classList.remove('celebrating', 'defeated');
@@ -2281,8 +2976,8 @@
         }
         shockwaves.length = 0;
         pointer = null; spaceHeld = false; flash = 0; shake = 0;
-        target.set(0, 0); flightVelocity.set(0, 0); flightTilt.set(0, 0, 0);
-        flightHeading.set(0, 0); flightMotion.set(0, 0, 0);
+        target.set(0, 0); flightVelocity.set(0, 0); flightTurn.set(0, 0); flightTilt.set(0, 0, 0); flightViewOffset.set(0, 0);
+        flightMotion.set(0, 0, 0);
         flightDirection.set(0, 0, -1); flightOrientation.set(0, 0, 0, 'YXZ');
         worldStep.set(0, 0, 0);
         collisionAlert.hidden = true; dangerVignette.style.opacity = 0;
@@ -2294,6 +2989,7 @@
         camera.fov = reducedMotion ? 70 : 90;
         camera.updateProjectionMatrix();
         setupLevelFleet();
+        beginFlightTutorial();
         for (const rocket of rockets) scene.remove(rocket.object);
         rockets.length = 0;
         lastShot = -Infinity; lastEmptyAttempt = -Infinity;
@@ -2490,7 +3186,7 @@
         targetMarker.classList.remove('locked');
       }
       function targetInfo(ship) {
-        if (!ship.visible || ship.userData.health <= 0) return null;
+        if (!ship.visible || ship.userData.health <= 0 || ship.userData.arrivalOpacity < .25) return null;
         if (ship.userData.type.asteroid && (ship.userData.hull.opacity < .25
           || ship.position.distanceToSquared(camera.position) > Math.pow(reducedMotion ? 500 : 2800, 2))) return null;
         // Target brackets must not reveal traffic before its distant arrival fade ends.
@@ -2556,38 +3252,24 @@
       const controlTitle = document.querySelector('#control-hints-title');
       const controlInput = document.querySelector('#control-input-label');
       const controlSteps = [
+        { action: 'checkpoint', title: 'checkpointTitle', input: 'steerInput' },
         { action: 'laser', title: 'laserTitle', input: 'mouseClick' },
         { action: 'heavy', title: 'powerLaserTitle', input: 'spaceKey' }
       ];
-      let controlStep = 0, controlStepCompletedAt = null;
       function showControlStep() {
-        const step = controlSteps[controlStep];
+        const step = controlSteps[tutorialStage];
+        if (!step) return;
         controlTitle.textContent = t(step.title);
         controlInput.textContent = t(step.input);
-        controlHints.classList.remove('complete');
+        controlHints.classList.remove('complete', 'finished');
         controlHints.classList.toggle('space-key', step.action === 'heavy');
-        controlStepCompletedAt = null;
-      }
-      showControlStep();
-      function markControlUsed(action) {
-        if (!started || paused || crashing || roundEnded || level !== 1 || controlHints.hidden
-          || controlStepCompletedAt !== null || controlSteps[controlStep]?.action !== action) return;
-        controlStepCompletedAt = performance.now();
-        controlHints.classList.add('complete');
+        controlHints.classList.toggle('checkpoint-step', step.action === 'checkpoint');
       }
       function updateControlHints() {
-        controlHints.hidden = !started || paused || crashing || roundEnded || level !== 1 || controlStep === controlSteps.length;
+        controlHints.hidden = !started || paused || crashing || roundEnded || tutorialStage >= controlSteps.length;
         if (controlHints.hidden) return;
-        const now = performance.now();
-        if (controlStepCompletedAt !== null) {
-          const elapsed = now - controlStepCompletedAt;
-          if (controlStep < controlSteps.length - 1) {
-            if (elapsed >= 700) { controlStep++; showControlStep(); }
-          } else {
-            controlHints.classList.toggle('finished', elapsed >= 1400);
-            if (elapsed >= 2200) { controlStep++; controlHints.hidden = true; return; }
-          }
-        }
+        controlHints.classList.toggle('complete', tutorialStepCompletedAt !== null);
+        controlHints.classList.toggle('finished', tutorialStage === 2 && tutorialStepCompletedAt !== null && gameTime - tutorialStepCompletedAt >= .8);
         // Follow the aiming cursor, flipping above it only near the bottom edge.
         const x = (mouseAim.x * .5 + .5) * innerWidth;
         const y = (-mouseAim.y * .5 + .5) * innerHeight;
@@ -2608,7 +3290,6 @@
           return;
         }
         if (!heavy && now - lastShot < 100 - 1e-6) return;
-        markControlUsed(heavy ? 'heavy' : 'laser');
         if (heavy) {
           heavyEnergy = 0;
           updateHeavyHud();
@@ -2988,16 +3669,18 @@
           crashTime += dt;
           if (crashTime >= 1.35) finishRound('collision');
         }
+        updateFlightTutorial(); // Advance lesson stages before this step moves the world.
+        updateRingShipArrivals();
         if (!paused && shieldHitTime > 0) shieldHitTime = Math.max(0, shieldHitTime - dt);
         if (!successBurst.hidden && !document.hidden) {
           successTime += dt;
           if (successTime >= 1.4) successBurst.hidden = true;
         }
         if (!paused && !roundEnded) {
-          gameTime = Math.min(roundDuration, gameTime + dt);
-          difficulty = gameTime / roundDuration;
-          if (gameTime >= roundDuration - 1e-9) finishRound();
-          if (gameTime - lastKill > 1.2) feedback.classList.remove('pop');
+          gameTime = tutorialStage < 3 ? gameTime + dt : Math.min(courseStartTime + roundDuration, gameTime + dt);
+          difficulty = tutorialStage < 3 ? 0 : (gameTime - courseStartTime) / roundDuration;
+          if (tutorialStage === 3 && gameTime >= courseStartTime + roundDuration - 1e-9) finishRound();
+          if (gameTime >= feedbackUntil) feedback.classList.remove('pop');
           if (combo > 0 && gameTime - lastKill >= comboWindows[combo]) { combo = 0; updateScore(); }
         }
         if (!paused && !roundEnded && heavyEnergy < 1) {
@@ -3013,30 +3696,24 @@
         speed = paused ? 0 : speed + (cruiseSpeed - speed) * easing;
         if (!paused) hitMarker = Math.max(0, hitMarker - dt);
         if (!paused) {
-          // Direct velocity steering: centering straightens flight, without undoing travel.
-          const response = 1 - Math.exp(-3 * dt);
-          const motion = reducedMotion ? .35 : 1;
-          flightVelocity.x += (target.x * speed * 1.15 * motion - flightVelocity.x) * response;
-          flightVelocity.y += (target.y * speed * motion - flightVelocity.y) * response;
-          flightMotion.set(flightVelocity.x, flightVelocity.y, -speed);
+          // Aircraft steering: inertia changes the heading; centering holds the new course.
+          advanceFlightHeading(flightOrientation, flightTurn, dt);
+          flightVelocity.multiplyScalar(Math.exp(-2 * dt));
+          flightMotion.set(0, 0, -speed).applyEuler(flightOrientation);
+          flightMotion.x += flightVelocity.x; flightMotion.y += flightVelocity.y;
           flightDirection.copy(flightMotion).normalize();
-          flightHeading.set(
-            -Math.atan2(flightVelocity.x, Math.max(speed, 1)),
-            Math.atan2(flightVelocity.y, Math.hypot(speed, flightVelocity.x))
-          );
-          flightOrientation.set(flightHeading.y, flightHeading.x, 0, 'YXZ');
-          const tiltEase = 1 - Math.exp(-5 * dt);
-          flightTilt.x += (flightHeading.y * .75 * motion - flightTilt.x) * tiltEase;
-          flightTilt.y += (flightHeading.x * .75 * motion - flightTilt.y) * tiltEase;
-          const bank = -THREE.MathUtils.clamp(flightVelocity.x / Math.max(speed, 1), -1.15, 1.15) * (reducedMotion ? .28 : .65) * motion;
-          // A sustained sideways move builds bank gradually; centering eases back to level.
-          const bankResponse = Math.abs(target.x) > .05 && bank * flightTilt.z >= 0 ? 1.2 : 2.6;
-          flightTilt.z += (bank - flightTilt.z) * (1 - Math.exp(-bankResponse * dt));
+          flightViewOffset.multiplyScalar(Math.exp(-(reducedMotion ? 5 : 8) * dt));
+          flightTilt.x = flightOrientation.x + flightViewOffset.x;
+          flightTilt.y = flightOrientation.y + flightViewOffset.y;
+          const bank = flightTurn.x / .9 * (reducedMotion ? .1 : .32);
+          flightTilt.z += (bank - flightTilt.z) * (1 - Math.exp(-4 * dt));
           camera.rotation.set(flightTilt.x, flightTilt.y, flightTilt.z, 'YXZ');
-          // Follow the spacecraft's pitch/yaw/bank, never cosmetic camera shake.
+          // Follow the aircraft, never cosmetic camera shake.
           playerHullRotation.copy(camera.quaternion);
         }
         worldStep.copy(flightMotion).multiplyScalar(paused ? 0 : -dt);
+        constrainFlightToBoundary();
+        if (started && !paused && !roundEnded && !crashing) courseWorldOffset.addScaledVector(worldStep, .85);
         if (crashing) camera.rotation.set(flightTilt.x, flightTilt.y, flightTilt.z, 'YXZ');
         if ((!paused || crashing) && shake > 0) {
           shake = Math.max(0, shake - dt * 3);
@@ -3092,7 +3769,7 @@
             if (crossesPlayer(ship, ship.position, future, 8)) danger = true;
           }
           // Steering can leave a hull visible even after its center passes world Z = 100.
-          if (hasPassedCamera(ship)) queueShip(ship);
+          if (!ship.userData.tutorialTarget && hasPassedCamera(ship)) queueShip(ship);
         }
         danger = updateShowerRockCollisions() || danger;
         collideShipsWithAsteroids();
@@ -3105,7 +3782,9 @@
           });
         }
         incomingFire = updateEnemyBolts(dt);
-        updateRepairPickup(dt);
+        if (tutorialStage === 3) updateRepairPickup(dt);
+        updateFlightRing();
+        updateFlightBoundary(dt);
         danger = danger || incomingFire;
         if (roundEnded && !celebrating) return;
         updateTargetLock(dt);
@@ -3148,13 +3827,16 @@
           });
           if (hit) {
             hitMarker = .16;
-            hit.userData.health -= rocket.damage;
+            const lessonWeapon = hit.userData.tutorialTarget;
+            const correctWeapon = !lessonWeapon || (lessonWeapon === 'heavy') === rocket.heavy;
+            hit.userData.health -= correctWeapon ? rocket.damage : 0;
             if (hit.userData.health <= 0) {
+              if (lessonWeapon) completeTutorialStep(lessonWeapon);
               playSound('explosion', hit.scale.x);
               award(hit);
               const explosionScale = hit.scale.x / (hit.userData.type.asteroid ? 3.2 : 2.4);
               explode(hit.position, 65, false, hit.userData.type.asteroid, explosionScale, true, hit.userData.type.capital);
-              if (hit.userData.type.asteroid) shatterAsteroid(hit);
+              if (hit.userData.type.asteroid && !lessonWeapon) shatterAsteroid(hit);
               queueShip(hit);
             } else {
               playSound('hit');
@@ -3256,7 +3938,7 @@
         camera.updateMatrixWorld();
         viewFrustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
         for (const ship of ships) {
-          if (!ship.visible) continue;
+          if (!ship.visible || ship.userData.arrivalOpacity < .25) continue;
           ship.updateMatrixWorld(true);
           const visibleRock = !ship.userData.type.asteroid || (ship.userData.hull.opacity >= .25
             && ship.position.distanceToSquared(camera.position) < Math.pow(reducedMotion ? 500 : 2800, 2));
@@ -3283,6 +3965,7 @@
         updateWeaponHud();
         shieldHit.hidden = shieldHitTime === 0;
         shieldHit.style.opacity = reducedMotion ? '.6' : String(shieldHitTime / .55);
+        document.querySelector('#shield-hud').classList.toggle('hit', shieldHitTime > 0);
         document.querySelector('#flight-state').textContent = !started || paused || crashing || roundEnded ? '' : speed > 650 ? t('finalSprint') : '';
         const cross = document.querySelector('#hit-cross');
         cross.style.opacity = hitMarker > 0 ? 1 : 0;
@@ -3292,7 +3975,7 @@
         sound.updateEngine(speed);
         collisionAlert.textContent = t(incomingFire ? 'incomingWarning' : 'collisionWarning');
         collisionAlert.hidden = !danger || paused || roundEnded;
-        feedback.style.visibility = danger && !paused && !roundEnded ? 'hidden' : 'visible';
+        feedback.style.visibility = danger && !paused && !roundEnded && !feedback.classList.contains('negative') ? 'hidden' : 'visible';
         dangerVignette.classList.toggle('warning', danger && !paused && !roundEnded);
         dangerVignette.style.opacity = crashing ? (reducedMotion ? .35 : .7) : danger && !paused && !roundEnded ? .4 : 0;
         sound.setAlarm(danger && !paused && !roundEnded);
@@ -3304,6 +3987,8 @@
         }
         repairMarker.hidden = repairMarker.hidden || paused || roundEnded || crashing;
         repairNotice.hidden = paused || !started || roundEnded || crashing || gameTime >= repairNoticeUntil;
+        renderFlightRingFeedback();
+        renderFlightBoundaryFeedback();
         capitalHud.hidden = !started || paused || roundEnded || crashing || !capitalShip?.visible;
         if (!capitalHud.hidden) {
           capitalHealth.max = capitalShip.userData.maxHealth;

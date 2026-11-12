@@ -10,33 +10,36 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
   return source.slice(from, to);
 };
-const makeGame = (reducedMotion = false) => new Function('THREE', 'reducedMotion', `
+const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('THREE', 'reducedMotion', 'trainingTime', `
   let wallTime = 0, frameCallback, renders = 0, steps = 0;
   const performance = { now: () => wallTime }, document = { hidden: false };
   const renderer = { setAnimationLoop: callback => { frameCallback = callback; } };
   const resetFrameStats = () => {}, updateFrameStats = () => {}; // HUD is covered by frame-stats.mjs.
-  const target = new THREE.Vector2(.6, .2), flightVelocity = new THREE.Vector2();
+  const target = new THREE.Vector2(.6, .2), flightVelocity = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
   const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3(), worldStep = new THREE.Vector3();
-  const flightHeading = new THREE.Vector2(), flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler();
+  const flightTurn = new THREE.Vector2(), flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
   const camera = new THREE.PerspectiveCamera(), distance = new THREE.Vector3();
   const playerHullRotation = new THREE.Quaternion();
   const roundDuration = 45, levelPressure = .8;
   let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
-  let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0;
+  let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0, feedbackUntil = 0;
   let normalHeld = false, heavyHeld = false;
   const comboWindows = [], feedback = {classList: {remove() {}}};
   const updateScore = () => {}, updateWeaponHud = () => {}, updateHeavyHud = () => {};
-  const markControlUsed = () => {}; // Tutorial behavior is covered by control-hints.mjs.
+  const constrainFlightToBoundary = () => {}; // Physical rebounds are covered by flight-boundary.mjs.
+  const tutorialStage = 3; // The timed course begins after the guided tutorial.
   const shots = [];
   let firingHeavy = false;
   const playSound = name => { if (name === 'shot') shots.push({heavy: firingHeavy, time: gameTime}); };
-  const finishRound = () => { gameTime = roundDuration; roundEnded = true; paused = true; };
+  const finishRound = () => { gameTime = courseStartTime + roundDuration; roundEnded = true; paused = true; };
   ${section('      const simulationStep =', '      const progressionTimeScale =')}
   ${section('      function levelFlightSpeed(', '      let capitalShip =')}
+  ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
   ${section('      let heavyEnergy =', '      function updateHeavyHud()')}
   ${section('      let lastShot =', '      const heatColors =')}
   ${section('      function fireRocket(', '        camera.updateMatrixWorld();')}
   }
+  gameTime = courseStartTime = trainingTime;
   function updateSimulation(dt) {
     steps++;
     ${section('        if (!paused && !roundEnded) {\n          gameTime =', '        worldStep.copy(flightMotion)')}
@@ -54,10 +57,10 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 'reducedMotion
     setPaused: value => { paused = value; resetSimulationClock(); },
     setHidden: value => { document.hidden = value; resetSimulationClock(); },
     fire: (normal, heavy) => { normalHeld = normal; heavyHeld = heavy; },
-    state: () => ({gameTime, speed, velocity: flightVelocity.toArray(), distance: distance.toArray(),
+    state: () => ({gameTime, speed, velocity: flightVelocity.toArray(), turn: flightTurn.toArray(), orientation: flightOrientation.toArray(), distance: distance.toArray(),
       heat: weaponHeat, overheated, heavyEnergy, shots, steps, renders, roundEnded, remainder: simulationRemainder})
   };
-`)(THREE, reducedMotion);
+`)(THREE, reducedMotion, trainingTime);
 
 function advance(game, duration, frameTimes) {
   let elapsed = 0, frame = 0;
@@ -114,12 +117,14 @@ stalled.frame(8); advance(quarter, .25, [1 / 60]);
 assert.deepEqual(simulatedState(stalled), simulatedState(quarter), 'A long stall must cap movement AND timers to the same 250 ms');
 assert.equal(stalled.state().steps, 15); assert.equal(stalled.state().renders, 1, 'Catch-up must draw only once');
 stalled.frame(1 / 60); assert.equal(stalled.state().steps, 16, 'Discard excess stall time, rather than draining it into later frames');
-for (const fps of [5, 10, 20, 60, 144]) {
-  const game = makeGame(); advance(game, 45, [1 / fps]);
-  assert.equal(game.state().roundEnded, true); assert.equal(game.state().gameTime, 45);
+for (const fps of [5, 10, 20, 60, 144]) for (const trainingTime of [0, 53.1, 180]) {
+  const game = makeGame(false, trainingTime);
+  advance(game, 44, [1 / fps]); assert.equal(game.state().roundEnded, false);
+  advance(game, 1, [1 / fps]);
+  assert.equal(game.state().roundEnded, true); assert.equal(game.state().gameTime, trainingTime + 45);
   assert.equal(game.state().steps, 2700, 'A level must end after exactly 45 simulated seconds');
 }
-assert.ok(source.includes('const step = simulationStep, motion = reducedMotion ? .35 : 1;'), 'Hazard prediction must share the physics timestep');
+assert.ok(source.includes('const step = simulationStep, acceleration ='), 'Hazard prediction must share the physics timestep');
 assert.equal((section('      function updateSimulation(dt)', '      function recordVisibleObjects()').match(/renderer.render/g) || []).length, 0,
   'Never render inside a catch-up tick');
 assert.equal((section('      function updateSimulation(dt)', '      function recordVisibleObjects()').match(/lastVisibleTime = gameTime/g) || []).length, 0,

@@ -154,7 +154,7 @@ for (const locale of ['en', 'de']) {
     } };
     new Function('document', 't', 'reason', 'retries', `
       const roundEnded = false, pauseMenu = {open: false}, crashing = true;
-      const roundDialog = {dataset: {}}, roundDuration = 45, level = 4;
+      const roundDialog = {dataset: {}}, roundDuration = 45, courseStartTime = 0, level = 4;
       let gameTime = 10;
       ${resultCode}
     `)(document, t, reason, lives);

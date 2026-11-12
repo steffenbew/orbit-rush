@@ -8,7 +8,7 @@ const expected = {
   shield: 'shield', volume: 'speaker-high', muted: 'speaker-slash', pause: 'pause', play: 'play',
   fullscreen: 'corners-out', 'exit-fullscreen': 'corners-in', trophy: 'trophy', 'heart-broken': 'heart-break',
   stop: 'warning-octagon', next: 'caret-double-right', finish: 'flag-checkered', restart: 'arrow-counter-clockwise',
-  rocket: 'rocket-launch', 'mouse-left': 'mouse-left-click', prohibit: 'prohibit', close: 'x'
+  rocket: 'rocket-launch', 'mouse-left': 'mouse-left-click', 'cursor-click': 'cursor-click', prohibit: 'prohibit', close: 'x'
 };
 const symbols = [...source.matchAll(/<symbol id="i-([^"]+)" data-phosphor="([^"]+)" viewBox="([^"]+)">([\s\S]*?)<\/symbol>/g)];
 assert.equal(symbols.length, Object.keys(expected).length);

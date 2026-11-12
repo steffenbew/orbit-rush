@@ -3,134 +3,167 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { t, setLanguage } from '../i18n.js';
 setLanguage('de');
-
+const THREE = await import('../assets/vendor/three.module.js');
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const section = (start, end) => {
+function section(start, end) {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
-};
-class Element {
-  hidden = true;
-  textContent = '';
-  offsetWidth = 220;
-  offsetHeight = 64;
-  style = {};
-  attributes = {};
-  setAttribute(name, value) { this.attributes[name] = value; }
-  classes = new Set();
-  classList = {
-    add: name => this.classes.add(name),
-    remove: name => this.classes.delete(name),
-    toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name)
-  };
 }
-const elements = new Map(['control-hints', 'control-hints-title', 'control-input-label']
-  .map(id => ['#' + id, new Element()]));
-const document = { querySelector: selector => elements.get(selector) };
-const hints = elements.get('#control-hints');
-const title = elements.get('#control-hints-title'), input = elements.get('#control-input-label');
-const game = new Function('document', 't', `
-  let started = false, paused = false, crashing = false, roundEnded = false, level = 1, now = 0;
-  const performance = {now: () => now};
-  const mouseAim = {x: 0, y: 0}, innerWidth = 1000, innerHeight = 800;
+const makeGame = () => new Function('THREE', 't', `
+  const elements = new Map();
+  const document = {querySelector(selector) {
+    if (!elements.has(selector)) {
+      const classes = new Set();
+      elements.set(selector, {hidden: true, textContent: '', offsetWidth: 220, offsetHeight: 64, style: {}, classes,
+        classList: {add: key => classes.add(key), remove: (...keys) => keys.forEach(key => classes.delete(key)),
+          toggle: (key, active) => active ? classes.add(key) : classes.delete(key)}});
+    }
+    return elements.get(selector);
+  }};
+  let started = true, paused = false, crashing = false, roundEnded = false, level = 1, gameTime = 0, difficulty = 0;
+  let lastKill = -Infinity, combo = 0, lastShot = -Infinity, lastEmptyAttempt = -Infinity, lastHeatShot = 0;
+  let shotFlashUntil = 0, emptyFlashUntil = 0, heavyEnergy = 1, weaponHeat = 0, overheated = false, hitMarker = 0;
+  let spawnQueue = [], normalStarts = 0, courseStartTime = 0, tutorialReinforcements = 0;
+  let nextShipTime = 2, nextHazardTime = 0, showerStart = 9, showerEnd = 25;
+  const progressionTimeScale = 1.5, hazardStartDelay = 4, firstCheckpointTime = 5;
+  const courseOrigin = new THREE.Vector3(), showerCourseOrigin = new THREE.Vector3(0, 0, -3000);
+  const heatPerShot = 10, reducedMotion = false, innerWidth = 1000, innerHeight = 800;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), rockets = [], repairPickup = {visible: false};
+  const flightMotion = new THREE.Vector3(0, 0, -334), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
+  const courseWorldOffset = new THREE.Vector3(), worldStep = new THREE.Vector3(), mouseAim = new THREE.Vector2();
+  const flightDistanceAt = time => time * 280;
+  const ships = Array.from({length: 8}, (_, index) => {
+    const ship = new THREE.Group(); ship.userData = {type: {asteroid: index === 4, radius: 20}, hull: {opacity: 1},
+      health: 3, previousPosition: new THREE.Vector3(), courseVelocity: new THREE.Vector3(),
+      collisionBox: new THREE.Box3(new THREE.Vector3(-20, -20, -20), new THREE.Vector3(20, 20, 20))};
+    return ship;
+  });
+  const flightRings = Array.from({length: 5}, () => { const gate = new THREE.Group();
+    gate.userData = {resolved: false, previous: new THREE.Vector3()}; return gate; });
+  const resetShip = ship => { ship.visible = true; ship.userData.health = 3; };
+  const setShipOpacity = (ship, opacity) => { ship.userData.arrivalOpacity = opacity; };
+  const queueShip = ship => { ship.visible = false; };
+  const playSound = () => {}, award = () => {}, explode = () => {}, updateShipHitFlash = () => {};
+  const shatterAsteroid = () => { throw new Error('Tutorial asteroid must not create dangerous fragments'); };
+  const updateScore = () => {}, updateHeavyHud = () => {}, updateWeaponHud = () => {};
+  function setupLevelFleet() {
+    normalStarts++;
+    ships.forEach((ship, index) => { ship.visible = index < 2; });
+    flightRings.forEach(gate => { gate.visible = true; gate.userData.resolved = false; });
+    courseWorldOffset.set(0, 0, 0);
+  }
+  let ringShipsPending = false;
+  const resetFlightRing = openingComplete => {
+    flightRings.forEach((gate, index) => {
+      if (openingComplete && index === 0) return;
+      gate.visible = true; gate.userData.resolved = false;
+    });
+  };
+  ${section('      let tutorialStage =', '      function setupLevelFleet(')}
   ${section('      const controlHints =', '      function fireRocket(')}
-  let gameTime = 0, heavyEnergy = 1, overheated = false, lastShot = -Infinity;
-  let lastEmptyAttempt = -Infinity, emptyFlashUntil = 0, shotFlashUntil = 0, weaponHeat = 0, lastHeatShot = 0;
-  const heatPerShot = 10;
-  const updateHeavyHud = () => {}, updateWeaponHud = () => {}, playSound = () => {};
   ${section('      function fireRocket(', '        camera.updateMatrixWorld();')}
   }
+  beginFlightTutorial(); updateControlHints();
   return {
-    markControlUsed, updateControlHints, fireRocket,
-    step: () => controlStep,
-    aim: (x, y) => { mouseAim.x = x; mouseAim.y = y; },
-    mode: name => {
-      started = name !== 'intro'; paused = name === 'pause'; crashing = name === 'crash';
-      roundEnded = name === 'result'; level = name === 'later-level' ? 2 : 1;
+    ships, gates: flightRings, courseWorldOffset, worldStep, flightOrientation, rockets,
+    hints: controlHints, title: controlTitle, input: controlInput, fireRocket,
+    state: () => ({stage: tutorialStage, completed: tutorialCompleted, completedAt: tutorialStepCompletedAt, time: gameTime, courseStartTime, normalStarts}),
+    action(action) {
+      if (action === 'checkpoint' && started && !paused && !crashing && !roundEnded && tutorialStage === 0) {
+        flightRings[0].visible = false; flightRings[0].userData.resolved = true;
+      }
+      completeTutorialStep(action);
     },
-    time: value => { now = value; gameTime = value / 1000; },
-    weapons: (heat, energy) => { overheated = heat; heavyEnergy = energy; }
+    markCombat() { combo = 2; lastKill = gameTime; lastShot = gameTime; lastHeatShot = gameTime; weaponHeat = 40; },
+    combat: () => ({combo, lastKill, lastShot, lastHeatShot, weaponHeat}),
+    aim(x, y) { mouseAim.set(x, y); updateControlHints(); },
+    mode(name) { started = name !== 'intro'; paused = name === 'pause'; crashing = name === 'crash'; roundEnded = name === 'result'; },
+    tick(dt) { if (started && !paused && !crashing && !roundEnded) gameTime += dt;
+      updateFlightTutorial(); updateControlHints(); },
+    retry() { setupLevelFleet(); beginFlightTutorial(); updateControlHints(); },
+    miss() { flightRings[0].visible = false; flightRings[0].userData.resolved = true; tutorialRetryAt = gameTime + 1.2; },
+    weapons(heat, energy) { overheated = heat; heavyEnergy = energy; },
+    hit(ship, heavy) {
+      const hit = ship, rocket = {heavy, damage: heavy ? 3 : 1, object: {position: new THREE.Vector3()}};
+      ${section('          if (hit) {', '          // Long-range capital retreats')}
+    }
   };
-`)(document, t);
+`)(THREE, t);
 
-for (const mode of ['intro', 'pause', 'crash', 'result', 'later-level']) {
-  game.mode(mode); game.updateControlHints();
-  assert.equal(hints.hidden, true, `Hide during ${mode}`);
-  game.markControlUsed('laser');
-  assert.equal(hints.classes.has('complete'), false, `Ignore actions during ${mode}`);
+const game = makeGame();
+assert.equal(game.title.textContent, t('checkpointTitle'));
+assert.equal(game.input.textContent, t('steerInput'));
+assert.equal(game.ships.filter(ship => ship.visible).length, 0, 'No ship or asteroid before the checkpoint lesson');
+assert.equal(game.gates.filter(gate => gate.visible).length, 1, 'One uncluttered practice checkpoint');
+assert.ok(game.hints.classes.has('checkpoint-step'));
+game.aim(.4, .25); assert.equal(game.hints.style.left, '700px'); assert.equal(game.hints.style.top, '364px');
+game.aim(1, -1); assert.equal(game.hints.style.left, '878px'); assert.equal(game.hints.style.top, '672px');
+game.aim(-1, 1); assert.equal(game.hints.style.left, '122px'); assert.equal(game.hints.style.top, '64px');
+game.fireRocket(true); game.fireRocket(true, true); game.action('laser'); game.action('heavy');
+assert.equal(game.state().stage, 0); assert.equal(game.state().completedAt, null, 'Firing cannot skip checkpoint training');
+for (const mode of ['intro', 'pause', 'crash', 'result']) {
+  game.mode(mode); game.tick(10); game.action('checkpoint');
+  assert.equal(game.hints.hidden, true); assert.equal(game.state().completedAt, null);
 }
-game.mode('flight'); game.updateControlHints();
-assert.equal(hints.hidden, false);
-assert.equal(title.textContent, 'LASER FEUERN');
-assert.equal(input.textContent, 'LINKSKLICK');
-assert.equal(hints.style.left, '500px');
-assert.equal(hints.style.top, '464px', 'Follow 64px below the cursor, clear of its weapon charge bar');
-game.aim(.4, .25); game.updateControlHints();
-assert.equal(hints.style.left, '700px'); assert.equal(hints.style.top, '364px');
-game.aim(1, -1); game.updateControlHints();
-assert.equal(hints.style.left, '878px', 'Keep the hint inside the right edge');
-assert.equal(hints.style.top, '672px', 'Flip above the cursor at the bottom edge');
-game.aim(-1, 1); game.updateControlHints();
-assert.equal(hints.style.left, '122px'); assert.equal(hints.style.top, '64px');
-game.aim(0, 0);
-game.markControlUsed('move');
-assert.equal(hints.classes.has('complete'), false, 'Mouse movement is not a tutorial step');
-assert.equal(hints.classes.has('space-key'), false);
-assert.equal(hints.classes.has('complete'), false);
-game.weapons(true, 1);
-game.fireRocket(true); game.fireRocket(true, true);
-assert.equal(hints.classes.has('complete'), false, 'Overheated or wrong weapon does not complete the normal laser step');
-game.weapons(false, 1); game.fireRocket(true);
-assert.equal(hints.classes.has('complete'), true, 'A successful normal shot completes the first step immediately');
-game.time(200); game.markControlUsed('laser');
-game.time(699); game.updateControlHints();
-assert.equal(game.step(), 0, 'Keep brief success feedback before advancing');
-game.mode('pause'); game.time(3000); game.updateControlHints();
-assert.equal(hints.hidden, true);
-assert.equal(game.step(), 0, 'No tutorial advancement behind the pause menu');
-game.mode('flight'); game.updateControlHints();
-assert.equal(hints.hidden, false);
-assert.equal(game.step(), 1);
-game.fireRocket(true);
-assert.equal(hints.classes.has('complete'), false, 'Normal shots must not complete the power-laser step');
-assert.equal(title.textContent, 'POWER-LASER · 3× SCHADEN');
-assert.equal(input.textContent, 'LEERTASTE');
-assert.equal(hints.classes.has('space-key'), true, 'Render the heavy-laser instruction as a wide spacebar keycap');
-game.weapons(false, 0); game.fireRocket(true, true);
-assert.equal(hints.classes.has('complete'), false, 'Empty heavy laser does not complete the tutorial');
-game.weapons(false, 1); game.fireRocket(true, true);
-assert.equal(hints.classes.has('complete'), true);
-game.time(4399); game.updateControlHints();
-assert.equal(hints.classes.has('finished'), false);
-game.time(4400); game.updateControlHints();
-assert.equal(hints.classes.has('finished'), true);
-assert.equal(hints.hidden, false, 'Fade before removing the final step');
-game.time(5200); game.updateControlHints();
-assert.equal(hints.hidden, true);
-game.mode('later-level'); game.mode('flight'); game.updateControlHints();
-assert.equal(hints.hidden, true, 'Completed tutorial stays dismissed on retries and new runs in this page');
-assert.equal(game.step(), 2, 'Only click and power laser remain');
-assert.ok(!source.includes('DAUERFEUER'), 'Do not show a separate held-fire instruction');
-console.log('PASS click → power laser tutorial, real shots, accurate titles, feedback and one-time fade');
-console.log('PASS no skipped steps, no repeated-input delay, hidden during pause/crash/results and no advancement behind pause');
+game.mode('flight'); game.action('checkpoint'); game.tick(.3);
+assert.ok(game.hints.classes.has('complete')); assert.ok(game.ships.every(ship => !ship.visible));
+game.mode('pause'); game.tick(20); assert.equal(game.state().stage, 0, 'Success delay freezes with the simulation');
+game.mode('flight'); game.tick(.41);
+assert.equal(game.state().stage, 1); assert.equal(game.title.textContent, t('laserTitle'));
+assert.equal(game.input.textContent, t('mouseClick')); assert.equal(game.ships.filter(ship => ship.visible).length, 1);
+const ship = game.ships.find(ship => ship.visible);
+assert.equal(ship.userData.tutorialTarget, 'laser');
+game.fireRocket(true); game.tick(.1);
+assert.equal(game.state().completedAt, null, 'The lesson requires destroying the actual target, not just clicking');
+game.hit(ship, true); assert.equal(ship.userData.health, 3, 'Wrong weapon cannot bypass the normal-laser lesson');
+game.hit(ship, false); game.hit(ship, false); assert.equal(game.state().completedAt, null);
+game.hit(ship, false); assert.equal(ship.visible, false); game.tick(.71);
+assert.equal(game.state().stage, 2); assert.equal(game.title.textContent, t('powerLaserTitle'));
+assert.equal(game.input.textContent, t('spaceKey')); assert.ok(game.hints.classes.has('space-key'));
+assert.equal(game.ships.filter(ship => ship.visible).length, 1);
+const asteroid = game.ships.find(ship => ship.visible);
+assert.ok(asteroid.userData.type.asteroid); assert.equal(asteroid.userData.health, 2);
+game.hit(asteroid, false); assert.equal(asteroid.userData.health, 2, 'The practice asteroid teaches the blue laser');
+game.hit(asteroid, true); game.tick(.81); assert.ok(game.hints.classes.has('finished'));
+game.worldStep.set(3, -2, 5); game.courseWorldOffset.set(-100, 20, 6000);
+game.markCombat(); const combat = game.combat(), previousTime = game.state().time;
+const projectile = {object: new THREE.Group()}; game.rockets.push(projectile);
+game.tick(.61);
+assert.equal(game.state().stage, 3); assert.equal(game.state().completed, true);
+assert.equal(game.state().time, previousTime + .61, 'Simulation time must continue, not restart');
+assert.equal(game.state().courseStartTime, game.state().time, 'Only the remaining timed encounters get an offset');
+assert.equal(game.state().normalStarts, 0, 'Completing training must not set up a second fleet');
+assert.equal(game.hints.hidden, true); assert.ok(game.ships.every(ship => !ship.visible));
+assert.deepEqual(game.combat(), combat, 'Preserve weapon heat, cooldowns and combo history');
+assert.deepEqual(game.rockets, [projectile], 'Do not delete live projectiles at the transition');
+assert.ok(game.courseWorldOffset.equals(new THREE.Vector3(-100, 20, 6000)), 'Preserve the continuous world position');
+assert.equal(game.gates[0].visible, false, 'Do not insert a second opening checkpoint after completing the lesson');
+assert.equal(game.gates.at(-1).visible, true); assert.ok(game.ships.every(ship => !ship.userData.tutorialTarget));
+game.retry(); assert.equal(game.state().stage, 3); assert.equal(game.hints.hidden, true, 'Completed tutorial stays dismissed on retry/new run');
+console.log('PASS checkpoint → real ship kill → blue-laser asteroid kill → normal flight, ordered visibility and simulation-timed hints');
 
-const movement = section('      // HUD controls sit above the canvas', '      function stop(event)');
-assert.ok(!movement.includes('markControlUsed'), 'Steering must not affect tutorial progress');
-assert.ok(source.includes('damage: heavy ? 3 : 1'), 'The 3× damage title must match actual projectile damage');
+const practice = makeGame(), first = practice.gates[0];
+practice.courseWorldOffset.set(-40, 20, 1500); practice.flightOrientation.y = 1;
+practice.miss(); practice.tick(1.19); assert.equal(first.visible, false);
+practice.tick(.02); assert.equal(practice.gates[0], first); assert.equal(first.visible, true);
+assert.equal(first.position.x, -40); assert.equal(first.position.y, 20); assert.equal(first.position.z, -1400);
+assert.equal(practice.state().stage, 0); assert.ok(practice.ships.every(ship => !ship.visible));
+practice.action('checkpoint'); practice.tick(.71); practice.retry();
+assert.equal(practice.state().stage, 0); assert.ok(practice.ships.every(ship => !ship.visible), 'An interrupted tutorial restarts safely');
+assert.ok(source.includes("if (gate.userData.kind === 'start') completeTutorialStep('checkpoint');"));
+assert.ok(section('      function updateShipArrivals(', '      function updateRetries(').includes('if (tutorialStage < 3)'));
+assert.ok(section('      async function startGame(', "      document.querySelector('#start')").includes('beginFlightTutorial();'));
+assert.ok(!section('      function fireRocket(', '        camera.updateMatrixWorld();').includes('completeTutorialStep'));
+assert.ok(source.includes('if (tutorialStage === 3 && gameTime >= courseStartTime + roundDuration - 1e-9) finishRound();'));
 const markup = section('  <aside id="control-hints"', '  <div id="flight-state"');
 assert.ok(markup.includes('role="status"') && markup.includes('aria-atomic="true"'));
-assert.ok(!markup.includes('<ol') && !markup.includes('<p'), 'Show only a compact title and control');
-assert.ok(!source.includes('pause-controls'), 'Keep the pause menu free of tutorial instructions');
-assert.ok(!source.includes('control-check') && !markup.includes('✓'), 'Remove all tutorial checkmark markup, styles and logic');
-assert.ok(markup.includes('id="control-mouse" class="icon" aria-hidden="true"') && markup.includes('href="#i-mouse-left"'),
-  'Use the existing inline SVG icon style without duplicating the accessible text');
-assert.ok(source.includes('<symbol id="i-mouse-left" data-phosphor="mouse-left-click"'), 'Use Phosphor’s left-click mouse icon');
-assert.match(source, /#control-hints\.space-key #control-mouse \{ display: none; \}/);
-assert.ok(source.includes("const controlInput = document.querySelector('#control-input-label')"),
-  'Update only the label so changing tutorial steps preserves the mouse icon');
+assert.ok(markup.includes('data-i18n="checkpointTitle"'));
+assert.ok(source.includes('#control-hints.checkpoint-step #control-mouse { display: none; }'));
+assert.ok(source.includes('#control-hints.checkpoint-step #control-cursor { display: block; }'));
+assert.ok(markup.includes('<use href="#i-cursor-click"/>'));
+assert.ok(source.indexOf('        updateFlightTutorial(); // Advance lesson stages') < source.indexOf('        if (started && !paused && !roundEnded && !crashing) courseWorldOffset.addScaledVector(worldStep, .85);'));
 assert.match(source, /#control-hints\.space-key #control-input \{[^}]*min-width: 170px/);
 assert.match(source, /#control-hints \{[^}]*pointer-events: none/);
 assert.match(source, /prefers-reduced-motion: reduce\) \{ #control-hints \{ transition: none/);
-assert.ok(section('      function renderFrame()', '      resetSimulationClock();\n      renderer.setAnimationLoop(').includes('updateControlHints();'));
-console.log('PASS cursor-attached hints without checkmarks, viewport edges, spacebar keycap and accessible announcements');
+console.log('PASS missed-checkpoint retry without heading tracking, interrupted/completed retries, no early enemies, no timer expiry, accessible pointer hints');
