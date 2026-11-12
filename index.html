@@ -2663,7 +2663,8 @@
         }
         shieldHitTime = .55; shieldHit.hidden = false;
         if (!reducedMotion) shake = Math.max(shake, .45);
-        playSound('hit');
+        // Use incoming normal speed, before the rebound; forward/tangential speed is irrelevant.
+        playSound(outward >= (reducedMotion ? 15 : 150) ? 'shieldHard' : 'shieldGlance');
       }
       function updateFlightBoundary(dt) {
         if (!started || roundEnded || crashing) {

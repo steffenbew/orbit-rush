@@ -76,6 +76,23 @@ function impact(game, dt = .1) {
   game.flightMotion.set(100, 0, -400);
   game.step(dt);
 }
+// Sample selection uses incoming speed into the wall, not forward speed or the rebound.
+for (const reducedMotion of [false, true]) {
+  const threshold = reducedMotion ? 15 : 150;
+  for (const outward of [threshold - 1, threshold, threshold + 1]) {
+    for (const forward of [400, 5000]) {
+      const game = makeGame(reducedMotion);
+      game.place(game.radii.x - 26 - .001, 0);
+      game.flightMotion.set(outward, 0, -forward);
+      game.step(.01);
+      assert.equal(game.sounds.length, 1);
+      assert.equal(game.sounds[0].name, outward >= threshold ? 'shieldHard' : 'shieldGlance');
+      assert.equal(game.state().shield, 90, 'Sound intensity does not change damage');
+    }
+  }
+}
+console.log('PASS shield samples: 001 for glancing, 000 for hard, independent of forward speed');
+
 function separate(game, dt) {
   game.place(0, 0); game.flightMotion.set(0, 0, -400); game.step(dt);
 }
