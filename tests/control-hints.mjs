@@ -43,6 +43,7 @@ const makeGame = () => new Function('THREE', 't', `
     gate.userData = {resolved: false, previous: new THREE.Vector3()}; return gate; });
   const resetShip = ship => { ship.visible = true; ship.userData.health = 3; };
   const setShipOpacity = (ship, opacity) => { ship.userData.arrivalOpacity = opacity; };
+  const constrainShipToBoundary = () => {}; // Real fleet containment is covered by flight-dynamics.mjs.
   const queueShip = ship => { ship.visible = false; };
   const playSound = () => {}, award = () => {}, explode = () => {}, updateShipHitFlash = () => {};
   const shatterAsteroid = () => { throw new Error('Tutorial asteroid must not create dangerous fragments'); };
