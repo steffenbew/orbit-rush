@@ -326,6 +326,10 @@
     #touch-joystick.held .joystick-knob { background: #7effd577; transition: transform 40ms linear; }
     @media (prefers-reduced-motion: reduce) { #touch-joystick.held .joystick-knob { transition: none; } }
     body.touch-device.playing .credits { display: none; }
+    body.touch-device .brand { display: none; }
+    body.touch-device .hud-actions { gap: 10px; }
+    body.touch-device .hud-actions button { width: 48px; height: 48px; flex-shrink: 0; }
+    .hud-actions .icon { pointer-events: none; }
     body.touch-device .scoreboard { padding: 8px 10px; gap: 6px 14px; border-radius: 12px; }
     body.touch-device .scoreboard .label { font-size: 8px; margin-bottom: 3px; }
     body.touch-device .scoreboard .number { font-size: 16px; }
@@ -339,13 +343,20 @@
     body.touch-device #round-clock .label { margin: 0; }
     body.touch-device #time-left { font-size: 13px; }
     body.touch-device #level-progress { height: 3px; }
-    body.touch-device #shield-hud { bottom: calc(24px + env(safe-area-inset-bottom)); }
+    body.touch-device #shield-hud { bottom: calc(8px + env(safe-area-inset-bottom)); }
     body.touch-device #capital-hud { bottom: calc(72px + env(safe-area-inset-bottom)); display: grid; gap: 2px; width: min(320px, calc(100vw - 24px)); padding: 5px 10px; border-radius: 8px; font-size: 9px; line-height: 12px; letter-spacing: 0; }
     body.touch-device #capital-health { display: block; height: 4px; margin: 0; }
     body.touch-device #capital-state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     body.touch-device #flight-boundary-notice { bottom: calc(366px + env(safe-area-inset-bottom)); }
-    @media (orientation: landscape) and (min-width: 600px) and (max-height: 500px) {
-      body.touch-device #flight-boundary-notice { bottom: calc(174px + env(safe-area-inset-bottom)); max-width: calc(100vw - 400px); }
+    @media (orientation: landscape) and (max-height: 500px) {
+      #touch-weapons { left: calc(32px + env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+      #touch-joystick { right: calc(32px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+      #touch-controls #touch-power { left: 88px; bottom: 48px; }
+      body.touch-device .hud { top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); }
+      body.touch-device .hud-actions { flex-direction: row; }
+      body.touch-device #capital-hud { width: min(320px, calc(100vw - 416px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+      body.touch-device #capital-hud strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      body.touch-device #flight-boundary-notice { bottom: calc(152px + env(safe-area-inset-bottom)); max-width: calc(100vw - 400px); }
     }
     body.touch-device #control-hints :is(#control-mouse, #control-cursor) { display: none; }
     body.touch-device #control-hints.space-key #control-input { min-width: 0; padding: 6px 10px; border: 0; background: #071629d9; box-shadow: none; }
@@ -490,10 +501,55 @@
   </dialog>
   <script type="module">
     import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=11';
-    import { createTouchControls } from './touch-controls.js?v=5';
+    import { createTouchControls } from './touch-controls.js?v=8';
     import { createRenderDiagnostics } from './render-diagnostics.js?v=1';
+    // Keep this helper with the entry point: the original PWA worker may still
+    // return a previous touch-controls module during its first interrupted update.
+    // Touch buttons must also work while another finger is holding a flight control.
+    function bindTouchButtons(buttons) {
+      for (const button of buttons) {
+        let pointerId = null, suppressTouchClick = false;
+        function reset() {
+          const id = pointerId;
+          pointerId = null;
+          if (id !== null && button.hasPointerCapture(id)) button.releasePointerCapture(id);
+        }
+        button.addEventListener('pointerdown', event => {
+          if (event.pointerType !== 'touch') { suppressTouchClick = false; return; }
+          if (button.disabled || pointerId !== null || event.button !== 0 || event.ctrlKey) return;
+          event.preventDefault();
+          suppressTouchClick = true;
+          pointerId = event.pointerId;
+          button.setPointerCapture(pointerId);
+        });
+        button.addEventListener('pointerup', event => {
+          if (event.pointerId !== pointerId) return;
+          event.preventDefault();
+          reset();
+          const rect = button.getBoundingClientRect();
+          // A drag onto a neighboring button must not activate either action.
+          if (!button.disabled && event.clientX >= rect.left && event.clientX < rect.right
+            && event.clientY >= rect.top && event.clientY < rect.bottom) button.click();
+        });
+        for (const name of ['pointercancel', 'lostpointercapture']) {
+          button.addEventListener(name, event => { if (event.pointerId === pointerId) reset(); });
+        }
+        button.addEventListener('click', event => {
+          // Our click(), keyboard and assistive activation have detail 0. Suppress only
+          // the extra native touch click, including Safari's legacy MouseEvent form.
+          if (event.pointerType === 'touch' || (suppressTouchClick && event.detail > 0)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, { capture: true });
+        window.addEventListener('blur', reset);
+        window.addEventListener('resize', reset);
+        document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
+      }
+    }
     const touchMode = matchMedia('(any-pointer: coarse)').matches;
     document.body.classList.toggle('touch-device', touchMode);
+    bindTouchButtons(document.querySelectorAll('button:not(#touch-laser, #touch-power)'));
     if (touchMode) document.querySelector('#effects').dataset.i18nAriaLabel = 'touchControls';
 
     setLanguage(detectLanguage(navigator.languages?.[0] || navigator.language));
@@ -3957,9 +4013,10 @@
           && !document.querySelector('dialog[open]:not(.victory)'),
         onSteer: (x, y) => {
           lastPointerPosition = null;
-          // Use one pixel scale for both axes so the aiming area stays circular.
-          const scale = Math.min(innerWidth, innerHeight) / 2;
+          // Keep aiming in a small circle, but give the stick full yaw/pitch/bank authority.
+          const scale = Math.min(innerWidth, innerHeight) / 4;
           steer({ clientX: innerWidth / 2 + x * scale, clientY: innerHeight / 2 - y * scale });
+          target.set(x, y);
         },
         onFire: heavy => fireRocket(true, heavy)
       });
@@ -4015,8 +4072,10 @@
         if (event.pointerType !== 'mouse' || event.type === 'pointercancel') target.set(0, 0);
       }
       for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(name, stop);
-      // Only leaving the page itself recenters steering, not crossing an overlay.
-      document.documentElement.addEventListener('pointerleave', () => { if (!pointer) target.set(0, 0); });
+      // Touch emits pointerleave on finger release; lifting a firing thumb must not cancel the stick.
+      document.documentElement.addEventListener('pointerleave', event => {
+        if (event.pointerType !== 'touch' && !pointer) target.set(0, 0);
+      });
       window.addEventListener('blur', () => {
         pointer = null; spaceHeld = false; target.set(0, 0);
         if (started && !paused) togglePause();

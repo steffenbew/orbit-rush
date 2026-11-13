@@ -52,16 +52,16 @@ for (const first of ['joystick', 'laser', 'power']) {
   const game = setup();
   const order = [first, ...['joystick', 'laser', 'power'].filter(name => name !== first)];
   order.forEach((name, i) => pointer(game[name], 'pointerdown', i + 1, 298, 560));
-  assert.deepEqual(game.aim(), [.5, -0], 'Full deflection maps directly to half the center-to-edge distance');
+  assert.deepEqual(game.aim(), [1, -0], 'Full deflection delivers full normalized steering');
   assert.ok(game.controls.normalHeld && game.controls.heavyHeld, 'Non-primary thumbs can fire and steer simultaneously');
   assert.equal(game.shots.length, 2);
   assert.ok(game.shots.includes(true) && game.shots.includes(false));
   const joystickId = order.indexOf('joystick') + 1;
   pointer(game.joystick, 'pointermove', 99, 222, 560);
   pointer(game.joystick, 'pointerup', 99);
-  assert.deepEqual(game.aim(), [.5, -0], 'Unrelated pointers cannot move or release a held control');
+  assert.deepEqual(game.aim(), [1, -0], 'Unrelated pointers cannot move or release a held control');
   for (let i = 0; i < 100; i++) pointer(game.joystick, 'pointermove', joystickId, 298, 560);
-  assert.deepEqual(game.aim(), [.5, -0], 'Holding or repeated moves never accumulate cursor travel');
+  assert.deepEqual(game.aim(), [1, -0], 'Holding or repeated moves never accumulate cursor travel');
   pointer(game.joystick, 'pointerup', joystickId);
   assert.deepEqual(game.aim(), [0, 0], 'Release recenters the cursor immediately');
   assert.equal(game.knob.style.transform, 'translate(0px, 0px)');
@@ -76,13 +76,13 @@ for (const first of ['joystick', 'laser', 'power']) {
 
 const game = setup();
 pointer(game.joystick, 'pointerdown', 1, 262, 561);
-assert.deepEqual(game.aim(), [2 / 38 * .5, -1 / 38 * .5], 'Even small finger movements map immediately without a dead zone');
+assert.deepEqual(game.aim(), [2 / 38, -1 / 38], 'Even small finger movements map immediately without a dead zone');
 assert.equal(game.knob.style.transform, 'translate(2px, 1px)', 'The knob follows finger displacement directly');
 pointer(game.joystick, 'pointermove', 1, 279, 560);
-assert.deepEqual(game.aim(), [.25, -0], 'Half finger travel maps to exactly half the available cursor range');
+assert.deepEqual(game.aim(), [.5, -0], 'Half finger travel maps to exactly half steering input');
 assert.equal(game.knob.style.transform, 'translate(19px, 0px)');
 pointer(game.joystick, 'pointermove', 1, 266, 560);
-assert.deepEqual(game.aim(), [6 / 38 * .5, -0], 'Moving back updates position immediately without smoothing');
+assert.deepEqual(game.aim(), [6 / 38, -0], 'Moving back updates position immediately without smoothing');
 pointer(game.joystick, 'pointermove', 1, 260, 560);
 assert.deepEqual(game.aim(), [0, -0], 'Only the exact center produces zero input');
 for (const direction of [-1, 1]) {
@@ -90,15 +90,15 @@ for (const direction of [-1, 1]) {
   for (const travel of [.2, .4, .6, .8, 1]) {
     pointer(game.joystick, 'pointermove', 1, 260 + direction * travel * 38, 560);
     const distance = Math.abs(game.aim()[0]);
-    assert.ok(distance > previous && distance <= .5, 'Direct aiming never exceeds half range');
-    assert.ok(Math.abs(distance - travel * .5) < 1e-10, 'Every deflection maps linearly');
+    assert.ok(distance > previous && distance <= 1, 'Steering stays within the normalized range');
+    assert.ok(Math.abs(distance - travel) < 1e-10, 'Every deflection maps linearly');
     assert.equal(Math.sign(game.aim()[0]), direction);
     previous = distance;
   }
 }
 for (const [x, y] of [[1000, 560], [-1000, 560], [260, -1000], [260, 1000], [1000, -1000], [-1000, 1000]]) {
   pointer(game.joystick, 'pointermove', 1, x, y);
-  assert.ok(Math.abs(Math.hypot(...game.aim()) - .5) < 1e-10, 'Axis and diagonal overdrags respect the same radial limit');
+  assert.ok(Math.abs(Math.hypot(...game.aim()) - 1) < 1e-10, 'Axis and diagonal overdrags respect the same radial limit');
 }
 for (const event of ['pointercancel', 'lostpointercapture']) {
   pointer(game.joystick, event, 1);
@@ -152,33 +152,59 @@ const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const callbackStart = source.indexOf('        onSteer: (x, y) => {');
 const callbackEnd = source.indexOf('        onFire:', callbackStart);
 assert.ok(callbackStart > 0 && callbackEnd > callbackStart);
-const makeCursor = new Function('innerWidth', 'innerHeight', `
-  const THREE = {MathUtils: {clamp: (value, min, max) => Math.max(min, Math.min(max, value))}};
-  const mouseAim = {x: .4, y: -.2, set(x, y) { this.x = x; this.y = y; }};
-  const target = {copy(aim) { this.x = aim.x; this.y = aim.y; }}, reticle = {style: {}};
+const THREE = await import('../assets/vendor/three.module.js');
+const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+const makeCursor = (width, height) => new Function('innerWidth', 'innerHeight', 'THREE', `
+  const mouseAim = new THREE.Vector2(), target = new THREE.Vector2(), reticle = {style: {}};
+  const flightVelocity = new THREE.Vector2(), flightTurn = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
+  const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3(), flightTilt = new THREE.Vector3();
+  const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
+  const camera = new THREE.PerspectiveCamera(), playerHullRotation = new THREE.Quaternion();
+  const paused = false, reducedMotion = false, speed = 400;
   let lastPointerPosition = {clientX: 100, clientY: 100};
   const callbacks = { ${source.slice(callbackStart, callbackEnd)} };
-  ${source.slice(source.indexOf('      function steer(event)'), source.indexOf('      // Suppress accidental secondary clicks'))}
-  return {move: callbacks.onSteer, mouseAim, target, reticle, lastPointer: () => lastPointerPosition};
-`);
+  ${section('      function steer(event)', '      // Suppress accidental secondary clicks')}
+  ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
+  return {move: callbacks.onSteer, mouseAim, target, reticle, camera, flightTurn,
+    lastPointer: () => lastPointerPosition,
+    step: dt => { ${section('        if (!paused) {\n          // Aircraft steering:', '        worldStep.copy(flightMotion)')} }
+  };
+`)(width, height, THREE);
 const cursor = makeCursor(800, 600);
-cursor.move(.5, 0);
-assert.deepEqual([cursor.mouseAim.x, cursor.mouseAim.y], [.375, 0], 'Game wiring uses absolute position with aspect-correct scaling');
+cursor.move(1, 0);
+assert.deepEqual(cursor.mouseAim.toArray(), [.375, 0], 'Aim retains its aspect-correct, limited range');
+assert.deepEqual(cursor.target.toArray(), [1, 0], 'Flight steering is independent of the small aiming circle');
 assert.deepEqual(cursor.reticle.style, {left: '550px', top: '300px'}, 'Full stick travel uses half the distance to the nearest viewport edge');
-cursor.move(.5, 0);
-assert.deepEqual([cursor.mouseAim.x, cursor.mouseAim.y], [.375, 0], 'Repeated input does not move the cursor farther');
+cursor.move(1, 0);
+assert.deepEqual(cursor.mouseAim.toArray(), [.375, 0], 'Repeated input does not move the cursor farther');
 cursor.move(0, 0);
-assert.deepEqual([cursor.mouseAim.x, cursor.mouseAim.y], [0, 0], 'Release centers the actual game cursor');
-assert.equal(cursor.target.x, cursor.mouseAim.x, 'Flight steering follows the limited cursor position');
+assert.deepEqual(cursor.mouseAim.toArray(), [0, 0], 'Release centers the actual game cursor');
+assert.deepEqual(cursor.target.toArray(), [0, 0], 'Release also neutralizes full-range flight steering');
 assert.equal(cursor.lastPointer(), null, 'Touch movement clears stale mouse coordinates');
-for (const [width, height] of [[390, 844], [844, 390], [800, 600], [600, 600]]) {
+for (const [width, height] of [[390, 844], [844, 390], [568, 320], [932, 430], [800, 600], [600, 600]]) {
   const circular = makeCursor(width, height);
   for (const travel of [.25, .5, 1]) for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
-    circular.move(Math.cos(angle) * .5 * travel, Math.sin(angle) * .5 * travel);
+    const x = Math.cos(angle) * travel, y = Math.sin(angle) * travel;
+    circular.move(x, y);
+    assert.deepEqual(circular.target.toArray(), [x, y], 'Yaw and pitch must not be scaled by the screen aspect ratio');
     const dx = parseFloat(circular.reticle.style.left) - width / 2;
     const dy = parseFloat(circular.reticle.style.top) - height / 2;
     const expectedRadius = Math.min(width, height) / 4 * travel;
     assert.ok(Math.abs(Math.hypot(dx, dy) - expectedRadius) < 1e-9, `${width}×${height}: equal pixel radius in every direction at every deflection`);
+  }
+  for (const sign of [-1, 1]) for (const travel of [.5, 1]) {
+    const controls = setup(), flight = makeCursor(width, height);
+    pointer(controls.joystick, 'pointerdown', 1, 260 + sign * 38 * travel, 560);
+    flight.move(...controls.aim());
+    for (let frame = 0; frame < 36; frame++) flight.step(1 / 60);
+    assert.ok(Math.abs(flight.flightTurn.x) > .9 * travel * .9, 'Touch reaches the same turn rate as desktop');
+    for (let frame = 36; frame < 60 * 24; frame++) flight.step(1 / 60);
+    assert.ok(Math.abs(flight.camera.rotation.z + sign * travel ** 2 * Math.PI / 2) < 1e-6,
+      `${width}×${height}: half stick banks 22.5°, full stick banks 90° in either direction`);
+    pointer(controls.joystick, 'pointerup', 1);
+    flight.move(...controls.aim());
+    for (let frame = 0; frame < 60 * 16; frame++) flight.step(1 / 60);
+    assert.ok(Math.abs(flight.camera.rotation.z) < .00002, 'Releasing the joystick smoothly levels the bank');
   }
 }
 assert.ok(!source.includes('touchControls.advance('), 'No velocity-based cursor integration remains');
@@ -202,9 +228,16 @@ assert.match(source, /body\.touch-device \.scoreboard \{ padding: 8px 10px; gap:
 assert.match(source, /body\.touch-device \.scoreboard \.number \{ font-size: 16px;/, 'Mobile score and level numbers are compact');
 assert.match(source, /body\.touch-device #time-left \{ font-size: 13px;/, 'Mobile timer remains visible at a compact size');
 assert.match(source, /body\.touch-device #capital-hud \{ bottom: calc\(72px \+ env\(safe-area-inset-bottom\)\); display: grid; gap: 2px;/, 'Mobile boss panel sits above the shield, below touch controls');
-assert.equal((source.match(/body\.touch-device #capital-hud \{/g) || []).length, 1, 'Landscape must not move the boss panel back into the play area');
+const landscape = section('    @media (orientation: landscape) and (max-height: 500px)', '    body.touch-device #control-hints');
+assert.match(landscape, /#touch-weapons \{[^}]*bottom: calc\(24px \+ env\(safe-area-inset-bottom\)\)/, 'Landscape fire controls sit near the bottom safe area');
+assert.match(landscape, /#touch-joystick \{[^}]*bottom: calc\(24px \+ env\(safe-area-inset-bottom\)\)/, 'Landscape joystick shares the low thumb zone');
+assert.match(landscape, /#touch-controls #touch-power \{ left: 88px; bottom: 48px;/, 'Landscape weapons use a shallow diagonal instead of a tall stack');
+assert.match(landscape, /body\.touch-device \.hud-actions \{ flex-direction: row;/, 'Short, narrow phones keep toolbar buttons away from the joystick');
+assert.match(landscape, /body\.touch-device #capital-hud \{ width: min\(320px, calc\(100vw - 416px/, 'Boss strip fits between the landscape controls');
+assert.doesNotMatch(landscape.match(/body\.touch-device #capital-hud \{[^}]*\}/)[0], /bottom:/, 'Boss strip stays above the shield, not in the middle of gameplay');
 assert.match(source, /body\.touch-device #capital-health \{ display: block; height: 4px; margin: 0;/, 'Compact boss strip retains its health bar');
-assert.match(source, /body\.touch-device #shield-hud \{[^}]*bottom: calc\(24px \+ env\(safe-area-inset-bottom\)\)/);
+assert.match(source, /body\.touch-device #shield-hud \{[^}]*bottom: calc\(8px \+ env\(safe-area-inset-bottom\)\)/, 'Mobile shield sits close to the bottom without covering the home indicator');
+assert.match(source, /body\.touch-device \.brand \{ display: none; \}/, 'Hide the in-game title on touch devices regardless of landscape width');
 const from = source.indexOf('        if (!paused && !roundEnded) {\n          if (pointer || touchControls.normalHeld)');
 const to = source.indexOf('        if (celebrating &&', from);
 assert.ok(from > 0 && to > from);
@@ -232,4 +265,4 @@ for (const name of ['startCrash', 'finishRound', 'restartRound', 'togglePause'])
 }
 assert.ok(source.includes("(event.pointerType === 'touch' && !celebrating) || event.target.closest('#touch-controls')"));
 assert.match(readFileSync(new URL('../scripts/deploy.sh', import.meta.url), 'utf8'), /touch-controls\.js/);
-console.log('PASS direct half-range cursor mapping, radial limits, immediate linear finger tracking, release/reset, enlarged orange center and outer button, raised controls, multi-touch and held-fire integration');
+console.log('PASS full-range aspect-independent touch steering/banking, circular half-range aim, low landscape controls, release/reset, multi-touch and held-fire integration');

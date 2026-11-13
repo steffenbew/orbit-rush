@@ -191,8 +191,13 @@ pointerEvent(window, 'pointermove', hud, {clientX: 950, clientY: 80});
 assert.ok(Math.abs(input.target.x - .9) < 1e-8); assert.ok(Math.abs(input.target.y - .8) < 1e-8);
 pointerEvent(window, 'pointerdown', hud);
 assert.equal(input.state().shots, 0, 'HUD interactions must not fire weapons');
+const heldSteering = input.target.clone();
+pointerEvent(page, 'pointerleave', page, {pointerType: 'touch', pointerId: 2, isPrimary: false});
+assert.ok(input.target.equals(heldSteering), 'Lifting a firing finger must not cancel held joystick steering');
+pointerEvent(page, 'pointerleave', page, {pointerType: 'touch', pointerId: 1});
+assert.ok(input.target.equals(heldSteering), 'The first touch may also be a firing finger');
 pointerEvent(page, 'pointerleave', page);
-assert.equal(input.target.length(), 0, 'Leaving the actual page still recenters steering');
+assert.equal(input.target.length(), 0, 'Leaving the actual page with a mouse still recenters steering');
 
 for (const mode of ['intro', 'pause', 'crash', 'defeat']) {
   input.mode(mode); pointerEvent(window, 'pointermove', hud, {clientX: 100, clientY: 100});

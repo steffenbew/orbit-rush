@@ -6,8 +6,6 @@ export function createTouchControls({ root, canPlay, onSteer, onFire }) {
   const power = root.querySelector('#touch-power');
   const held = new Map();
   const meters = [laser, power].map(button => button.querySelector('.touch-charge'));
-  // Full stick travel reaches halfway from the screen center to its nearest edge.
-  const cursorRange = .5;
 
   function moveStick(event) {
     const rect = joystick.getBoundingClientRect();
@@ -17,8 +15,8 @@ export function createTouchControls({ root, canPlay, onSteer, onFire }) {
     const distance = Math.hypot(x, y);
     if (distance > 1) { x /= distance; y /= distance; }
     knob.style.transform = `translate(${x * radius}px, ${y * radius}px)`;
-    // Immediate, linear mapping: no dead zone, response curve or interpolation.
-    onSteer(x * cursorRange, -y * cursorRange);
+    // Full normalized steering, independent of the viewport and aiming-circle size.
+    onSteer(x, -y);
   }
 
   function release(element) {
