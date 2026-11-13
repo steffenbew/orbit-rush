@@ -10,7 +10,7 @@ url=https://orbitrush.steffenbew.com
 # Explicit allowlist: never publish repository metadata, tests or local secrets.
 ssh -o BatchMode=yes "$host" "mkdir -p '$target'"
 rsync -rtvz --chmod=D755,F644 -e 'ssh -o BatchMode=yes' \
-  .htaccess index.html audio.js i18n.js CREDITS.md assets "$host:$target/"
+  .htaccess index.html audio.js i18n.js render-diagnostics.js CREDITS.md assets "$host:$target/"
 
 curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
   --retry 3 --retry-delay 5 --output /dev/null "$url/"

@@ -290,6 +290,12 @@
     @media (prefers-reduced-motion: reduce) { #danger-vignette { transition: none; } #danger-vignette.warning { animation: none; opacity: .4; } }
     #status { position: fixed; inset: 0; display: grid; place-items: center; color: #bac9ed; pointer-events: none; padding: 30px; text-align: center; }
     #status:empty { display: none; }
+    #render-diagnostics { position: fixed; inset: auto 0 max(16px, env(safe-area-inset-bottom)); margin: 0 auto; width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 16px; border-color: #ffac73; font-size: 13px; line-height: 1.4; }
+    #render-diagnostics h2 { margin: 0 0 8px; font-size: 18px; }
+    #render-diagnostics p { margin: 8px 0; }
+    #render-diagnostics button { float: none; width: auto; height: auto; min-height: 44px; padding: 8px 12px; margin: 4px 4px 4px 0; border: 1px solid #a8caff55; border-radius: 10px; font-size: 13px; }
+    #render-report { display: block; width: 100%; height: 120px; padding: 8px; resize: vertical; border: 1px solid #a8caff55; border-radius: 6px; background: #071329; color: #d5e6ff; font: 11px/1.4 ui-monospace, monospace; user-select: text; -webkit-user-select: text; }
+    #render-copy-status:empty { display: none; }
     @media (max-width: 450px) { button { width: 40px; height: 44px; font-size: 22px; } }
   </style>
 </head>
@@ -409,18 +415,36 @@
   <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio-Credits</a>
   <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><strong data-i18n="creditsEffects">Soundeffekte</strong></p><ul><li><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li><li><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Teilweise bearbeitet.</span></li></ul><p><strong data-i18n="creditsMusic">Musik</strong></p><ul><li><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li></ul></dialog>
   <div id="status" role="status"></div>
+  <dialog id="render-diagnostics" aria-labelledby="render-diagnostics-title" aria-describedby="render-diagnostics-help">
+    <h2 id="render-diagnostics-title" data-i18n="diagnosticsTitle">Darstellung angehalten</h2>
+    <p id="render-diagnostics-help" data-i18n="diagnosticsHelp">Bitte diesen Bericht kopieren und uns vor dem Neuladen schicken. Es wird nichts automatisch hochgeladen.</p>
+    <button id="copy-render-report" type="button" data-i18n="diagnosticsCopy">Diagnose kopieren</button>
+    <button id="reload-render" type="button" data-i18n="diagnosticsReload">Spiel neu laden</button>
+    <p id="render-copy-status" role="status" aria-live="polite"></p>
+    <textarea id="render-report" readonly spellcheck="false" data-i18n-aria-label="diagnosticsReport" aria-label="Diagnosebericht zum Darstellungsfehler"></textarea>
+  </dialog>
   <script type="module">
-    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=7';
+    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=11';
+    import { createRenderDiagnostics } from './render-diagnostics.js?v=1';
 
     setLanguage(detectLanguage(navigator.languages?.[0] || navigator.language));
     applyTranslations();
     const languagePicker = document.querySelector('#language');
     languagePicker.querySelector(`input[value="${language}"]`).checked = true;
     const status = document.querySelector('#status');
+    let getRenderState = () => ({ phase: 'loading' });
+    let stopRendering = () => {};
+    let renderPhase = 'initializing';
+    const renderDiagnostics = createRenderDiagnostics({
+      root: document.querySelector('#render-diagnostics'), canvas: document.querySelector('#space'), t,
+      getState: () => getRenderState(), onFailure: () => stopRendering()
+    });
     try {
       const THREE = await import('./assets/vendor/three.module.js');
       const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('#space'), antialias: true });
+      // Stop after the current callback, once Three.js has scheduled its next frame.
+      stopRendering = () => queueMicrotask(() => renderer.setAnimationLoop(null));
       // Keep high-DPI fill cost bounded; HUD text stays at native CSS resolution.
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
       const scene = new THREE.Scene();
@@ -3862,7 +3886,7 @@
       }
       // Suppress accidental secondary clicks without disabling links in the credits.
       document.addEventListener('contextmenu', event => {
-        if (event.target.closest('#audio-credits')) return;
+        if (event.target.closest('#audio-credits, #render-diagnostics')) return;
         event.preventDefault();
       });
       for (const name of ['auxclick', 'dblclick', 'dragstart', 'selectstart', 'wheel', 'gesturestart', 'gesturechange', 'gestureend']) {
@@ -4373,14 +4397,33 @@
         }
         renderer.render(scene, camera);
       }
+      getRenderState = () => ({
+        phase: renderPhase, level, gameTime, started, paused, roundEnded, crashing, reducedMotion,
+        effects: { particles: particles.length, shockwaves: shockwaves.length, rockets: rockets.length, enemyBolts: enemyBolts.length },
+        visibleShips: ships.filter(ship => ship.visible).length,
+        renderer: { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, points: renderer.info.render.points,
+          geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
+          pixelRatio: renderer.getPixelRatio(), contextLost: renderer.getContext().isContextLost() }
+      });
+      stopRendering = () => {
+        queueMicrotask(() => renderer.setAnimationLoop(null));
+        paused = true; speed = 0; pointer = null; spaceHeld = false;
+        sound.suspendAudio().catch(error => console.error('Could not suspend audio after render failure:', error));
+      };
       resetSimulationClock();
       renderer.setAnimationLoop(time => {
-        const elapsed = Math.max(0, (time - lastFrameTime) / 1000);
-        lastFrameTime = time;
-        advanceSimulation(elapsed);
-        renderFrame();
-        updateFrameStats(time);
+        renderDiagnostics.runFrame(() => {
+          const elapsed = Math.max(0, (time - lastFrameTime) / 1000);
+          lastFrameTime = time;
+          renderPhase = 'simulation';
+          advanceSimulation(elapsed);
+          renderPhase = 'render';
+          renderFrame();
+          renderPhase = 'frame-stats';
+          updateFrameStats(time);
+        });
       });
+      if (renderDiagnostics.failed) stopRendering();
     } catch (error) {
       document.querySelector('#intro').hidden = true;
       status.textContent = t('loadError');

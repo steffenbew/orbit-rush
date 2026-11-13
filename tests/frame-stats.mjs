@@ -19,6 +19,8 @@ const makeMonitor = (search = '?test') => new Function('search', 't', `
   const performance = { now: () => wallTime };
   const renderer = { setAnimationLoop: callback => { frameCallback = callback; } };
   let started = true, paused = false, crashing = false, roundEnded = false;
+  let renderPhase;
+  const renderDiagnostics = {failed: false, runFrame: callback => callback()};
   function updateSimulation() { steps++; }
   function renderFrame() { renders++; }
   ${section('      const performanceHud =', '      const progressionTimeScale =')}

@@ -22,6 +22,8 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('THRE
   const playerHullRotation = new THREE.Quaternion();
   const roundDuration = 45, level = 10, levelPressure = .8;
   let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
+  let renderPhase;
+  const renderDiagnostics = {failed: false, runFrame: callback => callback()};
   let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0, feedbackUntil = 0;
   let normalHeld = false, heavyHeld = false;
   const comboWindows = [], feedback = {classList: {remove() {}}};
