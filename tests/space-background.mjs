@@ -146,7 +146,7 @@ assert.deepEqual(sky.starPositions, introStars);
 console.log('PASS all three layers freeze on pause, resume correctly, and leave the intro calm');
 
 sky.setStarted(true); sky.worldStep.set(20, 20, 20);
-sky.middlePositions.set([2399, 1599, 69], 0); renderState();
+sky.middlePositions.set([2399, 1599, 3999], 0); renderState();
 assert.ok(sky.middlePositions[0] >= -2400 && sky.middlePositions[0] < -2300);
 assert.ok(sky.middlePositions[1] >= -1600 && sky.middlePositions[1] < -1500);
 assert.ok(sky.middlePositions[2] >= -4000 && sky.middlePositions[2] < -3900);
@@ -154,8 +154,32 @@ sky.worldStep.set(-20, -20, -20);
 sky.middlePositions.set([-2399, -1599, -3999], 0); renderState();
 assert.ok(sky.middlePositions[0] <= 2400 && sky.middlePositions[0] > 2300);
 assert.ok(sky.middlePositions[1] <= 1600 && sky.middlePositions[1] > 1500);
-assert.ok(sky.middlePositions[2] <= 70 && sky.middlePositions[2] > 0);
-console.log('PASS unchanged middle-layer recycling in every direction');
+assert.ok(sky.middlePositions[2] <= 4000 && sky.middlePositions[2] > 3900);
+console.log('PASS surrounding middle-layer recycling in every direction');
+
+// Near and middle stars must cover both sides of the old z=70 cutoff.
+const surrounding = makeSky();
+for (const positions of [surrounding.middlePositions, surrounding.dustPositions]) {
+  let ahead = 0, behind = 0;
+  for (let i = 2; i < positions.length; i += 3) {
+    if (positions[i] < -100) ahead++;
+    if (positions[i] > 100) behind++;
+  }
+  assert.ok(ahead > positions.length / 3 * .4 && behind > positions.length / 3 * .4,
+    'Turning must not expose an empty rear half of the moving star field');
+}
+for (const [points, varying] of [[sky.middleStars, 'middleVisibility'], [sky.flightDust, 'dustVisibility']]) {
+  const shader = {vertexShader: THREE.ShaderLib.points.vertexShader, fragmentShader: THREE.ShaderLib.points.fragmentShader};
+  points.material.onBeforeCompile(shader);
+  for (const axis of ['x', 'y', 'z']) assert.ok(shader.vertexShader.includes(`abs(position.${axis})`));
+  assert.ok(shader.fragmentShader.includes(`diffuseColor.a *= ${varying};`));
+}
+for (const sign of [-1, 1]) {
+  sky.dustPositions.set([0, 0, sign * 2099], 0);
+  sky.worldStep.set(0, 0, sign * 20); renderState();
+  assert.ok(sky.dustPositions[2] * sign < -2000, 'Near stars wrap behind the camera as well as ahead');
+}
+console.log('PASS front/rear star coverage, soft fades on all faces, and near-star recycling');
 
 const shader = {vertexShader: THREE.ShaderLib.points.vertexShader, fragmentShader: THREE.ShaderLib.points.fragmentShader};
 sky.stars.material.onBeforeCompile(shader);

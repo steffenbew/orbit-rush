@@ -224,13 +224,13 @@ for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) f
   assert.ok(Math.abs(game.worldStep.z + forward / fps) < 1e-8, 'Do not shorten forward travel');
   assert.ok(game.courseWorldOffset.clone().sub(start).distanceTo(game.worldStep.clone().multiplyScalar(.85)) < 1e-8,
     'The corrected step is the single shared displacement for the course and all world objects');
-  assert.ok(Math.abs(game.flightOrientation.y) <= 65 * Math.PI / 180 && Math.abs(game.flightOrientation.x) <= Math.PI / 4);
+  assert.ok(Math.abs(game.flightOrientation.y) <= Math.PI / 4 && Math.abs(game.flightOrientation.x) <= Math.PI / 4);
   assert.equal(game.state().shield, 90);
 }
 // Glancing hits near the steering limits must still point inward after heading clamping.
 for (const reducedMotion of [false, true]) {
   const game = makeGame(reducedMotion);
-  for (let face = 0; face < 24; face++) for (let yaw = -65; yaw <= 65; yaw += 13) for (let pitch = -45; pitch <= 45; pitch += 15) {
+  for (let face = 0; face < 24; face++) for (let yaw = -45; yaw <= 45; yaw += 9) for (let pitch = -45; pitch <= 45; pitch += 15) {
     const angle = face * Math.PI / 12, rx = game.radii.x - 26, ry = game.radii.y - 26;
     const normal = new THREE.Vector3(Math.cos(angle) / rx, Math.sin(angle) / ry, 0).normalize();
     game.flightOrientation.set(pitch * Math.PI / 180, yaw * Math.PI / 180, 0, 'YXZ');

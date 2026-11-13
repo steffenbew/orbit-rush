@@ -26,8 +26,8 @@ const makeFlight = reducedMotion => new Function('THREE', 'reducedMotion', `
 for (const reducedMotion of [false, true]) {
   const outcomes = [];
   for (const fps of [5, 30, 60, 120, 144]) {
-    const flight = makeFlight(reducedMotion), yawRate = reducedMotion ? .45 : .9, rate = yawRate * .4;
-    flight.target.set(.4, 0);
+    const flight = makeFlight(reducedMotion), yawRate = reducedMotion ? .45 : .9, rate = yawRate * .25;
+    flight.target.set(.25, 0); // Keep this inertia test inside the narrower soft-limit region.
     flight.step(.1);
     assert.ok(Math.abs(flight.flightTurn.x) > rate * .3 && Math.abs(flight.flightTurn.x) < rate * .35,
       'Turn-in reaches about one third of the requested rate in 100 ms, retaining some inertia');
@@ -43,7 +43,7 @@ for (const reducedMotion of [false, true]) {
     const settled = flight.flightOrientation.y;
     for (let i = 0; i < fps * 3; i++) flight.step(1 / fps);
     assert.ok(Math.abs(flight.flightOrientation.y - settled) < .00001);
-    assert.ok(flight.flightMotion.x > 140, 'Neutral controls keep travelling along the new heading');
+    assert.ok(flight.flightMotion.x > 90, 'Neutral controls keep travelling along the new heading');
     outcomes.push(flight.flightOrientation.y);
     assert.ok(Math.abs(flight.camera.rotation.z) < .001, 'Wings level after the turn, without undoing yaw');
     assert.ok(flight.playerHullRotation.equals(flight.camera.quaternion));
@@ -68,7 +68,47 @@ for (const reducedMotion of [false, true]) {
   }
   for (const heading of outcomes) assert.ok(Math.abs(heading - outcomes[0]) < 1e-8, 'Frame-rate-independent turn integration');
 }
-const yawLimit = 65 * Math.PI / 180, pitchLimit = Math.PI / 4;
+// Full input reaches a sideways bank without widening the heading cone.
+for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) for (const input of [.25, .5, 1]) {
+  const banked = makeFlight(false);
+  banked.target.set(sign * input, 0);
+  banked.step(1 / fps);
+  const firstBank = THREE.MathUtils.clamp(-sign * input ** 2 * Math.PI / 2 * (1 - Math.exp(-1.2 / fps)),
+    -50 * Math.PI / 180 / fps, 50 * Math.PI / 180 / fps);
+  assert.ok(Math.abs(banked.camera.rotation.z - firstBank) < 1e-10, 'Banking uses the slower inertia response');
+  for (let frame = 1; frame < fps * 24; frame++) banked.step(1 / fps);
+  const expected = -sign * input ** 2 * Math.PI / 2;
+  assert.ok(Math.abs(banked.camera.rotation.z - expected) < 1e-6);
+  assert.ok(Math.abs(banked.flightOrientation.y) <= Math.PI / 4);
+  assert.ok(banked.flightMotion.z < 0);
+  banked.target.set(0, 0);
+  for (let frame = 0; frame < fps * 16; frame++) banked.step(1 / fps);
+  assert.ok(Math.abs(banked.camera.rotation.z) < .00002, 'Release smoothly levels the aircraft');
+}
+// A full reversal must respect the same roll-speed cap, not snap through 180 degrees.
+for (const fps of [5, 60, 144]) {
+  const banked = makeFlight(false);
+  banked.target.set(1, 0);
+  for (let frame = 0; frame < fps * 20; frame++) banked.step(1 / fps);
+  banked.target.set(-1, 0);
+  for (let frame = 0; frame < fps * 8; frame++) {
+    const previous = banked.camera.rotation.z;
+    banked.step(1 / fps);
+    assert.ok(Math.abs(banked.camera.rotation.z - previous) <= 50 * Math.PI / 180 / fps + 1e-10);
+    if ((frame + 1) / fps <= 1.5) assert.ok(banked.camera.rotation.z < 0, 'Reversing a full bank takes time to reach level');
+  }
+  assert.ok(banked.camera.rotation.z > 0, 'A sustained reversal eventually banks the other way');
+}
+for (const sign of [-1, 1]) {
+  const banked = makeFlight(true);
+  banked.flightTurn.x = sign * .45;
+  banked.target.set(-sign, 0);
+  banked.step(.1);
+  const expected = banked.flightTurn.x / .9 * .1 * (1 - Math.exp(-.4));
+  assert.ok(Math.abs(banked.camera.rotation.z - expected) < 1e-10, 'Reduced-motion banking stays unchanged');
+}
+console.log('PASS curved ±90° input banking, gentle partial turns, smooth leveling and unchanged reduced motion');
+const yawLimit = Math.PI / 4, pitchLimit = Math.PI / 4;
 for (const reducedMotion of [false, true]) for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) {
   const bounded = makeFlight(reducedMotion);
   bounded.target.set(sign, sign);
@@ -90,13 +130,13 @@ for (const reducedMotion of [false, true]) for (const fps of [5, 60, 144]) for (
     'Turning back into the forward cone stays responsive, without a sticky boundary');
 }
 const soft = makeFlight(false), center = makeFlight(false);
-soft.flightOrientation.y = -60 * Math.PI / 180;
+soft.flightOrientation.y = -42 * Math.PI / 180;
 soft.target.set(1, 0); center.target.set(1, 0);
 soft.step(.1); center.step(.1);
 assert.ok(Math.abs(soft.flightTurn.x) < Math.abs(center.flightTurn.x) * .2, 'Outward input softens before hitting the limit');
 soft.flightVelocity.set(100, -50); soft.target.set(0, 0); soft.step(1);
 assert.ok(Math.abs(soft.flightVelocity.x - 100 * Math.exp(-2)) < 1e-8, 'Impact drift dissipates independently of the flight heading');
-console.log('PASS responsive aircraft inertia, persistent heading, soft ±65°/±45° limits, forward-only flight, impulse decay and pause at 5–144 FPS');
+console.log('PASS responsive aircraft inertia, persistent heading, matching soft ±45° yaw/pitch limits, forward-only flight, impulse decay and pause at 5–144 FPS');
 
 class Element extends EventTarget {
   closest() { return null; }
