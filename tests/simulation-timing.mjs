@@ -20,7 +20,7 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('THRE
   const flightTurn = new THREE.Vector2(), flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
   const camera = new THREE.PerspectiveCamera(), distance = new THREE.Vector3();
   const playerHullRotation = new THREE.Quaternion();
-  const roundDuration = 45, levelPressure = .8;
+  const roundDuration = 45, level = 10, levelPressure = .8;
   let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
   let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0, feedbackUntil = 0;
   let normalHeld = false, heavyHeld = false;

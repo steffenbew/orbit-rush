@@ -17,7 +17,7 @@ const makeGame = reducedMotion => new Function('THREE', 't', 'reducedMotion', `
   const flightDirection = new THREE.Vector3(0, 0, -1), flightTilt = new THREE.Vector3();
   const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ'), playerHullRotation = new THREE.Quaternion();
   const flightVelocity = new THREE.Vector2(), flightTurn = new THREE.Vector2(), flightViewOffset = new THREE.Vector2(), target = new THREE.Vector2();
-  const playerHullRadius = 26, roundDuration = 45, simulationStep = 1 / 60;
+  const playerHullRadius = 26, roundDuration = 45, simulationStep = 1 / 60, level = 1;
   let started = true, paused = false, roundEnded = false, crashing = false, celebrating = false;
   let shield = 100, shieldHitTime = 0, gameTime = 0, levelPressure = 0, difficulty = 0, speed = 0, hitMarker = 0, shake = 0;
   const sounds = [], crashes = [], messages = [], elements = new Map();

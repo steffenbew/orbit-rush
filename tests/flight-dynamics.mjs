@@ -82,6 +82,7 @@ const code = `
     get showerSpacing() { return showerSpacing; },
     setLevel: value => { level = value; }, setPressure: value => { levelPressure = value; },
     setTime: value => { gameTime = value; },
+    setCourseStart: value => { courseStartTime = value; },
     setPaused: value => { paused = value; },
     setRoundEnded: value => { roundEnded = value; }, setCrashing: value => { crashing = value; },
     shower: (corridor, strength, shape = 0, direction = 1) => {
@@ -116,14 +117,14 @@ for (const reducedMotion of [false, true]) {
   `)(THREE, reducedMotion);
   assert.equal(initialFleet.length, 8, 'Boot-time asteroid creation must not read uninitialized flight state');
   for (const ship of initialFleet.filter(ship => !ship.userData.type.asteroid)) {
-    const openingSpeed = reducedMotion ? 35 : 180 * 1.86;
+    const openingSpeed = reducedMotion ? 35 : 180 * 1.86 * 1.15;
     assert.ok(Math.abs(ship.userData.courseVelocity.length() - openingSpeed * .85 * ship.userData.cruiseRatio) < 1e-8,
       'Opening traffic must match the increased flight speed, without changing reduced motion');
   }
 }
 console.log('PASS initial fleet creation before flight state initialization');
 
-const flightSpeed = new Function('reducedMotion', 'levelPressure', 'progress', `
+const flightSpeed = new Function('reducedMotion', 'levelPressure', 'progress', 'level', `
   ${section('      function levelFlightSpeed(', '      function flightDistanceAt(')}
   return levelFlightSpeed(progress);
 `);
@@ -132,23 +133,24 @@ for (const reducedMotion of [false, true]) for (const level of [1, 2, 6, 20, 100
   for (const progress of [0, .25, .5, .75, 1]) {
     const previousSpeed = reducedMotion ? 35 + pressure * 10 + (8 + pressure * 15) * progress
       : 1.55 * (180 + pressure * 380 + (140 + pressure * 560) * Math.pow(progress, 1.6));
-    assert.ok(Math.abs(flightSpeed(reducedMotion, pressure, progress) / previousSpeed - (reducedMotion ? 1 : 1.2)) < 1e-8,
-      'Flight must be another 20% faster, with reduced motion unchanged');
+    assert.ok(Math.abs(flightSpeed(reducedMotion, pressure, progress, level) / previousSpeed - (reducedMotion ? 1 : 1.2 * (level === 1 ? 1.15 : 1))) < 1e-8,
+      'Level one adds 15% to the current speed; later levels and reduced motion stay unchanged');
   }
 }
-console.log('PASS another 20% faster forward flight across early/late levels and unchanged reduced-motion speed');
+console.log('PASS 15% faster level one throughout the round, unchanged later-level and reduced-motion speed');
 const pressureForLevel = new Function('level', 'return ' + source.match(/        levelPressure = ([^;]+);/)[1]);
-assert.equal(pressureForLevel(1), 0, 'Level one keeps its familiar speed');
+assert.equal(pressureForLevel(1), 0, 'Level one starts at zero progression pressure');
 assert.ok(Math.abs(pressureForLevel(2) - (1 - Math.exp(-1 / 6))) < 1e-12);
 for (const progress of [0, .5, 1]) {
-  const before = flightSpeed(false, 1 - Math.exp(-1 / 4), progress);
-  const after = flightSpeed(false, pressureForLevel(2), progress);
+  const before = flightSpeed(false, 1 - Math.exp(-1 / 4), progress, 2);
+  const after = flightSpeed(false, pressureForLevel(2), progress, 2);
+  assert.ok(after > flightSpeed(false, 0, progress, 1), 'Level two still flies faster than the boosted level one');
   assert.ok(after < before * .92 && after > before * .85, 'Level two is about 10% slower than before');
 }
 for (let level = 2; level <= 100; level++) {
   assert.ok(pressureForLevel(level) > pressureForLevel(level - 1) && pressureForLevel(level) < 1);
 }
-console.log('PASS gentler six-level speed ramp, slower level two, unchanged opening speed and bounded progression');
+console.log('PASS gentler six-level speed ramp, faster first level without reversing progression and bounded later speeds');
 
 const game = makeGame();
 const moveLaser = new Function('rocket', 'dt', 'playerLaserSpeed',
@@ -1476,7 +1478,7 @@ console.log(`PASS full-level collision chance at 5–144 FPS: straight ${unatten
 for (const reducedMotion of [false, true]) {
   const traffic = makeGame(reducedMotion);
   // Include retries and a return to level one after the larger fleet has been allocated.
-  for (const level of [1, 2, 3, 4, 8, 12, 20, 20, 1]) {
+  for (const level of [8, 1, 2, 3, 4, 8, 12, 20, 20, 1]) {
     traffic.setLevel(level);
     traffic.setupLevelFleet();
     const baseTypes = [0, 0, 3, 1, 2, 0, 2, 3];
@@ -1492,6 +1494,17 @@ for (const reducedMotion of [false, true]) {
       Math.round((regularCount + Math.round(regularCount * .2) + 3) * 1.3), 'Increase regular ships by about 30% without crowding the opening');
     assert.equal(active.filter(ship => ship.userData.type.asteroid).length,
       Math.round((baseFleet.filter(type => type === 3).length + Math.ceil(level / 2) + 3) * 1.3), 'Increase asteroid arrivals by about 30%');
+    const unlocked = ['INTERCEPTOR', 'NOVA SAUCER', 'TITAN CARRIER'].slice(0, Math.min(3, level));
+    const regularTypes = new Set(active.filter(ship => !ship.userData.type.asteroid).map(ship => ship.userData.type.name));
+    assert.deepEqual([...regularTypes].sort(), [...unlocked].sort(), 'Regular reinforcements respect level-based class unlocks, including a new run');
+    traffic.setTime(0);
+    traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).forEach(ship => traffic.queueShip(ship));
+    traffic.setTime(6); traffic.updateRingShipArrivals();
+    const routeShips = traffic.ringShips.filter(ship => ship.visible);
+    assert.equal(routeShips.length, 2, 'Only two extra ships accompany the checkpoint path');
+    assert.deepEqual(routeShips.map(ship => ship.userData.type.name).sort(), ['INTERCEPTOR', unlocked.at(-1)].sort(),
+      'The route pair includes the latest unlocked class, even after returning to level one');
+    traffic.setTime(0);
     assert.equal(active.filter(ship => ship.userData.stationary).length, 3, 'Three guaranteed stationary rocks are mixed into arrivals');
     assert.equal(traffic.queue[1].userData.type.asteroid, undefined, 'Extra ships arrive early among the rocks, not only at the end');
     assert.equal(traffic.capitalPending, level >= 4 && level % 4 === 0, 'Keep boss progression unchanged');
@@ -1500,7 +1513,57 @@ for (const reducedMotion of [false, true]) {
     assert.equal(traffic.ships.length, allocated, 'Reuse the extra ships on retry');
   }
 }
-console.log('PASS 30% more ships/asteroids, three stationary rocks, unchanged two-ship opening/bosses and fleet reuse');
+console.log('PASS planned fleet counts, three stationary rocks, unchanged two-ship opening/bosses and fleet reuse');
+
+for (const reducedMotion of [false, true]) for (const level of [1, 2, 3, 4, 6, 7, 9, 10, 12, 13, 20]) {
+  const traffic = makeGame(reducedMotion); traffic.setLevel(level); traffic.setupLevelFleet();
+  const limit = Math.min(6, 2 + Math.floor((level - 1) / 3));
+  const activeShips = () => traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital);
+  traffic.setTime(3); traffic.updateShipArrivals();
+  assert.equal(activeShips().length, 2, 'Every level opens with only two ships');
+  traffic.setTime(6); traffic.updateRingShipArrivals();
+  assert.equal(activeShips().length, 2, 'A timer alone never stacks route traffic onto the opening encounter');
+  traffic.flightRings[0].userData.passedAt = 6; traffic.updateRingShipArrivals();
+  assert.equal(activeShips().length, 2, 'A checkpoint cannot bypass an uncleared encounter');
+  traffic.queueShip(activeShips()[0]);
+  traffic.setTime(8.99); traffic.updateRingShipArrivals();
+  assert.equal(activeShips().length, 1, 'Wait three seconds after a ship leaves');
+  traffic.setTime(9); traffic.updateRingShipArrivals();
+  if (limit === 2) {
+    assert.equal(activeShips().length, 1, 'Early levels cannot add a pair beside one survivor');
+    traffic.queueShip(activeShips()[0]);
+    traffic.setTime(11.99); traffic.updateRingShipArrivals();
+    assert.equal(activeShips().length, 0);
+    traffic.setTime(12); traffic.updateRingShipArrivals();
+  }
+  assert.equal(traffic.ringShips.filter(ship => ship.visible).length, 2);
+  assert.equal(activeShips().length, limit === 2 ? 2 : 3);
+  const queuedRocks = traffic.queue.filter(ship => ship.userData.type.asteroid).length;
+  traffic.setTime(16); traffic.updateShipArrivals();
+  assert.equal(traffic.queue.filter(ship => ship.userData.type.asteroid).length, queuedRocks - 1, 'Waiting for a wave does not block queued rocks');
+  assert.equal(activeShips().length, limit === 2 ? 2 : 3, 'Do not top up a still-busy encounter');
+  // Isolate ship scheduling after separately verifying that rocks still arrive.
+  traffic.queue.splice(0, traffic.queue.length, ...traffic.queue.filter(ship => !ship.userData.type.asteroid));
+  traffic.setTime(17); activeShips().slice(1).forEach(ship => traffic.queueShip(ship));
+  traffic.setTime(19); traffic.updateShipArrivals();
+  assert.equal(activeShips().length, 1, 'A new group waits for the breather, not just a free slot');
+  traffic.flightRings[1].userData.passedAt = 19; traffic.updateShipArrivals();
+  assert.equal(activeShips().length, 2, 'A newly passed checkpoint can release a ready group early');
+  for (const time of [20.5, 22, 23.5, 25]) {
+    traffic.setTime(time); traffic.updateShipArrivals();
+    assert.ok(activeShips().length <= limit, 'Staggered wave members always respect the level limit');
+  }
+  assert.equal(activeShips().length, limit, 'The cap grows one slot every three levels, up to six ships');
+  traffic.flightRings[2].userData.passedAt = 26;
+  traffic.setTime(26); traffic.updateShipArrivals();
+  assert.equal(activeShips().length, limit, 'Checkpoints never override the active-ship limit');
+  if (limit >= 4) {
+    traffic.queueShip(activeShips()[0]);
+    traffic.setTime(34); traffic.updateShipArrivals();
+    assert.equal(activeShips().length, limit - 1, 'Even after the delay, several survivors block the next group');
+  }
+}
+console.log('PASS two-ship openings, level-scaled wave limits, three-second breathers, checkpoint triggers, no top-ups and asteroid continuity');
 
 for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) {
   const still = makeGame(reducedMotion); still.setLevel(3); still.setupLevelFleet();
@@ -1547,6 +1610,8 @@ for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (con
   arrivals.setLevel(level); arrivals.setPressure(1 - Math.exp(-(level - 1) / 4)); arrivals.setupLevelFleet();
   const pool = [...arrivals.ringShips], allocated = arrivals.ships.length;
   assert.equal(arrivals.ships.filter(ship => ship.visible).length, 2);
+  arrivals.setTime(2);
+  arrivals.ships.filter(ship => ship.visible).forEach(ship => arrivals.queueShip(ship));
   arrivals.setTime(5.99); arrivals.updateRingShipArrivals();
   assert.ok(pool.every(ship => !ship.visible), 'Keep course traffic hidden through the opening checkpoint');
   arrivals.setTime(6);
@@ -1562,15 +1627,19 @@ for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (con
   }
   arrivals.updateRingShipArrivals();
   assert.deepEqual(arrivals.ringShips, pool); assert.equal(arrivals.ships.length, allocated);
-  assert.equal(pool.length, 6, 'Six reusable ships add traffic along the checkpoint route');
-  const spacing = arrivals.levelFlightSpeed(6 / 45) * .85 * 2.5;
-  pool.slice(1).forEach((ship, index) => {
-    assert.ok(Math.abs(ship.userData.ringRoute.distance - pool[index].userData.ringRoute.distance - spacing) < 1e-8,
-      'Spread course traffic by 2.5 seconds of cruise distance instead of a tight formation');
-  });
+  assert.equal(pool.length, 2, 'Two reusable ships add traffic along the checkpoint route');
+  assert.ok(pool.every(ship => ['INTERCEPTOR', 'NOVA SAUCER', 'TITAN CARRIER'].slice(0, Math.min(3, level)).includes(ship.userData.type.name)),
+    'Only level-unlocked ship types join route traffic');
+  const spacing = arrivals.levelFlightSpeed(6 / 45) * .85;
+  const gaps = pool.slice(1).map((ship, index) => (ship.userData.ringRoute.distance - pool[index].userData.ringRoute.distance) / spacing);
+  assert.ok(gaps.every(gap => gap >= 1.4 && gap <= 2.2), 'Loose traffic keeps 1.4–2.2 seconds between arrivals');
+  assert.ok(Math.abs(gaps[0] - 1.8) > 1e-4, 'Arrival spacing is randomized, not a fixed formation');
   assert.ok(pool.every(ship => ship.visible && ship.userData.arrivalOpacity === 0));
-  assert.ok(pool.every(ship => ship.position.distanceTo(arrivals.camera.position) > (reducedMotion ? 450 : 3600)),
-    'Delayed traffic must still start well ahead, not teleport into the current flight path');
+  assert.ok(pool.every(ship => ship.position.distanceTo(arrivals.camera.position) > (reducedMotion ? 150 : 800)),
+    'Delayed traffic must leave a safe approach, not teleport into the current flight path');
+  const firstArrival = pool[0].position.distanceTo(arrivals.camera.position);
+  assert.ok(firstArrival < Math.max(reducedMotion ? 220 : 1200, arrivals.levelFlightSpeed(6 / 45) * .85 * 3.1),
+    'The first route ship stays nearby instead of starting beyond the distance fade');
   const routes = pool.map(ship => ship.userData.ringRoute);
   for (let frame = 1; frame <= fps * 12; frame++) {
     const dt = 1 / fps, time = 6 + frame * dt;
@@ -1582,7 +1651,10 @@ for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (con
       arrivals.updateShipCourse(ship, dt);
       ship.position.addScaledVector(ship.userData.courseVelocity, dt).addScaledVector(arrivals.worldStep, .85);
       assert.ok(ship.position.distanceTo(ship.userData.ringRoute.position.clone().add(arrivals.courseWorldOffset)) < 1e-8);
-      assert.ok(ship.position.z < -(reducedMotion ? 100 : 500), 'High-speed levels must not overtake still-arriving ships');
+      if (time < 10) {
+        const clearance = time < 7.2 ? (reducedMotion ? 100 : 500) : (reducedMotion ? 30 : 150);
+        assert.ok(ship.position.z < -clearance, 'Fade-ins stay clear; visible ships approach without an immediate fly-by');
+      }
     }
   }
   pool.forEach((ship, index) => assert.equal(ship.userData.ringRoute, routes[index], 'Activate the pending flight only once'));
@@ -1592,9 +1664,9 @@ trainingTraffic.setTime(30); trainingTraffic.updateRingShipArrivals();
 assert.ok(trainingTraffic.ringShips.every(ship => !ship.visible), 'A long tutorial must not trigger the scheduled course ships');
 assert.ok(source.indexOf('        updateRingShipArrivals();') < source.indexOf('        if (started && !paused && !roundEnded && !crashing) courseWorldOffset.addScaledVector(worldStep, .85);'),
   'Place delayed routes before applying the next world step');
-console.log('PASS two-ship opening, delayed distant course traffic, pause/lifecycle guards, single activation, high-speed clearance and model reuse');
+console.log('PASS two-ship opening, two nearby level-unlocked route ships, pause/lifecycle guards, single activation, high-speed clearance and model reuse');
 
-// Course traffic crosses the real, oriented openings, independent of player steering.
+// Course traffic stays near the real checkpoints, using loose lanes independent of player steering.
 for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (const shape of [-1, 0, 1, 2]) for (const fps of [5, 60, 144]) {
   const traffic = makeGame(reducedMotion);
   traffic.setLevel(level); traffic.setPressure(1 - Math.exp(-(level - 1) / 4)); traffic.setupLevelFleet();
@@ -1604,6 +1676,11 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
   }));
   const gateState = traffic.flightRings.map(gate => [gate.position.toArray(), gate.visible, gate.userData.resolved]);
   const passes = traffic.ringShips.map(() => new Set());
+  const firstGateOffsets = traffic.ringShips.map(ship => ship.userData.ringRoute.curve.points[2].clone().sub(gates[0].position));
+  assert.ok(Math.max(...firstGateOffsets.map(point => point.x)) - Math.min(...firstGateOffsets.map(point => point.x)) > gates[0].radius * 1.6,
+    'Traffic spans both sides of the checkpoint instead of sharing the same tight route');
+  assert.ok(Math.max(...firstGateOffsets.map(point => point.y)) - Math.min(...firstGateOffsets.map(point => point.y)) > 1e-4,
+    'Ships use distinct heights as well as lateral lanes');
   const previous = new THREE.Vector3(), local = new THREE.Vector3(), crossing = new THREE.Vector3(), corner = new THREE.Vector3();
   for (let frame = 1; frame <= 45 * fps; frame++) {
     const dt = 1 / fps, time = frame * dt;
@@ -1612,6 +1689,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
     traffic.target.set(Math.sin(time), Math.cos(time));
     traffic.flightOrientation.set(.3 * Math.cos(time), time * .1, 0, 'YXZ');
     traffic.worldStep.set(Math.sin(time) * 50 * dt, Math.cos(time) * 20 * dt, traffic.levelFlightSpeed(time / 45) * dt);
+    traffic.flightMotion.copy(traffic.worldStep).multiplyScalar(-1 / dt);
     traffic.courseWorldOffset.addScaledVector(traffic.worldStep, .85);
     traffic.ringShips.forEach((ship, index) => {
       previous.copy(ship.position).sub(traffic.courseWorldOffset).addScaledVector(traffic.worldStep, .85);
@@ -1624,31 +1702,175 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
       if (shape >= 0 && depth >= 0 && depth <= field.length) {
         assert.ok(Math.abs(local.y - field.origin.y - traffic.corridorCenter(depth)) < field.gap * .65,
           'Course traffic follows the narrow passage instead of clipping through the ceiling or floor');
+        const box = ship.userData.collisionBox;
+        for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+          corner.set(x, y, z).multiply(ship.scale).applyQuaternion(ship.quaternion).add(local);
+          const cornerDepth = field.origin.z - corner.z;
+          if (cornerDepth >= 0 && cornerDepth <= field.length) {
+            assert.ok(Math.abs(corner.y - field.origin.y - traffic.corridorCenter(cornerDepth)) < field.gap,
+              'The whole varied-lane hull stays between the corridor ceiling and floor');
+          }
+        }
       }
       gates.forEach((gate, gateIndex) => {
         const before = previous.clone().sub(gate.position).dot(gate.normal);
         const after = local.clone().sub(gate.position).dot(gate.normal);
         if (before <= 0 || after > 0) return;
-        assert.ok(!passes[index].has(gateIndex), 'Each interceptor crosses each gate once');
+        assert.ok(!passes[index].has(gateIndex), 'Each route ship crosses each gate once');
         passes[index].add(gateIndex);
         crossing.lerpVectors(previous, local, before / (before - after)).sub(gate.position);
         const box = ship.userData.collisionBox;
         for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
           corner.set(x, y, z).multiply(ship.scale).applyQuaternion(ship.quaternion).add(crossing);
           corner.addScaledVector(gate.normal, -corner.dot(gate.normal));
-          assert.ok(corner.length() < gate.radius * .925,
-            `Whole hull must fit: reduced=${reducedMotion}, level=${level}, shape=${shape}, fps=${fps}, ship=${index}, gate=${gateIndex}, radius=${corner.length()}/${gate.radius * .925}, time=${time}`);
+          assert.ok(corner.length() < gate.radius * 3.5,
+            `Traffic stays near the gate: reduced=${reducedMotion}, level=${level}, shape=${shape}, fps=${fps}, ship=${index}, gate=${gateIndex}, radius=${corner.length()}/${gate.radius * 3.5}, time=${time}`);
         }
       });
     });
   }
-  passes.forEach(passed => assert.equal(passed.size, gates.length, 'Every extra ship flies through every available ring within the level'));
+  passes.forEach(passed => assert.ok(passed.size >= 2,
+    'Route ships progress through the course; naturally overtaken ships need not reach the player finish'));
   assert.deepEqual(traffic.flightRings.map(gate => [gate.position.toArray(), gate.visible, gate.userData.resolved]), gateState,
     'NPC passages never move, hide or resolve the player gates');
   assert.equal(traffic.shield, 100, 'NPC passages cannot cost player armor');
   assert.equal(traffic.sounds.length, 0, 'NPC passages do not trigger player rewards or misses');
 }
-console.log('PASS six real ring-flying interceptors, whole-hull aperture clearance, corridor paths, independent steering and shared world motion at 5–144 FPS');
+console.log('PASS two level-unlocked ships in loose nearby lanes, corridor paths, independent steering and shared world motion at 5–144 FPS');
+
+// Distant targets must become catchable, and close ones must remain shootable instead of flashing past.
+for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (const fps of [5, 60, 144]) {
+  const traffic = makeGame(reducedMotion);
+  traffic.setLevel(level); traffic.setPressure(1 - Math.exp(-(level - 1) / 4)); traffic.setupLevelFleet();
+  traffic.ringCourse(false);
+  traffic.setTime(6); traffic.flightMotion.set(0, 0, -traffic.levelFlightSpeed(6 / 45));
+  traffic.courseWorldOffset.z = traffic.flightDistanceAt(6);
+  traffic.flightRings.forEach(gate => {
+    gate.position.add(traffic.courseWorldOffset);
+    if (gate.position.z >= 0) gate.userData.resolved = true;
+  });
+  traffic.resetRingShips(true);
+  const regular = traffic.ships.slice(0, 3);
+  regular.forEach(ship => traffic.resetShip(ship));
+  const targets = [...regular, ...traffic.ringShips.filter(ship => ship.visible)];
+  const engagementTime = targets.map(() => 0);
+  for (let frame = 1; frame <= 39 * fps; frame++) {
+    const dt = 1 / fps, time = 6 + frame * dt;
+    traffic.setTime(time); traffic.flightMotion.set(0, 0, -traffic.levelFlightSpeed(time / 45));
+    traffic.worldStep.copy(traffic.flightMotion).multiplyScalar(-dt);
+    traffic.courseWorldOffset.addScaledVector(traffic.worldStep, .85);
+    targets.forEach((ship, index) => {
+      traffic.updateShipCourse(ship, dt); traffic.moveShip(ship, dt);
+      const depth = -ship.position.z;
+      if (depth >= (reducedMotion ? 40 : 150) && depth <= (reducedMotion ? 350 : 1000)) engagementTime[index] += dt;
+    });
+  }
+  engagementTime.forEach((duration, index) => assert.ok(duration >= 3,
+    `At least three seconds to engage even a faster passing target: reduced=${reducedMotion}, level=${level}, fps=${fps}, ship=${index}, duration=${duration}`));
+}
+console.log('PASS catchable distant targets and readable engagement windows for all regular classes and route traffic at low/high speeds');
+
+// A small, nearby finale stays shootable throughout the countdown, including after a long tutorial.
+for (const reducedMotion of [false, true]) for (const level of [1, 7, 13]) for (const fps of [5, 60, 144]) for (const offset of [0, 60]) {
+  const traffic = makeGame(reducedMotion); traffic.setLevel(level); traffic.setPressure(1 - Math.exp(-(level - 1) / 6)); traffic.setupLevelFleet();
+  traffic.setCourseStart(offset); traffic.setTime(offset + 38);
+  const activeShips = () => traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital);
+  activeShips().forEach(ship => traffic.queueShip(ship));
+  const planned = new Set(traffic.queue.filter(ship => !ship.userData.type.asteroid)), arrivals = new Set();
+  traffic.setTime(offset + 38.49); traffic.updateShipArrivals();
+  assert.equal(activeShips().length, 0, 'The finale does not start before its short fade-in lead');
+  traffic.setTime(offset + 38.5);
+  for (const [setter, inactive] of [['setPaused', true], ['setRoundEnded', true], ['setCrashing', true], ['setStarted', false]]) {
+    traffic[setter](inactive); traffic.updateShipArrivals();
+    assert.equal(activeShips().length, 0, 'No countdown traffic while inactive');
+    traffic[setter](!inactive);
+  }
+  for (let frame = 0; frame < 6.5 * fps; frame++) {
+    const dt = 1 / fps, elapsed = 38.5 + frame * dt;
+    traffic.setTime(offset + elapsed); traffic.flightMotion.set(0, 0, -traffic.levelFlightSpeed(elapsed / 45));
+    traffic.worldStep.copy(traffic.flightMotion).multiplyScalar(-dt);
+    traffic.courseWorldOffset.addScaledVector(traffic.worldStep, .85);
+    traffic.updateRingShipArrivals(); traffic.updateShipArrivals();
+    assert.ok(activeShips().length <= 2, 'The finale tops up to two, not the larger later-level allowance');
+    for (const ship of activeShips()) {
+      if (!arrivals.has(ship)) {
+        arrivals.add(ship);
+        assert.ok(planned.has(ship), 'Reuse a scheduled, level-unlocked regular ship');
+        assert.equal(ship.userData.arrivalOpacity, 0, 'Nearby ships fade in instead of popping into view');
+        assert.equal(ship.userData.lastVisibleTime, -Infinity);
+        assert.equal(traffic.targetInfo(ship), null, 'No target brackets on an invisible arrival');
+        assert.ok(ship.position.distanceTo(traffic.camera.position) < (reducedMotion ? 220 : 800));
+        assert.ok(ship.userData.previousPosition.equals(ship.position), 'No swept collision from the old distant position');
+      }
+      traffic.updateShipCourse(ship, dt); traffic.moveShip(ship, dt);
+      if (traffic.hasPassedCamera(ship)) traffic.queueShip(ship);
+    }
+    traffic.camera.updateMatrixWorld();
+    if (elapsed >= 40) assert.ok(activeShips().some(ship => traffic.targetInfo(ship)),
+      `At least one visible, targetable ship throughout the five-second countdown: reduced=${reducedMotion}, level=${level}, fps=${fps}, elapsed=${elapsed}`);
+  }
+  assert.equal(arrivals.size, 2, 'Exactly two staggered finale arrivals, not an endless replacement stream');
+  activeShips().forEach(ship => traffic.queueShip(ship));
+  traffic.setTime(offset + 44.9); traffic.updateShipArrivals();
+  assert.equal(activeShips().length, 0, 'Clearing the finale never starts another last-second wave');
+  traffic.setTime(0); traffic.setupLevelFleet();
+  activeShips().forEach(ship => traffic.queueShip(ship));
+  traffic.setTime(38.5); traffic.updateShipArrivals();
+  assert.equal(activeShips().length, 1, 'Retry resets the finale budget');
+}
+for (const level of [1, 13]) {
+  const traffic = makeGame(); traffic.setLevel(level); traffic.setupLevelFleet();
+  const opening = traffic.ships.filter(ship => ship.visible);
+  traffic.setTime(40); traffic.updateShipArrivals();
+  assert.deepEqual(traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital), opening,
+    'Existing ships fill the finale allowance; no extra pair is stacked onto them');
+  opening.forEach(ship => traffic.queueShip(ship));
+  traffic.setTime(43); traffic.updateShipArrivals();
+  assert.equal(traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).length, 0,
+    'Do not introduce ships too late to finish fading in and engage');
+}
+console.log('PASS bounded nearby countdown traffic, full five-second targetability, soft fades, lifecycle guards, tutorial-relative timing and retry reuse');
+
+// Individual passing speeds, with one throttle-varying companion and one steadier companion.
+for (const reducedMotion of [false, true]) for (const fps of [5, 60, 144]) {
+  const traffic = makeGame(reducedMotion); traffic.setupLevelFleet(); traffic.ringCourse(false);
+  const routes = traffic.ringShips.map(ship => ship.userData.ringRoute);
+  assert.equal(routes.filter(route => route.throttleAmount > 0).length, 1);
+  assert.ok(traffic.ringShips[1].userData.passingSpeed > traffic.ringShips[0].userData.passingSpeed * 1.5,
+    'The pair has clearly different passing paces, rather than identical player-matching speed');
+  assert.ok(routes.every(route => route.cruiseRatio >= .94 && route.cruiseRatio <= 1.08));
+  assert.ok(Math.max(...routes.map(route => route.cruiseRatio)) - Math.min(...routes.map(route => route.cruiseRatio)) > 1e-4,
+    'Ships have meaningfully different cruising speeds');
+  const samples = routes.map(() => []), forwardSpeed = reducedMotion ? 34 : 340;
+  traffic.ringShips.forEach(ship => {
+    ship.position.set(0, 0, reducedMotion ? -100 : -500);
+    const route = ship.userData.ringRoute;
+    route.cruiseSpeed = forwardSpeed - ship.userData.passingSpeed * (2 - route.cruiseRatio);
+    ship.userData.courseVelocity.copy(ship.userData.cruiseDirection).multiplyScalar(route.cruiseSpeed);
+  });
+  for (let frame = 1; frame <= 24 * fps; frame++) {
+    const dt = 1 / fps, time = frame * dt;
+    traffic.setTime(time);
+    traffic.ringShips.forEach((ship, index) => {
+      const route = ship.userData.ringRoute, distance = route.distance;
+      traffic.flightMotion.copy(ship.userData.cruiseDirection).multiplyScalar(forwardSpeed / .85);
+      traffic.updateShipCourse(ship, dt);
+      const closingRatio = (forwardSpeed - (route.distance - distance) / dt) / ship.userData.passingSpeed;
+      if (time >= 6) samples[index].push(closingRatio);
+    });
+  }
+  samples.forEach((speeds, index) => {
+    const min = Math.min(...speeds), max = Math.max(...speeds);
+    const baseline = 2 - routes[index].cruiseRatio;
+    assert.ok(min > .65 && max < 1.7, 'All ships stay catchable with a bounded relative passing speed');
+    if (routes[index].throttleAmount) {
+      assert.ok(min < baseline - .12 && max > baseline + .12, 'Active ships visibly throttle down and accelerate');
+      const maxStep = Math.max(...speeds.slice(1).map((speed, sample) => Math.abs(speed - speeds[sample])));
+      assert.ok(maxStep < .04, `No abrupt speed changes: reduced=${reducedMotion}, fps=${fps}, step=${maxStep}`);
+    } else assert.ok(max - min < .01, 'The other companion holds its individual relative cruise pace');
+  });
+}
+console.log('PASS individual passing speeds and smooth independent throttle cycles at 5–144 FPS in both motion modes');
 
 const ringTraffic = makeGame(); ringTraffic.setupLevelFleet(); ringTraffic.resetRingShips();
 const runner = ringTraffic.ringShips[0];
@@ -1669,9 +1891,9 @@ ringTraffic.setTime(20); ringTraffic.updateShipArrivals();
 assert.equal(runner.visible, false, 'A destroyed interceptor cannot reappear mid-course');
 const allocatedShips = ringTraffic.ships.length;
 ringTraffic.setTime(0); ringTraffic.setupLevelFleet();
-assert.equal(ringTraffic.ships.length, allocatedShips, 'Retries reuse the same bounded three-ship pool');
+assert.equal(ringTraffic.ships.length, allocatedShips, 'Retries reuse the same bounded route-ship pool');
 assert.deepEqual(ringTraffic.ringShips, pool);
-assert.ok(ringTraffic.ringShips.every(ship => !ship.visible && ship.userData.health === 3 && ship.userData.lastVisibleTime === -Infinity),
+assert.ok(ringTraffic.ringShips.every(ship => !ship.visible && ship.userData.health === ship.userData.type.health && ship.userData.lastVisibleTime === -Infinity),
   'Retry resets the pool but keeps it out of the opening formation');
 ringTraffic.flightRings.forEach(gate => { gate.userData.resolved = true; });
 ringTraffic.resetRingShips();
@@ -1882,8 +2104,18 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   lesson.setTime(59.09); lesson.updateRingShipArrivals();
   assert.ok(lesson.ringShips.every(ship => !ship.visible), 'Route traffic waits six active course seconds');
   lesson.setTime(59.1); lesson.updateRingShipArrivals();
+  assert.ok(lesson.ringShips.every(ship => !ship.visible), 'The route pair cannot stack onto post-tutorial arrivals');
+  lesson.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).forEach(ship => lesson.queueShip(ship));
+  const next = lesson.queue[0];
+  lesson.setTime(61.59); lesson.updateShipArrivals(.05); assert.equal(next.visible, false);
+  lesson.setTime(61.6); lesson.updateShipArrivals(.05); assert.equal(next.visible, true);
+  assert.ok(next.position.distanceTo(lesson.camera.position) >= (reducedMotion ? 900 : 3600),
+    'Distant rocks keep arriving while ship waves wait');
+  lesson.setTime(62.09); lesson.updateRingShipArrivals();
+  assert.ok(lesson.ringShips.every(ship => !ship.visible), 'The next pair waits three active seconds');
+  lesson.setTime(62.1); lesson.updateRingShipArrivals();
   assert.ok(lesson.ringShips.every(ship => ship.visible && ship.userData.arrivalOpacity === 0));
-  assert.ok(lesson.ringShips.every(ship => ship.position.distanceTo(lesson.camera.position) > (reducedMotion ? 450 : 3600)));
+  assert.ok(lesson.ringShips.every(ship => ship.position.distanceTo(lesson.camera.position) > (reducedMotion ? 150 : 800)));
   lesson.worldStep.set(-5, 2, 15); lesson.courseWorldOffset.addScaledVector(lesson.worldStep, .85);
   for (const ship of lesson.ringShips) {
     const distance = ship.userData.ringRoute.distance;
@@ -1891,19 +2123,16 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     ship.position.addScaledVector(ship.userData.courseVelocity, .05).addScaledVector(lesson.worldStep, .85);
     assert.ok(ship.position.distanceTo(ship.userData.ringRoute.position.clone().add(lesson.courseWorldOffset)) < 1e-8,
       'Route and rendered position share exactly one world step');
-    assert.ok(ship.userData.ringRoute.distance - distance < 4, 'Traffic starts at opening speed, not the old elapsed tutorial time');
+    const cruiseStep = Math.max(lesson.levelFlightSpeed(6 / 45), lesson.flightMotion.length()) * .85 * .05;
+    assert.ok(ship.userData.ringRoute.distance - distance <= cruiseStep,
+      'Traffic uses current flight speed, not the old elapsed tutorial time');
     assert.ok(ship.userData.arrivalOpacity > 0 && ship.userData.arrivalOpacity < 1);
     ship.traverse(part => {
       if (part.isMesh && !part.userData.engineExhaust) assert.equal(part.material.opacity, ship.userData.arrivalOpacity);
     });
   }
-  const next = lesson.queue[0];
-  lesson.setTime(61.59); lesson.updateShipArrivals(.05); assert.equal(next.visible, false);
-  lesson.setTime(61.6); lesson.updateShipArrivals(.05); assert.equal(next.visible, true);
-  assert.ok(next.position.distanceTo(lesson.camera.position) >= (reducedMotion ? 900 : 3600),
-    'After two checkpoint arrivals, ordinary distant reinforcements resume');
   const continuedRoutes = lesson.ringShips.map(ship => ship.userData.ringRoute);
-  lesson.setTime(62.1); lesson.updateRingShipArrivals();
+  lesson.setTime(62.2); lesson.updateRingShipArrivals();
   lesson.ringShips.forEach((ship, index) => assert.equal(ship.userData.ringRoute, continuedRoutes[index], 'The delayed course traffic deploys only once'));
   lesson.setLevel(2); lesson.setTime(0); lesson.setupLevelFleet(); lesson.beginFlightTutorial();
   assert.equal(lesson.tutorialState().stage, 3, 'Completed training is skipped on the next run');

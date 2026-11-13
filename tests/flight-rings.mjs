@@ -206,18 +206,21 @@ for (const reducedMotion of [false, true]) {
   assert.ok(Number(game.wash.style.opacity) > 0, 'Tint starts while entering the gate');
   assert.equal(game.sounds.length, 0);
   game.move(.1); assert.equal(gate.visible, false);
+  assert.equal(gate.userData.passedAt, game.state().time, 'Successful crossings timestamp the ship-wave trigger');
   assert.deepEqual(game.messages.at(-1), {message: t('ringPassed'), negative: false}, 'Keep successful checkpoint feedback at the top');
   assert.equal(Number(game.wash.style.opacity), reducedMotion ? .25 : 1);
   game.move(.2); assert.ok(Number(game.wash.style.opacity) > 0);
   game.move(.2); assert.equal(game.wash.style.opacity, '0');
   const geometry = gate.children[0].geometry, allocated = game.scene.children.length;
   game.resetFlightRing();
+  assert.ok(game.rings.every(gate => gate.userData.passedAt === -Infinity), 'Retries clear old wave triggers');
   assert.equal(game.scene.children.length, allocated, 'A fixed bounded pool, no respawn allocations');
   assert.equal(game.scene.children.filter(object => object.userData.flightRing).length, 5);
   assert.equal(game.rings[0].children[0].geometry, geometry);
 }
 const miss = makeGame(); isolateGate(miss, 200, -10); miss.flightMotion.set(0, 0, -200); miss.move(.1);
 assert.equal(miss.wash.classList.contains('missed'), true);
+assert.ok(miss.rings.every(gate => gate.userData.passedAt === -Infinity), 'Missing a checkpoint does not release a ship wave');
 assert.deepEqual(miss.messages.at(-1), {message: t('ringMissed'), negative: true}, 'The top red message includes CHECKPOINT MISSED and the shield penalty');
 miss.configure({paused: true}); miss.renderFlightRingFeedback();
 assert.equal(miss.wash.style.opacity, '0');

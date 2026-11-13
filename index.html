@@ -837,10 +837,11 @@
         ship.userData.height = Math.sin(angle) * radius * .6;
         ship.userData.cruiseRatio = random(.42, .78) * (ship.userData.type.name === 'TITAN CARRIER' ? .75 : 1);
         ship.userData.throttle = ship.userData.cruiseRatio;
+        ship.userData.passingSpeed = random(reducedMotion ? 2 : 25, reducedMotion ? 6 : 95);
         ship.userData.throttleTime = random(3.5, 6.5);
         ship.userData.dodgeSkill = random(.65, 1.15);
         if (!ship.userData.type.asteroid) {
-          const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (180 + levelPressure * 380);
+          const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (level === 1 ? 1.15 : 1) * (180 + levelPressure * 380);
           ship.userData.courseVelocity.copy(ship.userData.cruiseDirection)
             .multiplyScalar(initial ? openingSpeed * .85 * ship.userData.cruiseRatio : 0);
         }
@@ -923,6 +924,14 @@
         }
         desired.add(avoidance.clampLength(0, 1).multiplyScalar((reducedMotion ? 25 : 170) * data.dodgeSkill));
       }
+      function shipCruiseSpeed(ship, forwardSpeed, throttle) {
+        const depth = ship.position.clone().sub(camera.position).dot(ship.userData.cruiseDirection);
+        // Close the gap quickly at range, then limit relative speed for a readable shooting window.
+        // Throttle still varies the pace, but cannot leave a target permanently pulling away.
+        const passingSpeed = ship.userData.passingSpeed * THREE.MathUtils.clamp(2 - throttle, .65, 1.7);
+        const approach = THREE.MathUtils.smoothstep(depth, reducedMotion ? 120 : 900, reducedMotion ? 400 : 2400);
+        return Math.max(0, forwardSpeed - THREE.MathUtils.lerp(passingSpeed, forwardSpeed * .9, approach));
+      }
       function updateShipCourse(ship, dt) {
         const data = ship.userData;
         data.courseAge += dt;
@@ -958,10 +967,8 @@
         const motion = reducedMotion ? .25 : 1;
         const phase = data.courseAge * data.maneuverRate + data.maneuverPhase;
         const lateralLimit = reducedMotion ? 9 : 35;
-        // Let distant traffic approach before matching our speed; otherwise slow levels
-        // would end before a far-away reinforcement ever reaches the playable area.
-        const cruise = 1 - THREE.MathUtils.smoothstep(depth, reducedMotion ? 250 : 1000, reducedMotion ? 900 : 3000);
-        const desired = data.cruiseDirection.clone().multiplyScalar(Math.max(0, flightMotion.dot(data.cruiseDirection)) * .85 * data.throttle * cruise);
+        const forwardSpeed = Math.max(0, flightMotion.dot(data.cruiseDirection)) * .85;
+        const desired = data.cruiseDirection.clone().multiplyScalar(shipCruiseSpeed(ship, forwardSpeed, data.throttle));
         // Stop lane tracking near the player: the final pass remains avoidable.
         if (depth > 180) {
           const lane = data.lane + Math.sin(phase) * 50 * motion;
@@ -971,7 +978,7 @@
         }
         avoidAsteroids(ship, desired);
         const previousForwardSpeed = data.courseVelocity.dot(data.cruiseDirection);
-        data.courseVelocity.lerp(desired, 1 - Math.exp(-.85 * dt));
+        data.courseVelocity.lerp(desired, 1 - Math.exp(-1.5 * dt));
         updateEngineThrust(ship, previousForwardSpeed, dt);
         const bank = -data.courseVelocity.dot(data.courseRight) / (reducedMotion ? 600 : 320);
         ship.quaternion.copy(data.baseRotation).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, THREE.MathUtils.clamp(bank, -.3, .3))));
@@ -1484,7 +1491,7 @@
       let nextHazardTime = hazardStartDelay;
       function levelFlightSpeed(progress) {
         return reducedMotion ? 35 + levelPressure * 10 + (8 + levelPressure * 15) * progress
-          : 1.86 * (180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(progress, 1.6));
+          : 1.86 * (level === 1 ? 1.15 : 1) * (180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(progress, 1.6));
       }
       function flightDistanceAt(time) {
         let forward = 0, distance = 0;
@@ -1712,6 +1719,15 @@
         return danger;
       }
       let spawnQueue = [], nextShipTime = 2 * progressionTimeScale, tutorialReinforcements = 0;
+      let shipWaveReadyAt = 0, shipWaveRemaining = 0;
+      let countdownShipsSpawned = 0, nextCountdownShipTime = 0;
+      function regularShipLimit() {
+        return Math.min(6, 2 + Math.floor((level - 1) / 3));
+      }
+      function canStartShipWave(activeShips, arrivals) {
+        return activeShips <= 1 && activeShips + arrivals <= regularShipLimit()
+          && (gameTime >= shipWaveReadyAt || flightRings.some(gate => gate.userData.passedAt > shipWaveReadyAt - 3));
+      }
       let tutorialStage = 3, tutorialCompleted = false, tutorialStepCompletedAt = null, tutorialRetryAt = 0;
       function beginFlightTutorial() {
         if (level !== 1 || tutorialCompleted) return;
@@ -1808,24 +1824,29 @@
         const regularShips = order.filter(index => !ships[index].userData.type.asteroid);
         const previousShipCount = regularShips.length + Math.round(regularShips.length * .2) + 3;
         const extraShipCount = Math.round(previousShipCount * 1.3) - regularShips.length;
-        while (bonusShips.length < extraShipCount) {
+        // A new run must not reuse a class unlocked in a previous, higher-level run.
+        const eligibleBonusShips = bonusShips.filter(index => regularShips.some(regular => ships[regular].userData.type === ships[index].userData.type));
+        while (eligibleBonusShips.length < extraShipCount) {
           const index = ships.length;
-          const template = ships[regularShips[bonusShips.length % regularShips.length]];
+          const template = ships[regularShips[eligibleBonusShips.length % regularShips.length]];
           createShip(index, shipTypes.indexOf(template.userData.type));
           bonusShips.push(index);
+          eligibleBonusShips.push(index);
         }
-        bonusShips.slice(0, extraShipCount).forEach((index, slot) => {
+        eligibleBonusShips.slice(0, extraShipCount).forEach((index, slot) => {
           order.splice(Math.min(3 + slot * 3, order.length), 0, index);
         });
         const fleet = order.map(index => ships[index]);
         ships.forEach(ship => { ship.visible = false; });
-        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (180 + levelPressure * 380);
+        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (level === 1 ? 1.15 : 1) * (180 + levelPressure * 380);
         fleet.slice(0, 2).forEach((ship, slot) => {
           resetShip(ship, true, slot);
           ship.position.z = -550 - slot * Math.max(280, openingSpeed * .85 * 1.5);
         });
         spawnQueue = fleet.slice(2);
         tutorialReinforcements = 0;
+        shipWaveReadyAt = 0; shipWaveRemaining = 0;
+        countdownShipsSpawned = 0; nextCountdownShipTime = 0;
         nextShipTime = 2 * progressionTimeScale;
         nextHazardTime = hazardStartDelay;
         showerStrength = Math.floor(random(0, 3));
@@ -2055,6 +2076,9 @@
         if (gameTime >= showerStart) advanceAsteroidShower(dt);
       }
       function queueShip(ship) {
+        if (ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital && !ship.userData.tutorialTarget) {
+          shipWaveReadyAt = gameTime + 3;
+        }
         ship.visible = false;
         if (!ship.userData.shower && !ship.userData.scheduledHazard && !ship.userData.type.capital && !ship.userData.ringRoute && !ship.userData.tutorialTarget) spawnQueue.push(ship);
       }
@@ -2096,6 +2120,32 @@
           }
         }
       }
+      function updateCountdownShips() {
+        const elapsed = gameTime - courseStartTime;
+        // Fade in just before the countdown, not from a distance that takes the rest of the round to reach.
+        if (elapsed < roundDuration - 6.5 || elapsed > roundDuration - 3
+          || countdownShipsSpawned >= 2 || gameTime < nextCountdownShipTime) return;
+        const activeShips = ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).length;
+        if (activeShips >= Math.min(2, regularShipLimit())) return;
+        const index = spawnQueue.findIndex(ship => !ship.userData.type.asteroid);
+        if (index < 0) return;
+        const ship = spawnQueue.splice(index, 1)[0];
+        resetShip(ship);
+        const data = ship.userData;
+        data.passingSpeed = Math.min(data.passingSpeed, reducedMotion ? 4 : 55);
+        ship.position.copy(camera.position).addScaledVector(data.cruiseDirection, reducedMotion ? 180 : 700)
+          .addScaledVector(data.courseRight, (countdownShipsSpawned % 2 ? 1 : -1) * (reducedMotion ? 35 : 140))
+          .addScaledVector(data.courseUp, reducedMotion ? 6 : 20);
+        constrainShipToBoundary(ship);
+        const offset = ship.position.clone().sub(camera.position);
+        data.lane = offset.dot(data.courseRight); data.height = offset.dot(data.courseUp);
+        data.previousPosition.copy(ship.position);
+        const forwardSpeed = Math.max(0, flightMotion.dot(data.cruiseDirection)) * .85;
+        data.courseVelocity.copy(data.cruiseDirection).multiplyScalar(shipCruiseSpeed(ship, forwardSpeed, data.throttle));
+        setShipOpacity(ship, 0);
+        countdownShipsSpawned++;
+        nextCountdownShipTime = gameTime + 1.75;
+      }
       function updateShipArrivals(dt = 0) {
         if (tutorialStage < 3) return;
         updateAsteroidShower(dt);
@@ -2106,6 +2156,7 @@
           capitalPending = false;
           resetShip(capitalShip);
         }
+        updateCountdownShips();
         if (!spawnQueue.length || gameTime < nextShipTime) return;
         if (tutorialReinforcements === 2) {
           // Start the fade-in one-third into the checkpoint approach, leaving more time to engage.
@@ -2113,8 +2164,23 @@
           const startZ = courseOrigin.z + courseWorldOffset.z;
           if (camera.position.z > THREE.MathUtils.lerp(startZ, gate.position.z, 1 / 3)) return;
         }
-        const index = tutorialReinforcements > 0 ? spawnQueue.findIndex(ship => !ship.userData.type.asteroid) : 0;
+        let index = tutorialReinforcements > 0 ? spawnQueue.findIndex(ship => !ship.userData.type.asteroid) : 0;
+        const activeShips = ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).length;
+        // New groups wait for a mostly cleared encounter and a breather (or a passed checkpoint).
+        // Tutorial arrivals are already staggered; rocks and bosses keep their own schedules.
+        const waitingForWave = tutorialReinforcements === 0 && (gameTime - courseStartTime >= roundDuration - 6.5 || ringShipsPending
+          || (shipWaveRemaining === 0 && !canStartShipWave(activeShips, 1)));
+        if (!spawnQueue[index].userData.type.asteroid && (activeShips >= regularShipLimit() || waitingForWave)) {
+          if (tutorialReinforcements > 0) return;
+          index = spawnQueue.findIndex(ship => ship.userData.type.asteroid);
+          if (index < 0) return;
+        }
         const ship = spawnQueue.splice(index, 1)[0];
+        if (!ship.userData.type.asteroid && tutorialReinforcements === 0) {
+          if (shipWaveRemaining === 0) shipWaveRemaining = regularShipLimit() - activeShips;
+          shipWaveRemaining--;
+          if (shipWaveRemaining === 0) shipWaveReadyAt = gameTime + 3;
+        }
         resetShip(ship);
         if (tutorialReinforcements > 0) {
           // First a close shooting target before the gate, then a separate arrival near the checkpoint.
@@ -2338,7 +2404,7 @@
           gate.userData.normal.set(0, 0, 1); gate.quaternion.identity();
           gate.userData.previous.copy(gate.position);
           gate.visible = true;
-          gate.userData.resolved = false; gate.userData.fadeStart = gameTime;
+          gate.userData.resolved = false; gate.userData.passedAt = -Infinity; gate.userData.fadeStart = gameTime;
           const brightness = (index === (openingComplete ? 1 : 0) ? 1 : .3) * flightRingOpacity(gate);
           gate.children[0].material.opacity = brightness;
           gate.children[1].material.uniforms.brightness.value = brightness;
@@ -2371,6 +2437,7 @@
         flightRingGuide.hidden = false;
       }
       function resolveFlightRing(gate, passed) {
+        gate.userData.passedAt = passed ? gameTime : -Infinity;
         gate.userData.resolved = true;
         gate.visible = false;
         flightRingWashUntil = gameTime + .35; flightRingWashStrength = 1;
@@ -2431,34 +2498,46 @@
       const ringShips = [], ringShipPoint = new THREE.Vector3(), ringShipForward = new THREE.Vector3(0, 0, -1);
       let ringShipsPending = false;
       function updateRingShipArrivals() {
-        if (!started || paused || roundEnded || crashing || tutorialStage < 3 || !ringShipsPending
-          || gameTime - courseStartTime < 6) return;
+        if (!started || paused || roundEnded || crashing || tutorialStage < 3 || tutorialReinforcements > 0 || !ringShipsPending
+          || gameTime - courseStartTime < 6 || gameTime - courseStartTime >= roundDuration - 6.5) return;
+        const activeShips = ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).length;
+        if (!canStartShipWave(activeShips, 2)) return;
         resetRingShips(true);
+        shipWaveReadyAt = gameTime + 3;
       }
       function resetRingShips(distant = false) {
         ringShipsPending = false;
         ringShips.forEach(ship => { ship.visible = false; });
         const gates = flightRings.filter(gate => !gate.userData.resolved);
         if (!gates.length) return;
-        // Reuse six light ships along the actual openings, not the player's heading.
-        while (ringShips.length < 6) {
-          createShip(ships.length, 0);
-          ringShips.push(ships[ships.length - 1]);
+        // Just two route companions; the second showcases the newest unlocked class.
+        const activeShips = [];
+        for (let index = 0; index < 2; index++) {
+          const type = shipTypes[index === 0 ? 0 : Math.min(2, level - 1)];
+          let ship = ringShips.find(ship => ship.userData.type === type && !activeShips.includes(ship));
+          if (!ship) {
+            createShip(ships.length, shipTypes.indexOf(type));
+            ship = ships[ships.length - 1];
+            ringShips.push(ship);
+          }
+          activeShips.push(ship);
         }
         const clearance = Math.min(...gates.map(gate => gate.userData.radius));
         const firstDistance = Math.min(gates[0].position.distanceTo(camera.position), flightDistanceAt(firstCheckpointTime));
-        const arrivalDistance = Math.max(reducedMotion ? 600 : 3800, levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 7);
-        ringShips.forEach((ship, index) => {
+        const arrivalDistance = Math.max(reducedMotion ? 180 : 900, levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 2.5);
+        activeShips.forEach((ship, index) => {
           resetShip(ship, true);
-          const lane = [-.32, .32, -.1][index % 3];
+          // Loose lanes beside and above/below the gates, rather than a single-file procession.
+          const lane = (index % 2 ? 1 : -1) * random(.8, 2.8);
+          const height = random(-.8, .8);
           const points = gates.flatMap(gate => {
             const center = gate.position.clone().sub(courseWorldOffset).add(
-              new THREE.Vector3(lane * gate.userData.radius, 0, 0).applyQuaternion(gate.quaternion));
-            // Approach each opening along its normal, rather than cutting across the rim.
+              new THREE.Vector3(lane * gate.userData.radius, height * gate.userData.radius, 0).applyQuaternion(gate.quaternion));
+            // Stay near the checkpoint plane without forcing NPCs through the player's opening.
             return [center.clone().addScaledVector(gate.userData.normal, gate.userData.radius * .75), center,
               center.clone().addScaledVector(gate.userData.normal, -gate.userData.radius * .75)];
           });
-          points.push(camera.position.clone().sub(courseWorldOffset).add(new THREE.Vector3(lane * clearance, 0, 0)));
+          points.push(camera.position.clone().sub(courseWorldOffset).add(new THREE.Vector3(lane * clearance, height * clearance, 0)));
           points.sort((a, b) => b.z - a.z);
           // Follow the narrow passage between gates, without adding any gates inside it.
           if (showerCorridor) {
@@ -2479,10 +2558,15 @@
           curve.arcLengthDivisions = 512; // Keep distance-based arrivals accurate with the extra checkpoint knots.
           const length = curve.getLength();
           // Spread traffic over the route instead of bringing in one tight formation.
-          const spacing = levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 2.5;
-          const distance = distant ? arrivalDistance + index * spacing : firstDistance * (.15 + index * .14);
+          const spacing = levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85;
+          const distance = distant ? arrivalDistance + (index * 1.8 + random(0, .4)) * spacing : firstDistance * (.15 + index * .07);
           const data = ship.userData;
-          data.ringRoute = { curve, length, distance, distant, position: curve.getPointAt(distance / length), exit: curve.getTangentAt(1) };
+          // A lingering companion and a quicker pass, not two ships pacing the player identically.
+          data.passingSpeed = random(index === 0 ? 25 : 70, index === 0 ? 45 : 95) * (reducedMotion ? .065 : 1);
+          data.ringRoute = { curve, length, distance, distant, position: curve.getPointAt(distance / length), exit: curve.getTangentAt(1),
+            cruiseSpeed: levelFlightSpeed(0) * .85,
+            cruiseRatio: random(.94, 1.08), throttleAmount: index === 0 ? .18 : 0,
+            throttlePhase: random(0, Math.PI * 2), throttleRate: Math.PI * 2 / random(6, 10) };
           setShipOpacity(ship, distant ? 0 : 1);
           // Fit the complete hull even when turning through the smaller reduced-motion openings.
           const bounds = data.collisionBox.getBoundingSphere(new THREE.Sphere());
@@ -2509,10 +2593,14 @@
         if (!started || paused || roundEnded || crashing || !ship.visible || dt <= 0) return;
         const data = ship.userData, route = data.ringRoute;
         const previousSpeed = data.courseVelocity.length();
-        // New course traffic approaches from the distance before matching cruise speed.
-        const arrival = route.distant ? .25 + .75 * THREE.MathUtils.smoothstep(data.courseAge, 0, 12) : 1;
         if (data.arrivalOpacity < 1) setShipOpacity(ship, Math.min(1, data.arrivalOpacity + dt / 1.2));
-        route.distance += levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * arrival * dt;
+        // One companion varies its throttle; the other keeps its own steadier passing pace.
+        const throttle = 1 + route.throttleAmount * Math.sin(data.courseAge * route.throttleRate + route.throttlePhase)
+          * THREE.MathUtils.smoothstep(data.courseAge, 3, 5);
+        const forwardSpeed = Math.max(0, flightMotion.dot(data.cruiseDirection)) * .85;
+        const desiredSpeed = shipCruiseSpeed(ship, forwardSpeed, route.cruiseRatio * throttle);
+        route.cruiseSpeed = THREE.MathUtils.lerp(route.cruiseSpeed, desiredSpeed, 1 - Math.exp(-1.5 * dt));
+        route.distance += route.cruiseSpeed * dt;
         route.curve.getPointAt(Math.min(1, route.distance / route.length), ringShipPoint);
         if (route.distance > route.length) ringShipPoint.addScaledVector(route.exit, route.distance - route.length);
         // Only intrinsic motion here; the regular fleet loop adds the shared world step once.
