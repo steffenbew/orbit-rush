@@ -2739,16 +2739,20 @@
             return [center.clone().addScaledVector(gate.userData.normal, gate.userData.radius * .75), center,
               center.clone().addScaledVector(gate.userData.normal, -gate.userData.radius * .75)];
           });
-          points.push(camera.position.clone().sub(courseWorldOffset).add(new THREE.Vector3(lane * clearance, height * clearance, 0)));
+          const start = camera.position.clone().sub(courseWorldOffset).add(new THREE.Vector3(lane * clearance, height * clearance, 0));
+          points.push(start);
           points.sort((a, b) => b.z - a.z);
-          // Follow the narrow passage between gates, without adding any gates inside it.
-          if (showerCorridor) {
-            const entry = points.filter(point => point.z > showerCourseOrigin.z).pop();
+          // Follow only the remaining passage; a delayed wave may arrive inside or beyond it.
+          if (showerCorridor && start.z > showerCourseOrigin.z - showerLength) {
+            const startDepth = showerCourseOrigin.z - start.z;
+            const entry = points.filter(point => point.z > showerCourseOrigin.z).pop() || start;
             const exit = points.find(point => point.z < showerCourseOrigin.z - showerLength);
-            const entryPadding = Math.min(200, (entry.z - showerCourseOrigin.z) / 2);
+            const entryPadding = Math.min(200, Math.max(0, (entry.z - showerCourseOrigin.z) / 2));
             const exitPadding = exit ? Math.min(200, (showerCourseOrigin.z - showerLength - exit.z) / 2) : 200;
+            if (startDepth >= 0) start.y = showerCourseOrigin.y + corridorCenter(startDepth);
             for (let step = -1; step <= 9; step++) {
               const depth = step < 0 ? -entryPadding : step > 8 ? showerLength + exitPadding : showerLength * step / 8;
+              if (showerCourseOrigin.z - depth >= start.z) continue;
               const x = THREE.MathUtils.lerp(entry.x, exit ? exit.x : entry.x, THREE.MathUtils.clamp(depth / showerLength, 0, 1));
               points.push(new THREE.Vector3(x - showerCourseOrigin.x, corridorCenter(THREE.MathUtils.clamp(depth, 0, showerLength)), -depth)
                 .applyQuaternion(showerRotation).add(showerCourseOrigin));
