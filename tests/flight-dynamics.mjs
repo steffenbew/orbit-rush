@@ -1918,7 +1918,7 @@ for (const reducedMotion of [false, true]) for (const aspect of [9 / 16, 16 / 9,
       entry.flightOrientation.set(.18, -.28, .08, 'YXZ');
       entry.spawnTutorialTarget();
       const ship = entry.ships.find(ship => ship.visible);
-      if (stage === 1) {
+      if (stage === 2) {
         assert.equal(ship.userData.arrivalOpacity, 0, 'The nearby ship blends in instead of popping into view');
         moveTutorialTarget(entry, ship, .1);
         assert.ok(ship.userData.arrivalOpacity > 0 && ship.userData.arrivalOpacity < 1);
@@ -1932,12 +1932,12 @@ for (const reducedMotion of [false, true]) for (const aspect of [9 / 16, 16 / 9,
       const duration = reducedMotion ? 3 : 2.4;
       const localOffset = offset.clone().applyQuaternion(new THREE.Quaternion().setFromEuler(entry.flightOrientation).invert());
       assert.ok(Math.abs(localOffset.x) < 1e-8, 'No sideways entrance');
-      assert.ok(Math.abs(localOffset.y - (stage === 1 ? (reducedMotion ? 7 : 28) : 0)) < 1e-8,
+      assert.ok(Math.abs(localOffset.y - (stage === 2 ? (reducedMotion ? 7 : 28) : 0)) < 1e-8,
         'Only the ship has a small downward approach; the asteroid comes straight ahead');
       assert.ok(Math.abs(localOffset.z + (reducedMotion ? 10.5 : 42)) < 1e-8);
       assert.ok(Math.abs(destination.distanceTo(entry.camera.position) - (reducedMotion ? 110 : 200)) < 1e-8, 'Both tutorial targets settle much closer');
       const destinationBearing = destination.clone().sub(entry.camera.position).normalize();
-      if (stage === 2) assert.ok(ship.position.clone().sub(entry.camera.position).normalize().distanceTo(destinationBearing) < 1e-8);
+      if (stage === 1) assert.ok(ship.position.clone().sub(entry.camera.position).normalize().distanceTo(destinationBearing) < 1e-8);
       const assertFitsOnScreen = () => {
         ship.updateMatrixWorld(true);
         const bounds = ship.userData.collisionBox;
@@ -1962,9 +1962,9 @@ for (const reducedMotion of [false, true]) for (const aspect of [9 / 16, 16 / 9,
         'A smooth, frame-rate-independent entrance reaches halfway at half duration');
       const halfway = ship.position.clone().project(entry.camera);
       assert.ok(Math.abs(halfway.x) < .5 && Math.abs(halfway.y) < .5, 'The short trajectory stays near the flight path');
-      if (stage === 2) assert.ok(ship.position.clone().sub(entry.camera.position).normalize().distanceTo(destinationBearing) < 1e-8,
+      if (stage === 1) assert.ok(ship.position.clone().sub(entry.camera.position).normalize().distanceTo(destinationBearing) < 1e-8,
         'The asteroid stays on the same straight line throughout its approach');
-      if (stage === 1) assert.equal(ship.userData.arrivalOpacity, 1, 'The spawn fade completes well before settling');
+      if (stage === 2) assert.equal(ship.userData.arrivalOpacity, 1, 'The spawn fade completes well before settling');
       entry.flightOrientation.set(-.2, .3, 0, 'YXZ');
       entry.flightMotion.set(-60, 40, -320).multiplyScalar(reducedMotion ? .1 : 1);
       advance(duration / 2);
@@ -2004,6 +2004,7 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   const target = lesson.ships.find(ship => ship.visible);
   assert.equal(lesson.ships.filter(ship => ship.visible).length, 1);
   assert.equal(target.userData.tutorialTarget, 'laser');
+  assert.ok(target.userData.type.asteroid); assert.equal(target.userData.health, 2);
   const position = target.position.clone().sub(target.userData.tutorialEntry);
   lesson.flightMotion.set(100, 20, -300);
   moveTutorialTarget(lesson, target, 3.1);
@@ -2011,10 +2012,11 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   moveTutorialTarget(lesson, target, .1);
   assert.ok(target.position.distanceTo(position) < 1e-8, 'Practice targets remain at a readable shooting distance after entering');
   lesson.queueShip(target); lesson.completeTutorialStep('laser'); lesson.setTime(51.6); lesson.updateFlightTutorial();
-  const rock = lesson.ships.find(ship => ship.visible);
-  assert.equal(lesson.tutorialState().stage, 2); assert.ok(rock.userData.type.asteroid);
-  assert.equal(rock.userData.tutorialTarget, 'heavy'); assert.equal(rock.userData.health, 2);
-  lesson.queueShip(rock); lesson.completeTutorialStep('heavy'); lesson.setTime(53.1); lesson.updateFlightTutorial();
+  const ship = lesson.ships.find(ship => ship.visible);
+  assert.equal(lesson.tutorialState().stage, 2); assert.ok(!ship.userData.type.asteroid);
+  assert.equal(ship.userData.type.name, 'INTERCEPTOR');
+  assert.equal(ship.userData.tutorialTarget, 'heavy'); assert.equal(ship.userData.health, 3);
+  lesson.queueShip(ship); lesson.completeTutorialStep('heavy'); lesson.setTime(53.1); lesson.updateFlightTutorial();
   assert.equal(lesson.tutorialState().stage, 3); assert.equal(lesson.tutorialState().time, 53.1);
   assert.equal(lesson.tutorialState().courseStartTime, 53.1);
   assert.equal(lesson.tutorialState().completed, true); assert.equal(lesson.shield, 100);

@@ -36,12 +36,19 @@ def read_state():
         return None
 
 
+class DevRequestHandler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        # Keep HTML and modules in sync while editing; stale translations can stop the game loop.
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+
 def start():
     override = os.environ.get("PORT", "")
     if override and (not override.isascii() or not override.isdigit() or not 1 <= int(override) <= 65535):
         raise ValueError("PORT must be an integer between 1 and 65535.")
     port = int(override) if override else 8080
-    handler = functools.partial(SimpleHTTPRequestHandler, directory=str(ROOT))
+    handler = functools.partial(DevRequestHandler, directory=str(ROOT))
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     except OSError as error:

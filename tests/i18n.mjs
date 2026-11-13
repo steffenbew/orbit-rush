@@ -5,6 +5,10 @@ import * as i18n from '../i18n.js';
 
 const { messages, detectLanguage, setLanguage, t, applyTranslations } = i18n;
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const runtimeModulePath = source.match(/from '(\.\/i18n\.js[^']*)'/)[1];
+const runtimeModuleUrl = new URL(runtimeModulePath, new URL('../index.html', import.meta.url));
+assert.ok(runtimeModuleUrl.searchParams.has('v'), 'The page bypasses the previously cached translation module');
+const runtimeI18n = await import(runtimeModuleUrl);
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from, `Missing section: ${start}`);
@@ -16,6 +20,9 @@ for (const [locale, shower, corridor] of [
 ]) {
   setLanguage(locale);
   assert.equal(t('asteroidShower'), shower);
+  assert.equal(t('flightGo'), locale === 'en' ? 'GO!' : 'LOS!', 'Localized tutorial-to-flight announcement');
+  runtimeI18n.setLanguage(locale);
+  assert.equal(runtimeI18n.t('flightGo'), t('flightGo'), 'The actual page import includes the tutorial handoff message');
   assert.equal(t('asteroidCorridor'), corridor, 'Use the clear corridor name without an extra ring label');
 }
 assert.ok(source.includes('data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span>'), 'Initial markup also uses the hyphenated German label');

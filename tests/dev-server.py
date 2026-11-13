@@ -76,6 +76,7 @@ class DevServerTests(unittest.TestCase):
                 if record["pid"] == process.pid:
                     with urllib.request.urlopen(record["url"], timeout=2) as response:
                         self.assertIn(b"Orbit Rush test", response.read())
+                        self.assertEqual(response.headers["Cache-Control"], "no-store")
                     return process, record
             time.sleep(.05)
         self.fail("Server did not become ready")
@@ -97,6 +98,7 @@ class DevServerTests(unittest.TestCase):
         self.assertEqual(record["url"].endswith(":8080"), preferred_free)
         with urllib.request.urlopen(record["url"] + "/module.js") as response:
             self.assertIn("javascript", response.headers["Content-Type"])
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
         repeated = self.command("start")
         self.assertEqual(repeated.returncode, 0, repeated.stderr)
         self.assertIn(record["url"], repeated.stdout)

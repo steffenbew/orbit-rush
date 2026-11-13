@@ -118,6 +118,9 @@
     #control-hints.space-key #control-input { min-width: 170px; padding: 7px 22px 8px; border: 1px solid #b9dfff99; border-bottom-width: 4px; border-radius: 6px; background: #13273deb; box-shadow: inset 0 1px #ffffff20, 0 2px 8px #0005; }
     #control-hints.complete.space-key #control-input { border-color: #7effd5; }
     #control-hints.finished { opacity: 0; }
+    #control-hints.go { color: #7effd5; transition: none; }
+    #control-hints.go h2 { font-size: 24px; }
+    #control-hints.go #control-input { display: none; }
     @media (prefers-reduced-motion: reduce) { #control-hints { transition: none; } }
     @media (max-width: 600px) { .hud { left: 12px; right: 12px; top: 12px; } .scoreboard { gap: 15px; padding: 12px; } .number { font-size: 20px; } .label { font-size: 8px; } .hud-actions { flex-direction: column; } }
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; opacity: 1; } }
@@ -394,7 +397,7 @@
   <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><span data-i18n="creditsEffects">Laser, Leermagazin-Klick, Treffer und Explosionen: </span><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a><span data-i18n="creditsEffectsChanges">. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe.</span></p><p><span data-i18n="creditsCombo">Combo-Sound und Kollisionsalarm: </span><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Combo-Datei unverändert. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.</span></p><p><span data-i18n="creditsMusic">Musik: </span><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a><span data-i18n="creditsMusicChanges"> (Lautstärke angeglichen, Höhen leicht abgesenkt), </span><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p></dialog>
   <div id="status" role="status"></div>
   <script type="module">
-    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js';
+    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=2';
 
     setLanguage(detectLanguage(navigator.languages?.[0] || navigator.language));
     applyTranslations();
@@ -1729,7 +1732,9 @@
           && (gameTime >= shipWaveReadyAt || flightRings.some(gate => gate.userData.passedAt > shipWaveReadyAt - 3));
       }
       let tutorialStage = 3, tutorialCompleted = false, tutorialStepCompletedAt = null, tutorialRetryAt = 0;
+      let tutorialGoUntil = 0;
       function beginFlightTutorial() {
+        tutorialGoUntil = 0;
         if (level !== 1 || tutorialCompleted) return;
         tutorialStage = 0; tutorialStepCompletedAt = null; tutorialRetryAt = 0;
         // Save the opening fleet for gradual reinforcements after the lesson, not a second near-camera formation.
@@ -1745,20 +1750,20 @@
         tutorialStepCompletedAt = gameTime;
       }
       function spawnTutorialTarget() {
-        const ship = ships[tutorialStage === 1 ? 0 : 4];
+        const ship = ships[tutorialStage === 1 ? 4 : 0];
         resetShip(ship, true);
         ship.userData.tutorialTarget = tutorialStage === 1 ? 'laser' : 'heavy';
-        if (tutorialStage === 2) {
+        if (ship.userData.type.asteroid) {
           ship.userData.asteroidTier = 2; ship.scale.setScalar(1.3);
           ship.userData.health = ship.userData.maxHealth = 2;
         }
         ship.position.set(0, 0, reducedMotion ? -110 : -200).applyEuler(flightOrientation).add(camera.position);
         // The ship gently descends into the path; the closer asteroid approaches straight along it.
         const offset = reducedMotion ? 7 : 28;
-        ship.userData.tutorialEntry = new THREE.Vector3(0, tutorialStage === 1 ? offset : 0, -offset * 1.5)
+        ship.userData.tutorialEntry = new THREE.Vector3(0, ship.userData.type.asteroid ? 0 : offset, -offset * 1.5)
           .applyEuler(flightOrientation);
         ship.position.add(ship.userData.tutorialEntry);
-        if (tutorialStage === 1) setShipOpacity(ship, 0);
+        if (!ship.userData.type.asteroid) setShipOpacity(ship, 0);
         constrainShipToBoundary(ship);
         ship.userData.previousPosition.copy(ship.position);
         ship.userData.courseVelocity.copy(flightMotion).multiplyScalar(.85);
@@ -1788,6 +1793,8 @@
         const depthShift = camera.position.z - courseWorldOffset.z - courseOrigin.z;
         courseOrigin.z += depthShift; showerCourseOrigin.z += depthShift;
         resetFlightRing(true);
+        tutorialGoUntil = gameTime + 1.2;
+        showControlStep();
         // Let the two staggered ships arrive first; route traffic follows after six course seconds.
         ringShipsPending = true;
       }
@@ -3468,18 +3475,21 @@
       ];
       function showControlStep() {
         const step = controlSteps[tutorialStage];
-        if (!step) return;
-        controlTitle.textContent = t(step.title);
-        controlInput.textContent = t(step.input);
+        const showingGo = tutorialStage === 3 && gameTime < tutorialGoUntil;
+        if (!step && !showingGo) return;
+        controlTitle.textContent = t(showingGo ? 'flightGo' : step.title);
+        controlInput.textContent = showingGo ? '' : t(step.input);
         controlHints.classList.remove('complete', 'finished');
-        controlHints.classList.toggle('space-key', step.action === 'heavy');
-        controlHints.classList.toggle('checkpoint-step', step.action === 'checkpoint');
+        controlHints.classList.toggle('go', showingGo);
+        controlHints.classList.toggle('space-key', !showingGo && step.action === 'heavy');
+        controlHints.classList.toggle('checkpoint-step', !showingGo && step.action === 'checkpoint');
       }
       function updateControlHints() {
-        controlHints.hidden = !started || paused || crashing || roundEnded || tutorialStage >= controlSteps.length;
+        const showingGo = tutorialStage === 3 && gameTime < tutorialGoUntil;
+        controlHints.hidden = !started || paused || crashing || roundEnded || (tutorialStage >= controlSteps.length && !showingGo);
         if (controlHints.hidden) return;
-        controlHints.classList.toggle('complete', tutorialStepCompletedAt !== null);
-        controlHints.classList.toggle('finished', tutorialStage === 2 && tutorialStepCompletedAt !== null && gameTime - tutorialStepCompletedAt >= .8);
+        controlHints.classList.toggle('complete', showingGo || tutorialStepCompletedAt !== null);
+        controlHints.classList.toggle('finished', !showingGo && tutorialStage === 2 && tutorialStepCompletedAt !== null && gameTime - tutorialStepCompletedAt >= .8);
         // Follow the aiming cursor, flipping above it only near the bottom edge.
         const x = (mouseAim.x * .5 + .5) * innerWidth;
         const y = (-mouseAim.y * .5 + .5) * innerHeight;
