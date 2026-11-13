@@ -37,7 +37,7 @@ const makeGame = reducedMotion => new Function('THREE', 't', 'reducedMotion', `
   const startCrash = object => { crashes.push(object); crashing = true; paused = true; object.visible = false; worldStep.set(0, 0, 0); };
   ${section('      function levelFlightSpeed(', '      const courseWorldOffset =')}
   ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
-  ${section('      function updateShield()', '      const repairMarker =')}
+  ${section('      const shieldHud =', '      const repairMarker =')}
   ${section('      const flightBoundaryNotice =', '      function collideWith(')}
   resetFlightBoundary();
   function step(dt, steering = false) {

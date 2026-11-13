@@ -45,7 +45,7 @@ const code = `
   ${section('      const inverseRotation =', '      const mouseAim =')}
   ${section('      const fleetOrder =', '      function updateRetries()')}
   ${section('      const enemyBolts =', '      const rockets =')}
-  ${section('      function updateShield()', '      function collideWith(')}
+  ${section('      const shieldHud =', '      function collideWith(')}
   ${section('      function recordVisibleObjects()', '      function renderFrame()')}
   if (crossingDanger !== null) {
     const crossing = setAsteroidCrossing;

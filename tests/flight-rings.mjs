@@ -31,7 +31,8 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
   const showFeedback = (message, negative = false) => messages.push({message, negative});
   const startCrash = object => { crashes.push(object); crashing = true; paused = true; };
   let started = true, paused = false, roundEnded = false, crashing = false, celebrating = false;
-  const tutorialStage = 3, completeTutorialStep = () => {};
+  let tutorialStage = 3, tutorialRetryAt = 0;
+  const completeTutorialStep = () => {};
   let gameTime = 0, difficulty = 0, levelPressure = 0, level = 1, shield = 100, shieldHitTime = 0, hitMarker = 0;
   let score = 0, best = 0, speed = 0;
   const simulationStep = 1 / 60, roundDuration = 45;
@@ -61,6 +62,7 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
     configure(options) {
       if ('time' in options) gameTime = options.time;
       if ('shield' in options) shield = options.shield;
+      if ('tutorialStage' in options) tutorialStage = options.tutorialStage;
       if ('paused' in options) paused = options.paused;
       if ('started' in options) started = options.started;
       if ('ended' in options) roundEnded = options.ended;
@@ -140,6 +142,36 @@ function isolateGate(game, x = 0, z = -100, radius = 120) {
   gate.userData.normal.set(0, 0, 1); gate.position.copy(game.camera.position).add(new THREE.Vector3(x, 0, z));
   return gate;
 }
+for (const reducedMotion of [false, true]) for (const kind of ['start', 'course', 'approach', 'finish']) {
+  for (const initialShield of [40, 97, 100]) {
+    const game = makeGame(reducedMotion), gate = isolateGate(game, 0, -10);
+    gate.userData.kind = kind;
+    game.configure({shield: initialShield});
+    game.flightMotion.set(0, 0, -200); game.move(.1);
+    const restored = Math.min(5, 100 - initialShield);
+    assert.equal(game.state().shield, initialShield + restored, 'Regular checkpoints restore up to five shield, capped at 100');
+    assert.equal(game.state().score, 100, 'Healing keeps the full checkpoint score');
+    assert.deepEqual(game.messages.at(-1), {
+      message: t('ringPassed') + (restored ? ` · ${t('repaired', {amount: restored})}` : ''), negative: false
+    }, 'Show actual healing alongside checkpoint points; omit it at full shield');
+    game.flightMotion.negate(); game.move(.2); game.flightMotion.negate(); game.move(.2);
+    assert.equal(game.state().shield, initialShield + restored, 'Re-crossing cannot farm shield');
+    assert.equal(game.messages.length, 1);
+  }
+}
+for (const reducedMotion of [false, true]) {
+  const game = makeGame(reducedMotion);
+  game.configure({shield: 60, tutorialStage: 0});
+  isolateGate(game, 200, -10);
+  game.flightMotion.set(0, 0, -200); game.move(.1);
+  assert.equal(game.state().shield, 50, 'Tutorial misses still cost ten shield');
+  isolateGate(game, 0, -10); game.move(.1);
+  assert.equal(game.state().shield, 50, 'Passing the retried tutorial checkpoint must not heal');
+  assert.equal(game.state().score, 100);
+  assert.equal(game.messages.at(-1).message, t('ringPassed'));
+}
+console.log('PASS +5 checkpoint shield, cap and actual-heal feedback, no repeat healing and no tutorial healing');
+
 for (const reducedMotion of [false, true]) {
   const game = makeGame(reducedMotion), gate = isolateGate(game);
   const near = reducedMotion ? 400 : 2600, far = reducedMotion ? 700 : 3600;
@@ -220,6 +252,7 @@ for (const reducedMotion of [false, true]) {
 }
 const miss = makeGame(); isolateGate(miss, 200, -10); miss.flightMotion.set(0, 0, -200); miss.move(.1);
 assert.equal(miss.wash.classList.contains('missed'), true);
+assert.deepEqual(miss.sounds, ['checkpointMiss'], 'Misses use their dedicated error cue, not the collision hit bank');
 assert.ok(miss.rings.every(gate => gate.userData.passedAt === -Infinity), 'Missing a checkpoint does not release a ship wave');
 assert.deepEqual(miss.messages.at(-1), {message: t('ringMissed'), negative: true}, 'The top red message includes CHECKPOINT MISSED and the shield penalty');
 miss.configure({paused: true}); miss.renderFlightRingFeedback();

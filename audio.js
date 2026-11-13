@@ -5,18 +5,24 @@ let alarmActive = false, alarmGain, alarmSource = null, alarmBuffer;
 const banks = {
   shot: { files: ['laser-soft.mp3'], volume: .16 },
   empty: { files: ['empty-click.wav'], volume: .28 },
-  lock: { files: ['lock-on.wav'], volume: .12 },
-  shieldGlance: { files: ['shield-glance.wav'], volume: .42 },
-  shieldHard: { files: ['shield-hard.wav'], volume: .42 },
+  lock: { files: ['lock-on.wav'], volume: .19 },
+  shieldGlance: { files: ['shield-hard.wav'], volume: .19 },
+  shieldHard: { files: ['shield-hard.wav'], volume: .24 },
   hit: { files: ['impact-1.mp3', 'impact-2.mp3', 'impact-3.mp3'], volume: .42 },
-  explosion: { files: ['blast-1.mp3', 'blast-2.mp3', 'blast-3.mp3'], volume: .55 },
-  go: { files: ['go-bing.wav'], volume: .17 },
-  checkpoint: { files: ['checkpoint-whoosh.wav'], volume: .24 },
+  // Trim the louder blasts and lift the quieter third sample without reprocessing files.
+  explosion: { files: ['blast-1.mp3', 'blast-2.mp3', 'blast-3.mp3'], volume: .55, variantGains: [.8, .75, 1.4] },
+  go: { files: ['go-bing.wav'], volume: .124775 },
+  // Original force-field sweep; adjust only gain, preserving its tone.
+  checkpoint: { files: ['checkpoint-pass.wav'], volume: .157083 },
+  checkpointMiss: { files: ['checkpoint-miss.wav'], volume: .34 },
   reward: { files: ['reward.wav'], volume: .24 }
 };
 const activeSounds = new Set();
 async function decode(file) {
-  const response = await fetch(new URL(`assets/audio/${file}`, import.meta.url));
+  const url = new URL(`assets/audio/${file}`, import.meta.url);
+  // Share the module version so replacing a sound also invalidates its cached file.
+  url.search = new URL(import.meta.url).search;
+  const response = await fetch(url);
   if (!response.ok) throw new Error(`Audio file unavailable: ${file} (${response.status})`);
   return context.decodeAudioData(await response.arrayBuffer());
 }
@@ -134,9 +140,9 @@ export function playSound(kind, shipScale = 2.4, allowPaused = false) {
   const source = context.createBufferSource();
   source.buffer = bank.buffers[variant];
   source.playbackRate.value = kind === 'explosion' ? (1.18 - shipScale * .1) * (.96 + Math.random() * .08)
-    : kind === 'shot' ? .9 : kind === 'go' || kind === 'checkpoint' || kind === 'reward' || kind === 'empty' || kind === 'lock' || kind === 'shieldGlance' || kind === 'shieldHard' ? 1 : .96 + Math.random() * .08;
+    : kind === 'shot' ? .9 : kind === 'go' || kind === 'checkpoint' || kind === 'checkpointMiss' || kind === 'reward' || kind === 'empty' || kind === 'lock' || kind === 'shieldGlance' || kind === 'shieldHard' ? 1 : .96 + Math.random() * .08;
   const gain = context.createGain();
-  gain.gain.value = bank.volume;
+  gain.gain.value = bank.volume * (bank.variantGains ? bank.variantGains[variant] : 1);
   source.connect(gain).connect(master);
   activeSounds.add(source);
   source.onended = () => { activeSounds.delete(source); source.disconnect(); gain.disconnect(); };

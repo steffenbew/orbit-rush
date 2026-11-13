@@ -43,15 +43,13 @@
     #retry-hud { margin-top: 6px; }
     #shield-hud { position: fixed; bottom: max(24px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid #7effd533; border-radius: 16px; background: #091629de; color: #7effd5; pointer-events: none; }
     #shield-hud .icon { width: 19px; height: 19px; }
-    #shield-energy { width: 120px; height: 7px; appearance: none; border: 0; border-radius: 4px; overflow: hidden; background: #18323c; }
-    #shield-energy::-webkit-progress-bar { background: #18323c; }
-    #shield-energy::-webkit-progress-value { background: #7effd5; }
-    #shield-energy::-moz-progress-bar { background: #7effd5; }
+    #shield-energy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    #shield-track { width: 120px; height: 7px; border-radius: 4px; overflow: hidden; background: #18323c; }
+    #shield-fill { display: block; width: 100%; height: 100%; background: #7effd5; transform-origin: left; }
     #shield-hud.low { color: #ff6470; border-color: #ff6470; animation: shield-warning 1.4s ease-in-out infinite; }
     @keyframes shield-warning { 0%, 100% { opacity: 1; box-shadow: 0 0 18px #ff334455; } 50% { opacity: .65; box-shadow: 0 0 3px #ff334411; } }
     @media (prefers-reduced-motion: reduce) { #shield-hud.low { animation: none; } }
-    #shield-hud.low #shield-energy::-webkit-progress-value { background: #ff6470; }
-    #shield-hud.low #shield-energy::-moz-progress-bar { background: #ff6470; }
+    #shield-hud.low #shield-fill { background: #ff6470; }
     #shield-value { font-size: 11px; }
     #repair-marker, #repair-notice { position: fixed; z-index: 3; pointer-events: none; color: #a7ffe0; background: #092b28e8; border: 1px solid #7effd599; border-radius: 12px; padding: 6px 10px; font-size: 12px; letter-spacing: .05em; }
     #repair-marker { transform: translate(-50%, -50%); }
@@ -62,7 +60,11 @@
     #flight-ring-wash { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, #6ef5ff29 0%, #33d9ff52 55%, #138dd499 100%); }
     #flight-ring-wash.missed { background: radial-gradient(ellipse at center, #ff493e14 0%, #ff493e33 55%, #c6233066 100%); }
     #flight-ring-guide { position: fixed; z-index: 3; color: #82efff; font-size: 30px; text-shadow: 0 0 14px #36dbff; pointer-events: none; }
+    #shield-hud.hit, #shield-hud.healed { animation: none; opacity: 1; }
     #shield-hud.hit { color: #ff938c; border-color: #ff493e; box-shadow: 0 0 22px #ff493e66; }
+    #shield-hud.hit #shield-fill { background: #ff938c; }
+    #shield-hud.healed { color: #b7ffe1; border-color: #7effb5; box-shadow: 0 0 22px #7effb566; }
+    #shield-hud.healed #shield-fill { background: #b7ffe1; }
     #capital-hud { position: fixed; bottom: max(82px, calc(env(safe-area-inset-bottom) + 66px)); left: 50%; transform: translateX(-50%); z-index: 3; width: min(320px, calc(100vw - 40px)); padding: 10px 14px; border: 1px solid #ff626677; border-radius: 12px; background: #25131ee8; color: #ffb2a8; font-size: 10px; letter-spacing: .08em; text-align: center; pointer-events: none; }
     #capital-hud strong, #capital-state { display: block; }
     #capital-health { width: 100%; height: 5px; margin: 7px 0; accent-color: #ff6266; }
@@ -386,7 +388,7 @@
       </div>
     </div>
   </header>
-  <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Schiffsschild"></progress><span id="shield-value" aria-hidden="true">100%</span></div>
+  <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Schiffsschild"></progress><span id="shield-track" aria-hidden="true"><span id="shield-fill"></span></span><span id="shield-value" aria-hidden="true">100%</span></div>
   <div id="repair-marker" hidden data-i18n-aria-label="collectRepair" aria-label="Schildreparatur einsammeln">✚ +25</div>
   <div id="repair-notice" hidden role="status"></div>
   <div id="flight-boundary-notice" hidden role="status"></div>
@@ -394,10 +396,10 @@
   <div id="flight-ring-guide" hidden aria-hidden="true">➤</div>
   <div id="feedback" aria-live="polite"></div>
   <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio-Credits</a>
-  <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><span data-i18n="creditsEffects">Laser, Leermagazin-Klick, Treffer und Explosionen: </span><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a><span data-i18n="creditsEffectsChanges">. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe.</span></p><p><span data-i18n="creditsCombo">Combo-Sound und Kollisionsalarm: </span><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Combo-Datei unverändert. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.</span></p><p><span data-i18n="creditsMusic">Musik: </span><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a><span data-i18n="creditsMusicChanges"> (Lautstärke angeglichen, Höhen leicht abgesenkt), </span><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p></dialog>
+  <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><span data-i18n="creditsEffects">Laser, Leermagazin-Klick, Treffer, Außenwandkontakte, Checkpoint-Durchflüge und Explosionen: </span><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a><span data-i18n="creditsEffectsChanges">. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe. Außenwandkontakte und Checkpoint-Durchflüge verwenden getrennte WAV-Samples mit fester Tonhöhe; streifende und harte Kontakte teilen sich ein Sample bei unterschiedlicher Lautstärke.</span></p><p><span data-i18n="creditsCombo">LOS!-, Checkpoint-Fehlton, Combo-Sound und Kollisionsalarm: </span><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Combo-Datei unverändert. Checkpoint-Fehlton nach WAV konvertiert, Lautstärke angeglichen, feste Tonhöhe. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.</span></p><p><span data-i18n="creditsMusic">Musik: </span><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a><span data-i18n="creditsMusicChanges"> (Lautstärke angeglichen, Höhen leicht abgesenkt), </span><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p></dialog>
   <div id="status" role="status"></div>
   <script type="module">
-    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=2';
+    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=4';
 
     setLanguage(detectLanguage(navigator.languages?.[0] || navigator.language));
     applyTranslations();
@@ -2240,10 +2242,40 @@
       let crashing = false, crashTime = 0;
       let shield = 100, shieldHitTime = 0;
       const shieldHit = document.querySelector('#shield-hit');
-      function updateShield() {
+      const shieldHud = document.querySelector('#shield-hud');
+      const shieldFill = document.querySelector('#shield-fill');
+      let shieldPrevious = shield, shieldDisplayed = shield, shieldFrom = shield, shieldTween = .25;
+      let shieldFeedbackTime = 0, shieldFeedback = '';
+      function updateShield(animate = true) {
+        const change = shield - shieldPrevious;
+        shieldPrevious = shield;
+        // The accessible value and number are immediate; only the decorative fill interpolates.
         document.querySelector('#shield-energy').value = shield;
         document.querySelector('#shield-value').textContent = `${Math.ceil(shield)}%`;
-        document.querySelector('#shield-hud').classList.toggle('low', shield <= 30);
+        shieldHud.classList.toggle('low', shield <= 30);
+        if (!animate) {
+          shieldDisplayed = shield; shieldTween = .25;
+          shieldFeedbackTime = 0; shieldFeedback = '';
+        } else if (change !== 0) {
+          shieldFrom = shieldDisplayed; shieldTween = 0;
+          shieldFeedback = change > 0 ? 'healed' : 'hit';
+          shieldFeedbackTime = .55;
+        }
+        if (reducedMotion) shieldDisplayed = shield;
+        renderShieldHud();
+      }
+      function updateShieldAnimation(dt) {
+        if (!started || paused || document.hidden) return;
+        shieldTween = Math.min(.25, shieldTween + dt);
+        const progress = shieldTween / .25;
+        shieldDisplayed = reducedMotion ? shield : shieldFrom + (shield - shieldFrom) * (1 - (1 - progress) ** 3);
+        shieldFeedbackTime = Math.max(0, shieldFeedbackTime - dt);
+      }
+      function renderShieldHud() {
+        shieldFill.style.transform = `scaleX(${shieldDisplayed / 100})`;
+        shieldHud.classList.toggle('hit', shieldFeedbackTime > 0 && shieldFeedback === 'hit');
+        shieldHud.classList.toggle('healed', shieldFeedbackTime > 0 && shieldFeedback === 'healed');
+        shieldHud.style.animationPlayState = paused || document.hidden ? 'paused' : 'running';
       }
       const repairMarker = document.querySelector('#repair-marker');
       const repairNotice = document.querySelector('#repair-notice');
@@ -2451,6 +2483,11 @@
         flightRingWashUntil = gameTime + .35; flightRingWashStrength = 1;
         flightRingWash.classList.toggle('missed', !passed);
         if (passed) {
+          const restored = tutorialStage >= 3 ? Math.min(5, 100 - shield) : 0;
+          if (restored > 0) {
+            shield += restored;
+            updateShield();
+          }
           if (gate.userData.kind === 'start') completeTutorialStep('checkpoint');
           score += 100;
           if (score > best) {
@@ -2458,7 +2495,7 @@
             try { localStorage.setItem('sternflug-highscore', String(best)); } catch {}
           }
           updateScore();
-          showFeedback(t('ringPassed'));
+          showFeedback(t('ringPassed') + (restored > 0 ? ` · ${t('repaired', { amount: restored })}` : ''));
           playSound('checkpoint');
         } else {
           if (tutorialStage === 0) tutorialRetryAt = gameTime + 1.2;
@@ -2466,7 +2503,7 @@
           updateShield();
           showFeedback(t('ringMissed'), true);
           shieldHitTime = .55; shieldHit.hidden = false; shieldHit.style.opacity = '1';
-          playSound('hit');
+          playSound('checkpointMiss');
           if (shield === 0) startCrash(gate);
         }
       }
@@ -2946,7 +2983,7 @@
         if (combo > 1) playSound('reward');
       }
       updateScore();
-      const sound = await import('./audio.js?v=go-2');
+      const sound = await import('./audio.js?v=audio-7');
       let soundEnabled = true, started = false, kills = 0, hitMarker = 0;
       const playSound = sound.playSound;
       const audioNotice = document.querySelector('#audio-notice');
@@ -3062,6 +3099,7 @@
         showerWarning.hidden = true;
         repairPickup.visible = false; repairMarker.hidden = true; repairNotice.hidden = true;
         shieldHitTime = 0; shieldHit.hidden = true;
+        updateShield(false);
         crashFlames = Array.from({ length: 24 }, () => ({
           x: Math.random(), y: Math.random(), size: random(.06, .14)
         }));
@@ -3113,6 +3151,7 @@
         sound.setAlarm(false);
         crashing = false; flash = 0; shake = 0;
         shieldHitTime = 0; shieldHit.hidden = true;
+        updateShield(false);
         document.querySelector('#impact-label').hidden = true;
         crashFire.hidden = true;
         document.querySelector('#flash').classList.remove('impact');
@@ -3176,7 +3215,7 @@
         difficulty = 0; paused = false; speed = 0;
         if (mode !== 'next') shield = 100;
         shieldHitTime = 0; shieldHit.hidden = true;
-        updateShield();
+        updateShield(false);
         if (roundDialog.open) roundDialog.close();
         if (pauseMenu.open) pauseMenu.close();
         document.querySelector('#pause').setAttribute('aria-pressed', 'false');
@@ -3893,6 +3932,7 @@
         updateFlightTutorial(); // Advance lesson stages before this step moves the world.
         updateRingShipArrivals();
         if (!paused && shieldHitTime > 0) shieldHitTime = Math.max(0, shieldHitTime - dt);
+        updateShieldAnimation(dt);
         if (!successBurst.hidden && !document.hidden) {
           successTime += dt;
           if (successTime >= 1.4) successBurst.hidden = true;
@@ -4208,7 +4248,7 @@
         updateWeaponHud();
         shieldHit.hidden = shieldHitTime === 0;
         shieldHit.style.opacity = reducedMotion ? '.6' : String(shieldHitTime / .55);
-        document.querySelector('#shield-hud').classList.toggle('hit', shieldHitTime > 0);
+        renderShieldHud();
         document.querySelector('#flight-state').textContent = !started || paused || crashing || roundEnded ? '' : speed > 650 ? t('finalSprint') : '';
         const cross = document.querySelector('#hit-cross');
         cross.style.opacity = hitMarker > 0 ? 1 : 0;
