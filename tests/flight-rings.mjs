@@ -93,7 +93,7 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) {
   assert.equal(game.rings.filter(gate => gate.visible).length, 5, 'Five checkpoints per ordinary level');
   const positions = game.rings.map(gate => gate.position.clone());
   assert.ok(Math.abs(positions[0].z + game.flightDistanceAt(5)) < 1e-8);
-  [5, 12, 22, 32, 44.5].forEach((time, index) => assert.ok(Math.abs(positions[index].z + game.flightDistanceAt(time)) < 1e-8));
+  [5, 12, 22, 32, 40].forEach((time, index) => assert.ok(Math.abs(positions[index].z + game.flightDistanceAt(time)) < 1e-8));
   assert.deepEqual(game.rings.map(gate => gate.userData.kind), ['start', 'course', 'course', 'course', 'finish']);
   assert.equal(game.rings.at(-1).children[0].material.opacity, 0, 'A very distant finish must never flash on reset');
   assert.equal(game.rings.at(-1).children[1].material.uniforms.brightness.value, 0);
@@ -271,7 +271,7 @@ assert.ok(source.includes('        renderFlightRingFeedback();'));
 assert.ok(source.includes('        resetFlightRing();'));
 console.log('PASS lifecycle guards, no gates in any corridor shape, original passage height and off-screen course guide');
 
-// The finish must fall within the final second, including an already-moving tutorial handoff.
+// Leave five seconds of finish margin, including an already-moving tutorial handoff.
 for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) for (const cruising of [false, true]) {
   const game = makeGame(reducedMotion); game.configure({pressure}); game.resetFlightRing();
   const finish = game.rings.at(-1);
@@ -280,10 +280,10 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) fo
   while (!finish.userData.resolved && game.state().time < 45) game.fly(1 / 60);
   assert.equal(game.state().score, 100, 'The finish must be reachable before the level ends');
   const remaining = 45 - game.state().time;
-  assert.ok(remaining > 0 && remaining <= 1,
+  assert.ok(remaining >= 4.5 && remaining <= 5.5,
     `Finish timing: reduced=${reducedMotion}, pressure=${pressure}, cruising=${cruising}, remaining=${remaining}`);
 }
-console.log('PASS final checkpoint in the last second at all cruise speeds, from rest and after training');
+console.log('PASS final checkpoint with five seconds to spare at all cruise speeds, from rest and after training');
 
 // A simple heading controller must be able to follow the actual fixed course within the round.
 for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) for (const shape of [0, 1, 2]) {
@@ -303,6 +303,6 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) fo
   }
   assert.equal(game.state().score, availablePoints, `Entire course must be flyable: pressure=${pressure}, shape=${shape}, reduced=${reducedMotion}`);
   assert.equal(game.state().shield, 100);
-  assert.ok(45 - game.state().time > 0 && 45 - game.state().time <= 1, 'Corridor routes also finish in the last second');
+  assert.ok(45 - game.state().time >= 4 && 45 - game.state().time <= 5.5, 'Corridor routes also leave comfortable finish margin');
 }
 console.log('PASS widely spaced course gates reachable within 45 seconds using real aircraft inertia at early/late speeds and all corridor shapes');

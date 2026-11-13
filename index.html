@@ -1897,7 +1897,7 @@
           showerRotation.setFromUnitVectors(new THREE.Vector3(0, 0, -1), showerDirection);
         }
         // Start beyond the distance fade; the field gradually emerges from the sky.
-        const lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5) + crossingOffset.length();
+        let lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5) + crossingOffset.length();
         showerLength = Math.max(900, approachSpeed * (showerEnd - showerStart));
         showerSpacing = showerCorridor ? Math.max(160, approachSpeed * [1.15, .9, .7][showerStrength])
           : Math.max(120, approachSpeed * [2.5, 1.4, .85][showerStrength]);
@@ -1910,13 +1910,15 @@
         showerBend *= showerHalfGap;
         // Fixed-width core plus a sparse fringe, never scaled to the viewport.
         showerHalfWidth = showerCorridor ? 900 : 650;
+        if (showerCorridor) {
+          // Reserve a real passage and a clear finish even on slow reduced-motion flights.
+          const finishClearance = (reducedMotion ? 14 : 80) * 3 + levelFlightSpeed(1) * .85 * .75;
+          const available = flightDistanceAt(roundDuration - 5) - flightDistanceAt(showerTime) - finishClearance;
+          lead = Math.min(lead, Math.max(0, available - Math.min(showerLength, approachSpeed * 4)));
+          showerLength = Math.min(showerLength, available - lead);
+        }
         showerCourseOrigin.copy(courseOrigin).add(crossingOffset).addScaledVector(showerDirection, lead);
         showerCourseOrigin.z -= flightDistanceAt(showerTime);
-        if (showerCorridor) {
-          // Leave a clear finish checkpoint after the passage, including at reduced-motion speeds.
-          const finishClearance = (reducedMotion ? 14 : 80) * 3 + levelFlightSpeed(1) * .85 * .75;
-          showerLength = Math.min(showerLength, flightDistanceAt(42) + showerCourseOrigin.z - courseOrigin.z - finishClearance);
-        }
       }
       function advanceAsteroidShower(dt) {
         const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
@@ -2241,7 +2243,7 @@
       function resetFlightRing(openingComplete = false) {
         // Five fixed checkpoints; redistribute intermediate gates around, never inside, a corridor.
         const radius = reducedMotion ? 14 : 80;
-        let depths = [firstCheckpointTime, 12, 22, 32, 42].map(flightDistanceAt);
+        let depths = [firstCheckpointTime, 12, 22, 32, roundDuration - 5].map(flightDistanceAt);
         let approachDepth, exitDepth;
         if (showerCorridor) {
           const entranceDepth = courseOrigin.z - showerCourseOrigin.z;
@@ -2258,8 +2260,6 @@
           }
           depths.sort((a, b) => a - b);
         }
-        // Preserve the corridor/intermediate layout; reach the finish in the final second.
-        depths[depths.length - 1] = flightDistanceAt(roundDuration - .5);
         flightRings.forEach((gate, index) => {
           if (openingComplete && index === 0) return; // Leave the passed opening checkpoint behind.
           const depth = depths[index], y = showerCorridor && depth > exitDepth ? corridorCenter(showerLength) : 0;
@@ -2373,8 +2373,8 @@
         ringShips.forEach(ship => { ship.visible = false; });
         const gates = flightRings.filter(gate => !gate.userData.resolved);
         if (!gates.length) return;
-        // A small, reusable flight follows the actual openings, not the player's heading.
-        while (ringShips.length < 3) {
+        // Reuse six light ships along the actual openings, not the player's heading.
+        while (ringShips.length < 6) {
           createShip(ships.length, 0);
           ringShips.push(ships[ships.length - 1]);
         }
@@ -2383,7 +2383,7 @@
         const arrivalDistance = Math.max(reducedMotion ? 600 : 3800, levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 7);
         ringShips.forEach((ship, index) => {
           resetShip(ship, true);
-          const lane = [-.32, .32, -.1][index];
+          const lane = [-.32, .32, -.1][index % 3];
           const points = gates.flatMap(gate => {
             const center = gate.position.clone().sub(courseWorldOffset).add(
               new THREE.Vector3(lane * gate.userData.radius, 0, 0).applyQuaternion(gate.quaternion));
@@ -2411,7 +2411,9 @@
           const curve = new THREE.CatmullRomCurve3(points);
           curve.arcLengthDivisions = 512; // Keep distance-based arrivals accurate with the extra checkpoint knots.
           const length = curve.getLength();
-          const distance = distant ? arrivalDistance + index * (reducedMotion ? 80 : 350) : firstDistance * (.3 + index * .2);
+          // Spread traffic over the route instead of bringing in one tight formation.
+          const spacing = levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 2.5;
+          const distance = distant ? arrivalDistance + index * spacing : firstDistance * (.15 + index * .14);
           const data = ship.userData;
           data.ringRoute = { curve, length, distance, distant, position: curve.getPointAt(distance / length), exit: curve.getTangentAt(1) };
           setShipOpacity(ship, distant ? 0 : 1);
@@ -2497,8 +2499,9 @@
             float edgeDistance = abs(0.5 - hexDistance);
             float edge = 1.0 - smoothstep(0.012, 0.025 + fwidth(hexDistance), edgeDistance);
             float corona = exp(-edgeDistance * 16.0);
-            // Long, softly fading coverage from the outset, rather than a speed-expanding horizon.
+            // Reveal a wider section around the tube, without extending the forward horizon.
             vec3 fieldOffset = shieldWorldPosition - warningPoint;
+            fieldOffset.xy *= 0.8;
             fieldOffset.z *= 0.15;
             float fieldGlow = exp(-pow(length(fieldOffset) / patchSize, 2.0));
             float fresnel = pow(1.0 - abs(dot(normalize(shieldNormal), normalize(-shieldViewPosition))), 2.0);
@@ -2683,8 +2686,8 @@
         const radius = Math.hypot(x, y), a = vx * vx + vy * vy, b = 2 * (x * vx + y * vy), c = radius * radius - 1;
         const impactTime = c >= 0 ? 0 : a > 1e-16 ? (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a) : Infinity;
         const clearance = (1 - radius) * Math.min(rx, ry);
-        const proximity = 1 - THREE.MathUtils.smoothstep(clearance, 0, reducedMotion ? 90 : 400);
-        const predicted = 1 - THREE.MathUtils.smoothstep(impactTime, 0, 2.5);
+        const proximity = 1 - THREE.MathUtils.smoothstep(clearance, 0, reducedMotion ? 120 : 550);
+        const predicted = 1 - THREE.MathUtils.smoothstep(impactTime, 0, 3);
         const impactAge = Math.min(10, gameTime - flightBoundaryImpactAt);
         const contact = 1 - THREE.MathUtils.smoothstep(impactAge, 0, .75);
         const intensity = Math.max(proximity, predicted, contact);
@@ -2697,7 +2700,7 @@
         uniforms.impactPoint.value.copy(flightBoundaryImpact).add(flightBoundaryOrigin).add(courseWorldOffset);
         flightBoundaryAim.copy(flightBoundaryLocal);
         // Ease the look-ahead in: crossing the prediction threshold must not jump the visible horizon.
-        if (impactTime > 0 && impactTime < 2.5) flightBoundaryAim.addScaledVector(flightMotion, .85 * impactTime * predicted);
+        if (impactTime > 0 && impactTime < 3) flightBoundaryAim.addScaledVector(flightMotion, .85 * impactTime * predicted);
         const aimRadius = Math.hypot(flightBoundaryAim.x / flightBoundaryRadii.x, flightBoundaryAim.y / flightBoundaryRadii.y);
         if (aimRadius > 1e-8) { flightBoundaryAim.x /= aimRadius; flightBoundaryAim.y /= aimRadius; }
         uniforms.warningPoint.value.copy(flightBoundaryAim).add(flightBoundaryOrigin).add(courseWorldOffset);

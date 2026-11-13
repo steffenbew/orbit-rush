@@ -127,7 +127,8 @@ for (const reducedMotion of [false, true]) {
   assert.ok(!shader.includes('float ripple = contact *'), 'Wave propagation must outlive the contact flash');
   assert.equal(uniforms.contact.value, 0, 'No impact flash, ripple or sparks before contact');
   assert.equal(uniforms.patchSize.value, reducedMotion ? 260 : 1100, 'Default coverage does not expand with speed');
-  assert.ok(shader.includes('fieldOffset.z *= 0.15;'), 'Extend the longitudinal glow from the outset');
+  assert.ok(shader.includes('fieldOffset.xy *= 0.8;'), 'Reveal a modest 25% more shield to either side');
+  assert.ok(shader.includes('fieldOffset.z *= 0.15;'), 'Keep the original forward horizon');
   assert.ok(shader.includes('p.y += gridOffset;') && shader.includes('p.y * 0.6'), 'Cells and sheen remain world-anchored when recentering the tube');
   assert.equal(game.boundary.scale.z, game.camera.far * 4);
   const gridAt = worldZ => ((worldZ - game.boundary.position.z) / game.boundary.scale.z + .5)
@@ -181,12 +182,33 @@ for (const reducedMotion of [false, true]) for (const forward of [35, 400, 2500,
     game.flightMotion.set(sideways, 0, -forward); game.step(.01);
     return game.uniforms.warningPoint.value.clone();
   };
-  const before = probe(2.5001), after = probe(2.4999);
-  assert.ok(before.distanceTo(after) < .1, 'No sudden forward extension at the 2.5-second warning threshold');
+  const before = probe(3.0001), after = probe(2.9999);
+  assert.ok(before.distanceTo(after) < .1, 'No sudden forward extension at the 3-second warning threshold');
   assert.equal(game.uniforms.patchSize.value, reducedMotion ? 260 : 1100, 'The default extent stays fixed even at extreme speed');
   assert.equal(game.boundary.scale.z, game.camera.far * 4);
 }
 console.log('PASS continuous warning horizon and constant default extent at slow/extreme speeds');
+
+// Earlier visibility for parallel near-wall flight and predicted approaches, without damage.
+for (const reducedMotion of [false, true]) {
+  const nearby = makeGame(reducedMotion);
+  nearby.place(nearby.radii.x - 26 - (reducedMotion ? 100 : 450), 0);
+  nearby.flightMotion.set(0, 0, -400);
+  nearby.step(.2);
+  assert.equal(nearby.boundary.visible, true, 'Show the wall before the old proximity threshold');
+  assert.equal(nearby.notice.hidden, false);
+  assert.equal(nearby.state().shield, 100);
+
+  const approach = makeGame(reducedMotion);
+  const outward = reducedMotion ? 70 : 300;
+  approach.place(approach.radii.x - 26 - outward * .85 * 2.9, 0);
+  approach.flightMotion.set(outward, 0, -400);
+  approach.step(.1);
+  assert.equal(approach.boundary.visible, true, 'Reveal a predicted contact before the original 2.5-second threshold');
+  assert.equal(approach.notice.hidden, false);
+  assert.equal(approach.state().shield, 100);
+}
+console.log('PASS earlier proximity and predictive warnings without damage');
 
 // Sweep all sides and corners at speeds far above gameplay. No endpoint clamping through the wall.
 for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) for (let i = 0; i < 16; i++) {

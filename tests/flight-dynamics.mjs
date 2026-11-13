@@ -1562,6 +1562,12 @@ for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (con
   }
   arrivals.updateRingShipArrivals();
   assert.deepEqual(arrivals.ringShips, pool); assert.equal(arrivals.ships.length, allocated);
+  assert.equal(pool.length, 6, 'Six reusable ships add traffic along the checkpoint route');
+  const spacing = arrivals.levelFlightSpeed(6 / 45) * .85 * 2.5;
+  pool.slice(1).forEach((ship, index) => {
+    assert.ok(Math.abs(ship.userData.ringRoute.distance - pool[index].userData.ringRoute.distance - spacing) < 1e-8,
+      'Spread course traffic by 2.5 seconds of cruise distance instead of a tight formation');
+  });
   assert.ok(pool.every(ship => ship.visible && ship.userData.arrivalOpacity === 0));
   assert.ok(pool.every(ship => ship.position.distanceTo(arrivals.camera.position) > (reducedMotion ? 450 : 3600)),
     'Delayed traffic must still start well ahead, not teleport into the current flight path');
@@ -1642,7 +1648,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
   assert.equal(traffic.shield, 100, 'NPC passages cannot cost player armor');
   assert.equal(traffic.sounds.length, 0, 'NPC passages do not trigger player rewards or misses');
 }
-console.log('PASS three real ring-flying interceptors, whole-hull aperture clearance, corridor paths, independent steering and shared world motion at 5–144 FPS');
+console.log('PASS six real ring-flying interceptors, whole-hull aperture clearance, corridor paths, independent steering and shared world motion at 5–144 FPS');
 
 const ringTraffic = makeGame(); ringTraffic.setupLevelFleet(); ringTraffic.resetRingShips();
 const runner = ringTraffic.ringShips[0];
