@@ -980,8 +980,8 @@ function assertShipInsideBoundary(game, ship) {
   for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
     const corner = new THREE.Vector3(x, y, z).multiply(ship.scale).applyQuaternion(ship.quaternion)
       .add(ship.position).sub(game.flightBoundaryOrigin).sub(game.courseWorldOffset);
-    assert.ok(Math.hypot(corner.x / game.flightBoundaryRadii.x, corner.y / game.flightBoundaryRadii.y) < 1,
-      `${ship.userData.type.name}: the entire rotated hull must stay inside the shield zone`);
+    assert.ok(Math.hypot(corner.x / game.flightBoundaryRadii.x, corner.y / game.flightBoundaryRadii.y) <= .98 + 1e-8,
+      `${ship.userData.type.name}: the entire rotated hull must retain clearance inside the shield zone`);
   }
 }
 
@@ -1850,6 +1850,7 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     lesson.setPaused(false); lesson.updateShipArrivals(.05);
     assert.equal(lesson.queue.length, queued.length - slot - 1, 'One ship at a time, not a sudden fleet');
     assert.equal(ship.visible, true); assert.equal(ship.userData.arrivalOpacity, 0);
+    assertShipInsideBoundary(lesson, ship);
     assert.equal(ship.userData.health, 3, 'Real interceptor health, with no tutorial weapon restriction');
     const offset = ship.position.clone().sub(nextGate.position);
     assert.ok(offset.dot(nextGate.userData.normal) > 0, 'Both ships start before the checkpoint plane, not behind it');

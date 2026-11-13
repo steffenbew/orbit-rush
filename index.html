@@ -2134,6 +2134,8 @@
               .addScaledVector(data.courseRight, reducedMotion ? 50 : 180)
               .addScaledVector(data.courseUp, reducedMotion ? 8 : 25);
           }
+          // This checkpoint-relative placement happens after resetShip's boundary check.
+          constrainShipToBoundary(ship);
           const offset = ship.position.clone().sub(camera.position);
           data.lane = offset.dot(data.courseRight); data.height = offset.dot(data.courseUp);
           data.previousPosition.copy(ship.position);
@@ -2652,7 +2654,8 @@
         }
         shipBoundaryBounds.getCenter(shipBoundaryLocal).sub(flightBoundaryOrigin).sub(courseWorldOffset);
         const radius = Math.hypot(shipBoundaryLocal.x / flightBoundaryRadii.x, shipBoundaryLocal.y / flightBoundaryRadii.y);
-        const limit = 1 - hullRadius - .001;
+        // Keep a visible clearance inside the membrane, including wing tips on tilted ships.
+        const limit = 1 - hullRadius - .02;
         if (radius <= limit) return;
         ship.position.x += shipBoundaryLocal.x * (limit / radius - 1);
         ship.position.y += shipBoundaryLocal.y * (limit / radius - 1);
