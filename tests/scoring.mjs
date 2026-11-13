@@ -22,7 +22,7 @@ function makeGame(storageBlocked = false) {
       toggle: (key, value) => value ? classes.add(key) : classes.delete(key)}, offsetWidth: 0};
     ${feedbackCode}
     const localStorage = {setItem: (...args) => { if (storageBlocked) throw new Error('Blocked'); saved.push(args); }};
-    const updateRank = () => {}, updateScore = () => {}, playSound = sound => sounds.push(sound);
+    const updateScore = () => {}, playSound = sound => sounds.push(sound);
     ${awardCode}
     return { award, time: value => { gameTime = value; }, end: () => { roundEnded = true; },
       penalty: amount => showFeedback(t('shieldLost', { amount }), true), expire: () => { ${expireCode} },

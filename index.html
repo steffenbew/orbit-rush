@@ -141,7 +141,7 @@
     .language-picker:disabled { opacity: .5; }
     .language-picker input:disabled + span { cursor: wait; }
     #intro .intro-card { position: relative; z-index: 1; }
-    body:not(.playing) :is(.brand, .hud, .mission, .credits, .reticle, #flight-state, #flight-path, #target, #shield-hud) { visibility: hidden; }
+    body:not(.playing) :is(.brand, .hud, .credits, .reticle, #flight-state, #flight-path, #target, #shield-hud) { visibility: hidden; }
     .eyebrow { color: #7effd5; font-size: 11px; letter-spacing: .32em; text-transform: uppercase; }
     h1 { font-size: clamp(72px, min(12vw, 18vh), 136px); line-height: .92; letter-spacing: -.07em; margin: 20px 0; font-weight: 850; }
     h1 span { display: block; color: #7effd5; }
@@ -169,8 +169,6 @@
     .brand { position: fixed; top: 32px; left: 50%; transform: translateX(-50%); color: #d3f7ff; font-weight: 750; font-size: 14px; letter-spacing: .3em; text-align: center; white-space: nowrap; pointer-events: none; }
     .brand > span { display: block; text-indent: .3em; }
     .brand small { display: block; font-size: 8px; letter-spacing: .2em; text-indent: .2em; color: #80a5be; margin-top: 6px; }
-    .mission { position: fixed; left: 25px; bottom: 33px; pointer-events: none; color: #bad3e3; font-size: 11px; line-height: 1.9; }
-    .mission strong { color: #7effd5; font-size: 12px; letter-spacing: .12em; }
     .reticle.hit { box-shadow: 0 0 24px #ffd67f88; }
     .reticle.overheated { color: #ff3d48; border-color: transparent; box-shadow: 0 0 12px #ff334466; }
     .reticle.overheated::before, .reticle.overheated::after { opacity: 0; }
@@ -186,7 +184,7 @@
     .reticle.empty { border-style: solid; background: #ff303050; box-shadow: 0 0 18px #ff3030b0; }
     #hit-cross { position: fixed; width: 36px; height: 36px; pointer-events: none; opacity: 0; transform: translate(-50%, -50%) rotate(45deg); border: 3px solid #ffe4a0; border-radius: 7px; }
     #flight-state { position: fixed; left: 50%; top: 130px; transform: translateX(-50%); color: #9ac9dc; font-size: 10px; letter-spacing: .25em; pointer-events: none; }
-    @media (max-width: 900px) { .brand { display: none; } .mission { left: 16px; } }
+    @media (max-width: 900px) { .brand { display: none; } }
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; } }
     button:hover { background: #b9dfff14; }
     button[aria-pressed="true"] { background: #7effd51b; box-shadow: inset 0 0 0 1px #7effd56b; }
@@ -216,7 +214,7 @@
     #flight-state { background: #091629c9; border-radius: 20px; padding: 10px 16px; text-align: center; line-height: 1.6; }
     #flight-state:empty { display: none; }
     .credits { color: #91aabd; text-underline-offset: 3px; }
-    @media (max-width: 600px) { .scoreboard { gap: 17px; } .label { font-size: 8px; } .mission { font-size: 10px; } }
+    @media (max-width: 600px) { .scoreboard { gap: 17px; } .label { font-size: 8px; } }
     #round-clock { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; border-top: 1px solid #93c7dc20; padding-top: 8px; font-variant-numeric: tabular-nums; }
     #round-clock .label { margin: 0; }
     #performance-hud { color: #a9bdce; font: 10px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; pointer-events: none; }
@@ -274,7 +272,7 @@
     #new-record[hidden] { display: none; }
     #new-record .icon { width: 28px; height: 28px; }
     #round-end #play-again { width: 100%; min-width: 0; margin: 10px 0 0; pointer-events: auto; }
-    body.celebrating .mission, body.defeated .reticle { visibility: hidden; }
+    body.defeated .reticle { visibility: hidden; }
     @media (max-width: 600px) { #flight-state { top: 174px; } }
     @media (max-width: 450px) { .scoreboard { gap: 12px; } .scoreboard .number { font-size: 18px; } #best { font-size: 11px; } }
     #flight-path { position: fixed; left: 50%; top: 50%; width: 18px; height: 18px; border: 1px solid #d7edff99; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
@@ -336,7 +334,6 @@
     </div>
   </section>
   <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
-  <div class="mission"><strong id="rank">ROOKIE PILOT</strong><br><span id="mission-progress">0 / 5 Abschüsse bis ACE PILOT</span></div>
   <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
     <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
     <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS / TOUCH LENKEN</span></span>
@@ -2133,7 +2130,7 @@
               ship.userData.health = 0;
             }
             if (ship.userData.health <= 0) {
-              // Environmental kills deliberately do not award score, combo or pilot rank.
+              // Environmental kills deliberately do not award score, combo or kill credit.
               explode(ship.position, 65, false, false, ship.scale.x / 2.4, false, ship.userData.type.capital);
               if (gameTime - ship.userData.lastVisibleTime < .3) playSound('explosion', ship.scale.x);
               queueShip(ship);
@@ -2245,10 +2242,6 @@
           indicator.querySelectorAll('.retry-icons span').forEach((icon, index) => icon.classList.toggle('spent', index >= retries));
         }
         document.querySelector('#retry-result').hidden = !roundEnded;
-      }
-      function updateRank() {
-        document.querySelector('#rank').textContent = kills >= 15 ? 'ORBIT LEGEND' : kills >= 5 ? 'ACE PILOT' : 'ROOKIE PILOT';
-        document.querySelector('#mission-progress').textContent = kills >= 15 ? t('rankRecord', { kills }) : t('rankProgress', { kills, target: kills >= 5 ? 15 : 5, rank: kills >= 5 ? 'ORBIT LEGEND' : 'ACE PILOT' });
       }
       let roundEnded = false, difficulty = 0;
       let celebrating = false;
@@ -2983,7 +2976,6 @@
         if (roundEnded) return;
         combo = combo > 0 && gameTime - lastKill < comboWindows[combo] ? Math.min(combo + 1, 5) : 1;
         kills += 1;
-        updateRank();
         lastKill = gameTime;
         const basePoints = ship.userData.type.points * (ship.userData.type.asteroid ? ship.userData.asteroidTier : 1);
         const points = basePoints * combo;
@@ -3300,7 +3292,6 @@
         document.querySelector('#pause').title = t('pauseFlight');
         sound.resumeAudio().catch(audioError);
         syncMusic();
-        updateRank();
         updateRetries();
         feedback.classList.remove('pop');
         for (const p of particles) { scene.remove(p.object); p.object.material.dispose(); }
@@ -3982,14 +3973,12 @@
       document.querySelector('#start').disabled = false;
       document.querySelector('#start-label').dataset.i18n = 'startFlight';
       document.querySelector('#start-label').textContent = t('startFlight');
-      updateRank();
       updateRetries();
       languagePicker.disabled = false;
       languagePicker.addEventListener('change', event => {
         if (started) return;
         setLanguage(event.target.value);
         applyTranslations();
-        updateRank();
         updateRetries();
         showControlStep();
         updateHeavyHud();

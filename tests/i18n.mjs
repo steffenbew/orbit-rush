@@ -102,7 +102,7 @@ function makeLanguagePicker(browserLanguage, fallbackLanguage = 'en-US') {
     const setLanguage = value => { i18n.setLanguage(value); language = value; };
     const applyTranslations = () => i18n.applyTranslations(document);
     ${section('    setLanguage(detectLanguage(', "    const status = document.querySelector('#status');")}
-    const updateRank = () => updates.push('rank'), updateRetries = () => updates.push('lives');
+    const updateRetries = () => updates.push('lives');
     const showControlStep = () => updates.push('tutorial'), updateHeavyHud = () => updates.push('power');
     const updateWeaponHud = () => updates.push('laser'), syncFullscreen = () => updates.push('fullscreen');
     ${section("      languagePicker.addEventListener('change'", '      let danger =')}
@@ -126,7 +126,7 @@ for (const browser of ['de-DE', 'de-AT', 'de-CH']) {
   chooseLanguage(document, 'en');
   assert.equal(document.documentElement.lang, 'en');
   assert.equal(document.querySelector('#start-label').textContent, 'START FLIGHT');
-  assert.deepEqual(updates, ['rank', 'lives', 'tutorial', 'power', 'laser', 'fullscreen']);
+  assert.deepEqual(updates, ['lives', 'tutorial', 'power', 'laser', 'fullscreen']);
   assert.equal(makeLanguagePicker(browser).document.radios.de.checked, true, 'A new page load preselects the browser language again');
   game.start(); chooseLanguage(document, 'de');
   assert.equal(document.documentElement.lang, 'en', 'Hidden start-screen controls cannot change an active run');
@@ -181,7 +181,6 @@ for (const locale of ['en', 'de']) {
   assert.equal(t('powerLaserTitle').includes('3×'), true, 'Translations preserve the actual damage multiplier');
 }
 setLanguage('en');
-assert.equal(t('rankProgress', {kills: 2, target: 5, rank: 'ACE PILOT'}), '2 / 5 kills to ACE PILOT');
 assert.equal(t('capitalStatus', {health: 9, max: 30, state: t('capitalCharging')}), '9 / 30 ARMOR · GUNS CHARGING');
 assert.equal(t('repaired', {amount: 25}), '+25 SHIELD');
 assert.ok(source.includes('score.toLocaleString(language)'), 'Final scores use the selected language');

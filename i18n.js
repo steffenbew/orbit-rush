@@ -1,4 +1,4 @@
-// UI copy only. Ship/rank names and the Orbit Rush brand stay the same in both languages.
+// UI copy only. Ship names and the Orbit Rush brand stay the same in both languages.
 export const messages = {
   en: {
     language: 'Language',
@@ -87,8 +87,6 @@ export const messages = {
     boundaryWarning: 'ENERGY BARRIER · STEER TOWARD THE COURSE',
     boundaryContact: 'BARRIER REBOUND · −10 SHIELD',
     shieldDepleted: 'SHIELD DEPLETED',
-    rankProgress: '{kills} / {target} kills to {rank}',
-    rankRecord: '{kills} kills · Go for the record!',
     finalSprint: 'HYPERSPEED · FINAL STRETCH',
     audioCredits: 'Audio credits',
     close: 'Close',
@@ -183,8 +181,6 @@ export const messages = {
     boundaryWarning: 'ENERGIEBARRIERE · ZURÜCK ZUM PARCOURS',
     boundaryContact: 'BARRIERENABPRALL · −10 SCHILD',
     shieldDepleted: 'SCHILD AUFGEBRAUCHT',
-    rankProgress: '{kills} / {target} Abschüsse bis {rank}',
-    rankRecord: '{kills} Abschüsse · Weiter zum Rekord!',
     finalSprint: 'HYPERSPEED · ENDSPURT',
     audioCredits: 'Audio-Credits',
     close: 'Schließen',
