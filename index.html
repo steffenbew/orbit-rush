@@ -3062,20 +3062,28 @@
       }
       updateIntroOrbit(0);
       async function startGame(withSound = true) {
-        // Fullscreen must be requested in the user gesture, before awaiting audio loading.
-        if (document.fullscreenEnabled && !document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(error => {
-            console.warn('Automatic fullscreen request failed:', error);
-          });
-        }
         const button = document.querySelector('#start');
         const label = document.querySelector('#start-label');
         button.disabled = true;
         languagePicker.disabled = true;
         label.dataset.i18n = 'loadingAudio';
         label.textContent = t('loadingAudio');
+        let audioTimeout;
         try {
-          if (withSound) await sound.initAudio();
+          // Unlock audio first: fullscreen can consume Safari's user activation.
+          // Both calls must happen in the click handler, before the first await.
+          const audioReady = withSound ? sound.initAudio() : Promise.resolve();
+          if (document.fullscreenEnabled && !document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(error => {
+              console.warn('Automatic fullscreen request failed:', error);
+            });
+          }
+          if (withSound) await Promise.race([
+            audioReady,
+            new Promise((_, reject) => {
+              audioTimeout = setTimeout(() => reject(new Error('Audio startup timed out. Retry or start without sound.')), 15000);
+            })
+          ]);
           soundEnabled = withSound;
           document.querySelector('#sound').setAttribute('aria-pressed', String(withSound));
           document.querySelector('#sound').setAttribute('aria-label', t(withSound ? 'soundOff' : 'soundOn'));
@@ -3101,7 +3109,11 @@
           label.dataset.i18n = 'retryStart';
           label.textContent = t('retryStart');
           document.querySelector('#silent-start').disabled = false;
-        } finally { button.disabled = false; languagePicker.disabled = false; }
+        } finally {
+          clearTimeout(audioTimeout);
+          button.disabled = false;
+          languagePicker.disabled = false;
+        }
       }
       document.querySelector('#start').addEventListener('click', () => startGame());
       document.querySelector('#silent-start').addEventListener('click', () => startGame(false));

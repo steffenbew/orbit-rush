@@ -209,10 +209,13 @@ const makeStart = () => new Function('THREE', `
   let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true, lastPointerPosition = null;
   const mouseAim = new THREE.Vector2(.7, -.6), target = new THREE.Vector2(.7, -.6), reticle = {style: {}};
   const camera = new THREE.PerspectiveCamera(), scene = {fog: {}}, reducedMotion = false;
-  const elements = new Map();
+  const elements = new Map(), calls = [], timers = new Map(), errors = [];
+  let timerId = 0;
+  const setTimeout = (callback, delay) => { timers.set(++timerId, {callback, delay}); return timerId; };
+  const clearTimeout = id => timers.delete(id);
   const document = {
     fullscreenEnabled: true, fullscreenElement: null,
-    documentElement: {requestFullscreen() { innerWidth = 1280; innerHeight = 900; return Promise.resolve(); }},
+    documentElement: {requestFullscreen() { calls.push('fullscreen'); innerWidth = 1280; innerHeight = 900; return Promise.resolve(); }},
     body: {classList: {add() {}}}, activeElement: {blur() {}},
     querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, {disabled: false, hidden: false, dataset: {}, setAttribute() {}});
@@ -221,29 +224,62 @@ const makeStart = () => new Function('THREE', `
   };
   const languagePicker = document.querySelector('#language'), audioNotice = document.querySelector('#audio-notice');
   let finishAudio = () => {}, lessons = 0;
-  const sound = {initAudio: () => new Promise(resolve => { finishAudio = resolve; })};
+  const sound = {initAudio: () => { calls.push('audio'); return new Promise(resolve => { finishAudio = resolve; }); }};
   const t = key => key, setupLevelFleet = () => {}, beginFlightTutorial = () => { lessons++; };
   const resetSimulationClock = () => {}, syncMusic = () => {}, playSound = () => {};
-  const audioError = error => { throw error; };
+  const audioError = error => { errors.push(error.message); audioNotice.hidden = false; };
   ${section('      function steer(event)', '      // Suppress accidental secondary clicks')}
   ${section('      async function startGame(', "      document.querySelector('#start').addEventListener")}
   return {
     start: startGame, loadAudio: () => finishAudio(), remember: value => { lastPointerPosition = value; },
-    state: () => ({started, paused, lessons, aim: mouseAim.toArray(), turn: target.toArray(), reticle: reticle.style,
-      introHidden: document.querySelector('#intro').hidden, buttonDisabled: document.querySelector('#start').disabled})
+    expireAudio: () => { for (const timer of timers.values()) timer.callback(); },
+    state: () => ({started, paused, lessons, soundEnabled, calls, errors, timerDelays: [...timers.values()].map(timer => timer.delay),
+      aim: mouseAim.toArray(), turn: target.toArray(), reticle: reticle.style,
+      introHidden: document.querySelector('#intro').hidden, buttonDisabled: document.querySelector('#start').disabled,
+      languageDisabled: languagePicker.disabled, label: document.querySelector('#start-label').textContent,
+      silentDisabled: document.querySelector('#silent-start').disabled, noticeHidden: audioNotice.hidden})
   };
 `)(THREE);
 for (const withSound of [false, true]) for (const pointer of [null, {clientX: 500, clientY: 400}, {clientX: 950, clientY: 700}]) {
   const start = makeStart(); start.remember(pointer);
   const loading = start.start(withSound);
+  assert.deepEqual(start.state().calls, withSound ? ['audio', 'fullscreen'] : ['fullscreen'], 'Unlock audio before fullscreen, without awaiting either');
+  assert.deepEqual(start.state().timerDelays, withSound ? [15000] : []);
   if (withSound) start.remember({clientX: 100, clientY: 100}); // Pointer movement while audio is loading must not start a turn.
   start.loadAudio(); await loading;
   const state = start.state();
   assert.equal(state.started, true); assert.equal(state.paused, false); assert.equal(state.lessons, 1);
   assert.equal(state.introHidden, true); assert.equal(state.buttonDisabled, false);
+  assert.deepEqual(state.timerDelays, [], 'Successful startup clears its timeout');
   assert.deepEqual(state.aim, [0, 0]); assert.deepEqual(state.turn, [0, 0]);
   assert.deepEqual(state.reticle, {left: '640px', top: '450px'}, 'Center against the new fullscreen viewport, not the old menu coordinates');
 }
+for (const retryWithSound of [false, true]) {
+  const start = makeStart();
+  const loading = start.start();
+  const finishOriginalAudio = start.loadAudio;
+  start.expireAudio();
+  await loading;
+  const state = start.state();
+  assert.equal(state.started, false, 'Stalled audio must not start gameplay');
+  assert.equal(state.buttonDisabled, false);
+  assert.equal(state.languageDisabled, false);
+  assert.equal(state.silentDisabled, false);
+  assert.equal(state.noticeHidden, false);
+  assert.equal(state.label, 'retryStart');
+  assert.match(state.errors[0], /Audio startup timed out/);
+  assert.deepEqual(state.timerDelays, []);
+  finishOriginalAudio();
+  await Promise.resolve();
+  assert.equal(start.state().started, false, 'Late audio completion must not start a timed-out attempt');
+  const retry = start.start(retryWithSound);
+  if (retryWithSound) start.loadAudio();
+  await retry;
+  assert.equal(start.state().started, true, 'Retry and silent play both recover from a timeout');
+  assert.equal(start.state().soundEnabled, retryWithSound);
+  assert.equal(start.state().lessons, 1);
+}
+console.log('PASS audio unlock before fullscreen, bounded startup, timeout recovery and no late game start');
 assert.ok(source.includes('const introAsteroids = new THREE.Group();'), 'Home-screen orbit uses decorative asteroids instead of an SVG track');
 assert.ok(!source.includes('updateIntroCheckpoint'));
 assert.match(source, /#intro \.intro-card \{ position: relative; z-index: 1; \}/);
