@@ -9,8 +9,8 @@ const banks = {
   shieldGlance: { files: ['shield-hard.wav'], volume: .19 },
   shieldHard: { files: ['shield-hard.wav'], volume: .24 },
   hit: { files: ['impact-1.mp3', 'impact-2.mp3', 'impact-3.mp3'], volume: .42 },
-  // Trim the louder blasts and lift the quieter third sample without reprocessing files.
-  explosion: { files: ['blast-1.mp3', 'blast-2.mp3', 'blast-3.mp3'], volume: .55, variantGains: [.8, .75, 1.4] },
+  // Match measured average levels to the quietest blast, without boosting any sample.
+  explosion: { files: ['blast-1.mp3', 'blast-2.mp3', 'blast-3.mp3'], volume: .55, variantGains: [.52, .75, .6] },
   go: { files: ['go-bing.wav'], volume: .124775 },
   // Original force-field sweep; adjust only gain, preserving its tone.
   checkpoint: { files: ['checkpoint-pass.wav'], volume: .157083 },

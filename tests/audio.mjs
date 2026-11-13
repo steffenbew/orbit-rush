@@ -81,6 +81,6 @@ for (let variant = 0; variant < 3; variant++) {
   assert.equal(bank.variantGains.length, bank.files.length);
   audio.playSound('explosion');
   assert.equal(played.at(-1).buffer, bank.buffers[variant]);
-  assert.equal(played.at(-1).output.gain.value, .55 * [.8, .75, 1.4][variant], 'Explosion trim follows the chosen sample');
+  assert.equal(played.at(-1).output.gain.value, .55 * [.52, .75, .6][variant], 'Explosion trim follows the chosen sample');
 }
 console.log('PASS versioned audio-file URLs, local assets, fixed checkpoint pitch, balanced gains and per-variant explosion trims');
