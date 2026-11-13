@@ -128,13 +128,6 @@
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; opacity: 1; } }
     [hidden] { display: none !important; }
     .intro { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at center, #071329c9, #07132940 58%, #03071133); padding: 24px; }
-    .intro-orbit { position: absolute; left: 50%; top: 50%; width: min(120vw, 120vh, 1040px); height: auto; transform: translate(-50%, -50%) rotate(-24deg); fill: none; pointer-events: none; filter: drop-shadow(0 0 12px #55eec744); transition: filter .6s; }
-    .orbit-trail { stroke: #7effd5; stroke-opacity: .4; stroke-width: 1.5; stroke-linecap: round; transition: stroke-opacity .6s; }
-    @media (hover: hover) {
-      #intro:has(#start:hover:not(:disabled)) .intro-orbit { filter: drop-shadow(0 0 6px #39ff9caa) drop-shadow(0 0 20px #39ff9c77); }
-      #intro:has(#start:hover:not(:disabled)) .orbit-trail { stroke-opacity: .85; }
-    }
-    @media (prefers-reduced-motion: reduce) { .intro-orbit, .orbit-trail { transition: none; } }
     .intro-card { width: 100%; max-width: 580px; text-align: center; color: #e9f8ff; }
     .language-picker { position: relative; display: grid; grid-template-columns: repeat(2, 1fr); width: max-content; max-width: 100%; margin: 8px auto 0; padding: 4px; border: 1px solid #7effd533; border-radius: 999px; background: #071629b3; }
     .language-selection { position: absolute; inset: 4px; z-index: 2; display: grid; grid-template-columns: repeat(2, 1fr); background: #7effd5; pointer-events: none; clip-path: inset(0 50% 0 0 round 999px); transition: clip-path .45s cubic-bezier(.22, 1, .36, 1); }
@@ -327,11 +320,6 @@
   <canvas id="effects" data-i18n-aria-label="controls" aria-label="Mit Maus oder Touch lenken und zielen. Klicken oder gedrückt halten zum Lasern. Leertaste feuert den starken Laser; danach lädt er kurz auf."></canvas>
   <div class="brand"><span>ORBIT RUSH</span><small>SPACE ARCADE</small></div>
   <section id="intro" class="intro" data-i18n-aria-label="startScreen" aria-label="Spiel starten">
-    <svg class="intro-orbit" viewBox="0 0 800 600" aria-hidden="true">
-      <defs><ellipse id="intro-orbit-path" cx="400" cy="300" rx="350" ry="175" pathLength="100"/></defs>
-      <use href="#intro-orbit-path" stroke="#7effd518" stroke-width="1"/>
-      <use class="orbit-trail" href="#intro-orbit-path" stroke-dasharray="56 44" stroke-dashoffset="68"/>
-    </svg>
     <div class="intro-card">
       <div class="intro-logo">
         <h1>ORBIT<span>RUSH</span></h1>
@@ -3021,25 +3009,57 @@
         sound.setPaused(paused || !started || document.hidden);
         sound.setMuted(!soundEnabled);
       }
-      const introOrbit = document.querySelector('.intro-orbit');
-      const orbitTrail = introOrbit.querySelector('.orbit-trail');
+      // Decorative only: share the existing rock geometries, never the gameplay fleet or shaders.
+      const introAsteroids = new THREE.Group();
+      const introRockMaterial = new THREE.MeshStandardMaterial({ color: 0xb6ada0,
+        roughness: 1, metalness: .04, flatShading: true, vertexColors: true });
+      const introRockCount = 60;
+      const introRockSizes = Array.from({ length: introRockCount }, (_, index) =>
+        index % 10 === 0 ? 22 + Math.random() * 10 : 7 + Math.random() ** 1.5 * 13);
+      const introRockPhases = Array.from({ length: introRockCount }, (_, index) =>
+        (index + Math.random() * .7) * Math.PI * 2 / introRockCount);
+      const introRockOffsets = Array.from({ length: introRockCount }, () => .84 + Math.random() * .32);
+      const introRockSpeeds = Array.from({ length: introRockCount }, () => .9 + Math.random() * .2);
+      const introRockSpins = Array.from({ length: introRockCount }, () =>
+        new THREE.Vector3((Math.random() - .5) * .22, (Math.random() - .5) * .26, (Math.random() - .5) * .16));
+      for (let index = 0; index < introRockCount; index++) {
+        introAsteroids.add(new THREE.Mesh(ships[index % 2 ? 7 : 4].children[0].geometry, introRockMaterial.clone()));
+      }
+      scene.add(introAsteroids);
       const introPlay = document.querySelector('#start');
       const orbitHover = matchMedia('(hover: hover)');
-      let orbitPhase = 12, orbitTail = 68, orbitSpeed = 100 / 90, orbitTime = 0;
+      const orbitTilt = -24 * Math.PI / 180;
+      let orbitPhase = 0, orbitSpeed = Math.PI * 2 / 90, orbitTime = 0;
       function updateIntroOrbit(dt) {
-        if (reducedMotion || document.hidden) return;
-        const hovering = orbitHover.matches && !introPlay.disabled && introPlay.matches(':hover');
-        orbitTime += dt;
-        const pulse = 1 + .35 * Math.sin(orbitTime * .9);
-        const targetSpeed = 100 / (hovering ? 10 : 90) * pulse;
-        orbitSpeed += (targetSpeed - orbitSpeed) * (1 - Math.exp(-3 * dt));
-        // Keep phases unwrapped so the tail never jumps when the light completes a lap.
-        orbitPhase -= orbitSpeed * dt;
-        orbitTail += (orbitPhase + 56 - orbitTail) * (1 - Math.exp(-.8 * dt));
-        const length = orbitTail - orbitPhase;
-        orbitTrail.setAttribute('stroke-dasharray', `${length} ${100 - length}`);
-        orbitTrail.setAttribute('stroke-dashoffset', String(orbitTail % 100));
+        if (document.hidden) return;
+        if (!reducedMotion) {
+          const hovering = orbitHover.matches && !introPlay.disabled && introPlay.matches(':hover');
+          const targetSpeed = Math.PI * 2 / (hovering ? 45 : 90);
+          orbitSpeed += (targetSpeed - orbitSpeed) * (1 - Math.exp(-2 * dt));
+          orbitPhase += orbitSpeed * dt;
+          orbitTime += dt;
+        }
+        const diameter = Math.min(innerWidth * .98, innerHeight * 1.2, 1040);
+        const basePixelScale = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 260 / innerHeight;
+        introAsteroids.children.forEach((rock, index) => {
+          // Bounded individual drift keeps clusters alive without opening large gaps.
+          const drift = .03 * Math.sin(orbitPhase * introRockSpeeds[index] + index);
+          const phase = introRockPhases[index] + orbitPhase + drift;
+          const x = Math.cos(phase) * diameter * 350 / 800 * introRockOffsets[index];
+          const y = Math.sin(phase) * diameter * 175 / 800 * introRockOffsets[index];
+          const farSide = (Math.sin(phase) + 1) / 2;
+          const depth = 248 + farSide * 24;
+          const pixelScale = basePixelScale * depth / 260;
+          rock.position.set((x * Math.cos(orbitTilt) - y * Math.sin(orbitTilt)) * pixelScale,
+            -(x * Math.sin(orbitTilt) + y * Math.cos(orbitTilt)) * pixelScale, -depth);
+          // Keep perspective subtle so the belt reads as one coherent ring.
+          rock.scale.setScalar(introRockSizes[index] / 11 * basePixelScale * 1.1);
+          rock.material.color.copy(introRockMaterial.color).multiplyScalar(1 - farSide * .08);
+          const spin = introRockSpins[index];
+          rock.rotation.set(index * .7 + orbitTime * spin.x, index * .9 + orbitTime * spin.y, index * .4 + orbitTime * spin.z);
+        });
       }
+      updateIntroOrbit(0);
       async function startGame(withSound = true) {
         // Fullscreen must be requested in the user gesture, before awaiting audio loading.
         if (document.fullscreenEnabled && !document.fullscreenElement) {
@@ -4284,6 +4304,7 @@
         }
       }
       function renderFrame() {
+        introAsteroids.visible = !started;
         updateControlHints();
         recordVisibleObjects();
         recordVisibleShowerRocks();

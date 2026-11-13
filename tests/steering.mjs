@@ -244,7 +244,7 @@ for (const withSound of [false, true]) for (const pointer of [null, {clientX: 50
   assert.deepEqual(state.aim, [0, 0]); assert.deepEqual(state.turn, [0, 0]);
   assert.deepEqual(state.reticle, {left: '640px', top: '450px'}, 'Center against the new fullscreen viewport, not the old menu coordinates');
 }
-assert.ok(source.includes('<svg class="intro-orbit"'));
+assert.ok(source.includes('const introAsteroids = new THREE.Group();'), 'Home-screen orbit uses decorative asteroids instead of an SVG track');
 assert.ok(!source.includes('updateIntroCheckpoint'));
 assert.match(source, /#intro \.intro-card \{ position: relative; z-index: 1; \}/);
 console.log('PASS restored home layout with neutral mouse/keyboard/silent starts, including fullscreen resize and audio-loading pointer movement');
