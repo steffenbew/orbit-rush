@@ -1246,10 +1246,10 @@
       // Reuse one ship of each type for the intro; gameplay unlocks the fleet gradually.
       createShip(ships.length, 4);
       const introFormation = [
-        { ship: ships[0], x: -.64, y: .28, mobileX: -.55, mobileY: .60, depth: 360, yaw: .35, pitch: .70 },
-        { ship: ships[1], x: .65, y: .30, mobileX: .50, mobileY: .76, depth: 460, yaw: .35, pitch: .45, mobilePitch: .75 },
-        { ship: ships[2], x: .58, y: -.48, mobileX: .40, mobileY: .48, depth: 620, mobileDepth: 750, yaw: .70, pitch: .45, mobilePitch: .9 },
-        { ship: ships[8], x: -.50, y: -.40, mobileX: -.15, mobileY: -.57, depth: 1450, mobileDepth: 2100, yaw: -.55, pitch: .35 }
+        { ship: ships[0], x: -.76, y: .70, mobileX: -.60, mobileY: .76, depth: 220, yaw: .35, pitch: .92 },
+        { ship: ships[1], x: .74, y: .70, mobileX: .56, mobileY: .76, depth: 430, yaw: .35, pitch: .65, mobilePitch: .75 },
+        { ship: ships[2], x: .70, y: -.55, mobileX: .53, mobileY: -.72, depth: 620, mobileDepth: 800, yaw: .70, pitch: .45, mobilePitch: .9 },
+        { ship: ships[8], x: -.62, y: -.50, mobileX: -.24, mobileY: -.64, depth: 1600, mobileDepth: 2100, yaw: -.55, pitch: .35 }
       ];
       let introTime = 0;
       ships.forEach(ship => { ship.visible = introFormation.some(placement => placement.ship === ship); });
@@ -1261,8 +1261,8 @@
           ship.scale.setScalar(ship.userData.type.scale);
           const depth = (compact && placement.mobileDepth ? placement.mobileDepth : placement.depth) + Math.sin(time * .1 + index) * 18;
           const halfHeight = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * depth;
-          const x = (compact ? placement.mobileX : placement.x) + Math.sin(time * .16 + index * 2.1) * .10;
-          const y = (compact ? placement.mobileY : placement.y) + Math.sin(time * .13 + index) * .055;
+          const x = (compact ? placement.mobileX : placement.x) + Math.sin(time * .16 + index * 2.1) * .035;
+          const y = (compact ? placement.mobileY : placement.y) + Math.sin(time * .13 + index) * .025;
           ship.position.set(x * halfHeight * camera.aspect, y * halfHeight, -depth);
           const pitch = compact ? (placement.mobilePitch ?? placement.pitch) : placement.pitch;
           ship.rotation.set(pitch + Math.sin(time * .12 + index) * .08,

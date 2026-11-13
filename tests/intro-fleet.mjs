@@ -32,6 +32,11 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
     assert.ok(visible.every(ship => ship.scale.x === ship.userData.type.scale), 'Every preview retains its full gameplay scale');
     const boss = visible.find(ship => ship.userData.type.capital);
     assert.ok(boss); assert.equal(boss.userData.health, 60);
+    const anchors = visible.map(ship => ship.position.clone().project(intro.camera));
+    assert.ok(anchors[0].x < -.5 && anchors[0].y > .6, 'Fighter stays in the upper-left corner');
+    assert.ok(anchors[1].x > .4 && anchors[1].y > .6, 'Saucer stays in the upper-right corner');
+    assert.ok(anchors[2].x > .4 && anchors[2].y < -.5, 'Carrier stays in the lower-right corner');
+    assert.ok(anchors[3].x < -.15 && anchors[3].y < -.45, 'Leviathan stays in the lower-left corner');
     assert.equal(intro.ships.filter(ship => ship.userData.type.capital).length, 1);
     const opening = boss.position.clone(), rotation = boss.quaternion.clone();
     intro.step(2);
@@ -53,9 +58,10 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
         const size = projected.getSize(new THREE.Vector2());
         return size.x * size.y;
       });
-      for (let i = 1; i < projectedAreas.length; i++) {
+      assert.ok(projectedAreas[2] > projectedAreas[0], 'The closer fighter remains smaller than the Carrier');
+      for (let i = 2; i < projectedAreas.length; i++) {
         assert.ok(projectedAreas[i] > projectedAreas[i - 1],
-          `Preserve Interceptor < Saucer < Carrier < Leviathan on screen at ${width}×${height}, time=${time}: ${projectedAreas}`);
+          `Preserve small ships < Carrier < Leviathan on screen at ${width}×${height}, time=${time}: ${projectedAreas}`);
       }
       assert.ok(projectedAreas[3] > projectedAreas[2] * 2, 'The Leviathan must look substantially larger than the Carrier');
       const bounds = boss.userData.collisionBox;
