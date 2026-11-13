@@ -12,12 +12,7 @@ stop() {
 }
 
 test() {
-  python3 tests/dev-server.py
-  local test_file
-  for test_file in tests/*.mjs; do
-    printf '\n→ %s\n' "$test_file"
-    node "$test_file"
-  done
+  node --test --test-concurrency=6 tests/*.mjs
 }
 
 usage() {
@@ -26,7 +21,7 @@ usage() {
     '' \
     '  start, dev  Serve locally in the foreground (Python 3)' \
     '  stop        Stop only this checkout’s tracked server' \
-    '  test        Run all test suites (Python 3 and Node.js)' \
+    '  test        Run all test suites in parallel (Python 3 and Node.js 20+)' \
     '  help        Show this help' \
     '' \
     'Default: port 8080, or a free port if occupied; prints the actual URL.' \
