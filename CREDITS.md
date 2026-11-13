@@ -16,6 +16,7 @@ Die Audiodateien werden lokal aus `assets/audio/` abgespielt; es gibt keine Audi
 - Originalpaket: https://opengameart.org/sites/default/files/sci-fi_sounds.zip
 - Lizenz: **CC0 1.0 Universal**, https://creativecommons.org/publicdomain/zero/1.0/
 - Original-Lizenzdatei: `assets/audio/KENNEY-LICENSE.txt`
+- `checkpoint-whoosh.wav`: aus `Audio/doorOpen_000.ogg`, 250-Hz-Hochpass und 2,2-kHz-Tiefpass, 70 ms Einblendung und 300 ms Ausblendung ab 250 ms, Lautstärkeangleichung auf −22 LUFS; mono PCM-WAV mit 44,1 kHz. Sanfter Durchflug-Sound mit fester Tonhöhe, Gain 0,24.
 - Außenwandkontakte (WAV-Konvertierung mit 44,1 kHz, keine weiteren Effekte): `shield-glance.wav` aus `forceField_001.ogg`, `shield-hard.wav` aus `forceField_000.ogg`; feste Tonhöhe, Gain 0,42. Auswahl nach eingehender Normalgeschwindigkeit an der Außenwand: ab 150 hart (15 bei reduzierter Bewegung), darunter streifend. Schaden und Kontakt-Cooldown unverändert.
 - Aktiver Lasersound: `laser-soft.mp3`, abgeleitet von `Audio/laserRetro_000.ogg`, zusätzlich mit 1,5-kHz-Tiefpass bearbeitet. Leiser Mix und feste Abspielgeschwindigkeit 0,9; kein Variantenwechsel.
 - Leermagazin-Klick: `empty-click.wav`, erste 120 ms von `Audio/impactMetal_000.ogg`, 400-Hz-Hochpass, 2,4-kHz-Tiefpass, Ausklang von 40–120 ms, Lautstärke zunächst auf 70 %, anschließend Dynamikkompression (Schwelle 0,045, Verhältnis 4:1, Attack 0,1 ms, Release 20 ms, Makeup ×5) und +2 dB für einen besser hörbaren Klangkörper; mono PCM-WAV mit 44,1 kHz. Im Spiel mit fester Tonhöhe und Gain 0,28 abgespielt.
@@ -32,6 +33,7 @@ Die Audiodateien werden lokal aus `assets/audio/` abgespielt; es gibt keine Audi
 - Originalpaket: https://opengameart.org/sites/default/files/sounds_1.zip
 - Lizenz: **Creative Commons Attribution 3.0 Unported (CC BY 3.0)**
 - Lizenztext: https://creativecommons.org/licenses/by/3.0/
+- `go-bing.wav`: `sounds/buttonselect/6.wav`, unverändert übernommen. Einmaliger Bestätigungston beim Erscheinen von „LOS!“ / „GO!“ nach dem Training; feste Tonhöhe, Gain 0,17.
 - `reward.wav`: `sounds/powerups/1.wav`
 - `warning-low.wav`: aus `sounds/misc/alarm.wav`. Erste 0,65 Sekunden verwendet, auf 85 % der ursprünglichen Tonhöhe/Abspielgeschwindigkeit abgesenkt, auf 44,1 kHz resampelt, 800-Hz-Tiefpass, Lautstärke auf 65 %, Schnittkanten mit 3/5 ms geglättet. Dauer ca. 0,765 Sekunden; im Spiel mit Ruhepause alle 0,95 Sekunden wiederholt.
 - `reward.wav` wurde unverändert übernommen; Lautstärke wird im Spiel angepasst.

@@ -1795,6 +1795,7 @@
         resetFlightRing(true);
         tutorialGoUntil = gameTime + 1.2;
         showControlStep();
+        playSound('go');
         // Let the two staggered ships arrive first; route traffic follows after six course seconds.
         ringShipsPending = true;
       }
@@ -2458,7 +2459,7 @@
           }
           updateScore();
           showFeedback(t('ringPassed'));
-          playSound('reward');
+          playSound('checkpoint');
         } else {
           if (tutorialStage === 0) tutorialRetryAt = gameTime + 1.2;
           shield = Math.max(0, shield - 10);
@@ -2945,7 +2946,7 @@
         if (combo > 1) playSound('reward');
       }
       updateScore();
-      const sound = await import('./audio.js');
+      const sound = await import('./audio.js?v=go-2');
       let soundEnabled = true, started = false, kills = 0, hitMarker = 0;
       const playSound = sound.playSound;
       const audioNotice = document.querySelector('#audio-notice');

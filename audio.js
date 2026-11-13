@@ -10,6 +10,8 @@ const banks = {
   shieldHard: { files: ['shield-hard.wav'], volume: .42 },
   hit: { files: ['impact-1.mp3', 'impact-2.mp3', 'impact-3.mp3'], volume: .42 },
   explosion: { files: ['blast-1.mp3', 'blast-2.mp3', 'blast-3.mp3'], volume: .55 },
+  go: { files: ['go-bing.wav'], volume: .17 },
+  checkpoint: { files: ['checkpoint-whoosh.wav'], volume: .24 },
   reward: { files: ['reward.wav'], volume: .24 }
 };
 const activeSounds = new Set();
@@ -132,7 +134,7 @@ export function playSound(kind, shipScale = 2.4, allowPaused = false) {
   const source = context.createBufferSource();
   source.buffer = bank.buffers[variant];
   source.playbackRate.value = kind === 'explosion' ? (1.18 - shipScale * .1) * (.96 + Math.random() * .08)
-    : kind === 'shot' ? .9 : kind === 'reward' || kind === 'empty' || kind === 'lock' || kind === 'shieldGlance' || kind === 'shieldHard' ? 1 : .96 + Math.random() * .08;
+    : kind === 'shot' ? .9 : kind === 'go' || kind === 'checkpoint' || kind === 'reward' || kind === 'empty' || kind === 'lock' || kind === 'shieldGlance' || kind === 'shieldHard' ? 1 : .96 + Math.random() * .08;
   const gain = context.createGain();
   gain.gain.value = bank.volume;
   source.connect(gain).connect(master);

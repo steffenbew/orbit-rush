@@ -92,9 +92,9 @@ export const messages = {
     finalSprint: 'HYPERSPEED · FINAL STRETCH',
     audioCredits: 'Audio credits',
     close: 'Close',
-    creditsEffects: 'Lasers, empty-magazine clicks, hits, outer-shield contacts and explosions: ',
+    creditsEffects: 'Lasers, empty-magazine clicks, hits, outer-shield contacts, checkpoints and explosions: ',
     creditsEffectsChanges: '. Converted to MP3 and volume-matched; variable pitch in-game. The empty-magazine click is a short, filtered WAV excerpt with a softened tail and fixed pitch. Outer-shield samples are converted to WAV with fixed pitch; separate samples for glancing and hard impacts.',
-    creditsCombo: 'Combo sound and collision alarm: ',
+    creditsCombo: 'GO and combo sounds and collision alarm: ',
     creditsComboChanges: '. Combo file unchanged. Alarm shortened, pitched down, treble reduced and mixed quieter; cut edges smoothed briefly.',
     creditsMusic: 'Music: ',
     creditsMusicChanges: ' (volume-matched, treble slightly reduced), '
@@ -191,9 +191,9 @@ export const messages = {
     finalSprint: 'HYPERSPEED · ENDSPURT',
     audioCredits: 'Audio-Credits',
     close: 'Schließen',
-    creditsEffects: 'Laser, Leermagazin-Klick, Treffer, Außenwandkontakte und Explosionen: ',
+    creditsEffects: 'Laser, Leermagazin-Klick, Treffer, Außenwandkontakte, Checkpoints und Explosionen: ',
     creditsEffectsChanges: '. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe. Außenwand-Samples nach WAV konvertiert, feste Tonhöhe; getrennte Samples für streifende und harte Kontakte.',
-    creditsCombo: 'Combo-Sound und Kollisionsalarm: ',
+    creditsCombo: 'LOS!-, Combo-Sound und Kollisionsalarm: ',
     creditsComboChanges: '. Combo-Datei unverändert. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.',
     creditsMusic: 'Musik: ',
     creditsMusicChanges: ' (Lautstärke angeglichen, Höhen leicht abgesenkt), '

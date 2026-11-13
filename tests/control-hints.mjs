@@ -45,7 +45,7 @@ const makeGame = () => new Function('THREE', 't', `
   const setShipOpacity = (ship, opacity) => { ship.userData.arrivalOpacity = opacity; };
   const constrainShipToBoundary = () => {}; // Real fleet containment is covered by flight-dynamics.mjs.
   const queueShip = ship => { ship.visible = false; };
-  const playSound = () => {}, award = () => {}, explode = () => {}, updateShipHitFlash = () => {};
+  const sounds = [], playSound = kind => sounds.push(kind), award = () => {}, explode = () => {}, updateShipHitFlash = () => {};
   const feedbackMessages = [], showFeedback = message => feedbackMessages.push(message);
   const shatterAsteroid = () => { throw new Error('Tutorial asteroid must not create dangerous fragments'); };
   const updateScore = () => {}, updateHeavyHud = () => {}, updateWeaponHud = () => {};
@@ -68,7 +68,7 @@ const makeGame = () => new Function('THREE', 't', `
   }
   beginFlightTutorial(); updateControlHints();
   return {
-    ships, gates: flightRings, courseWorldOffset, worldStep, flightOrientation, rockets, feedbackMessages,
+    ships, gates: flightRings, courseWorldOffset, worldStep, flightOrientation, rockets, feedbackMessages, sounds,
     hints: controlHints, title: controlTitle, input: controlInput, fireRocket,
     state: () => ({stage: tutorialStage, completed: tutorialCompleted, completedAt: tutorialStepCompletedAt, time: gameTime, courseStartTime, normalStarts}),
     action(action) {
@@ -139,6 +139,7 @@ game.tick(.61);
 assert.equal(game.state().stage, 3); assert.equal(game.state().completed, true);
 assert.deepEqual(game.feedbackMessages, [], 'GO no longer appears in the top feedback banner');
 assert.equal(game.title.textContent, t('flightGo'));
+assert.equal(game.sounds.filter(kind => kind === 'go').length, 1, 'One bing when GO appears');
 assert.equal(game.input.textContent, '', 'The GO prompt has no stale mouse/spacebar instruction');
 assert.ok(game.hints.classes.has('go') && !game.hints.classes.has('finished'));
 assert.equal(game.state().time, previousTime + .61, 'Simulation time must continue, not restart');
@@ -163,6 +164,7 @@ game.tick(.02); assert.equal(game.hints.hidden, true, 'GO disappears after 1.2 a
 game.tick(1); assert.equal(game.hints.hidden, true, 'GO does not reappear later in the flight');
 game.retry(); assert.equal(game.state().stage, 3); assert.equal(game.hints.hidden, true, 'Completed tutorial stays dismissed on retry/new run');
 assert.deepEqual(game.feedbackMessages, [], 'No duplicate GO announcement in the top banner');
+assert.equal(game.sounds.filter(kind => kind === 'go').length, 1, 'No repeat bing on updates, pause/resume or retry');
 const quickRetry = makeGame();
 for (const [action, delay] of [['checkpoint', .71], ['laser', .71], ['heavy', 1.41]]) {
   quickRetry.action(action); quickRetry.tick(delay);

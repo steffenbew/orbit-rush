@@ -121,7 +121,7 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) {
   assert.equal(game.halo.depthWrite, false, 'The open center must not occlude ships');
   const radius = game.rings[0].scale.x;
   while (!game.sounds.length && game.state().time < 7) game.fly(1 / 60);
-  assert.deepEqual(game.sounds, ['reward']);
+  assert.deepEqual(game.sounds, ['checkpoint']);
   assert.ok(Math.abs(game.state().time - 5) < .04, 'The opening checkpoint arrives after five seconds, with more time to read the instruction');
   assert.equal(game.state().shield, 100); assert.equal(game.state().score, 100);
   assert.deepEqual(game.messages.at(-1), {message: t('ringPassed'), negative: false}, 'Checkpoint points use the shared positive top feedback');
