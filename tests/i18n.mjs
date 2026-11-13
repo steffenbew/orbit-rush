@@ -135,14 +135,21 @@ assert.equal(makeLanguagePicker('fr-FR').document.radios.en.checked, true);
 assert.equal(makeLanguagePicker(undefined, 'de-DE').document.radios.de.checked, true, 'Use navigator.language when the language list is unavailable');
 assert.ok(!source.includes('orbit-rush-language'), 'Previously saved choices must not override browser detection');
 const intro = section('  <section id="intro"', '  <button id="audio-notice"');
-assert.ok(intro.indexOf('id="language"') > intro.indexOf('id="start"'), 'Place the pill directly below Start Flight');
+assert.ok(intro.indexOf('id="language"') > intro.indexOf('id="start"'), 'Place the language pill below the logo and play button');
 const startButton = intro.match(/<button id="start"[\s\S]*?<\/button>/)[0];
-assert.ok(startButton.includes('id="start-label"') && startButton.includes('href="#i-rocket"') && startButton.includes('aria-hidden="true"'));
-assert.ok(!source.includes("document.querySelector('#start').textContent"), 'Changing language or loading state must preserve the rocket icon');
+assert.ok(startButton.includes('aria-labelledby="start-label"') && startButton.includes('href="#i-play"') && startButton.includes('aria-hidden="true"'));
+assert.ok(intro.includes('<span id="start-label"'), 'Localized loading status also names the play button');
+assert.ok(!source.includes("document.querySelector('#start').textContent"), 'Changing language or loading state must preserve the play icon');
 assert.ok(!messages.en.startFlight.includes('↗') && !messages.de.startFlight.includes('↗'));
 assert.ok(!intro.includes('<select'), 'Use a two-option pill instead of a dropdown');
 assert.equal((intro.match(/type="radio" name="language"/g) || []).length, 2, 'Native radios provide keyboard selection and checked state');
 assert.match(source, /\.language-picker input:focus-visible \+ span/);
+assert.match(source, /\.language-selection \{[^}]*position: absolute;[^}]*clip-path: inset\(0 50% 0 0 round 999px\);[^}]*transition: clip-path \.45s cubic-bezier/, 'One clipped selection layer slides without shifting layout');
+assert.ok(source.includes('.language-picker:has(input[value="de"]:checked) .language-selection { clip-path: inset(0 0 0 50% round 999px); }'), 'Native checked state controls the sliding selection');
+assert.ok(intro.includes('<div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>'), 'Decorative dark text is clipped together with the mint background, without duplicate accessible labels');
+assert.ok(!source.includes('transition: color .25s'), 'Text contrast follows the pill position, never a word-wide fade');
+assert.ok(source.includes('transition: clip-path .45s cubic-bezier(.22, 1, .36, 1);'), 'Language movement settles without overshoot');
+assert.ok(source.includes('.language-selection { transition: none; }'), 'Language animation respects reduced motion');
 console.log('PASS browser-language preselection on each load, manual switching, native pill controls and active-run guard');
 
 // Exercise actual result-copy logic for every outcome in both languages.

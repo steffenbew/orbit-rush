@@ -128,13 +128,21 @@
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; opacity: 1; } }
     [hidden] { display: none !important; }
     .intro { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at center, #071329c9, #07132940 58%, #03071133); padding: 24px; }
-    .intro-orbit { position: absolute; left: 50%; top: 50%; width: min(120vw, 120vh, 1040px); height: auto; transform: translate(-50%, -50%) rotate(-24deg); fill: none; pointer-events: none; filter: drop-shadow(0 0 12px #55eec744); }
+    .intro-orbit { position: absolute; left: 50%; top: 50%; width: min(120vw, 120vh, 1040px); height: auto; transform: translate(-50%, -50%) rotate(-24deg); fill: none; pointer-events: none; filter: drop-shadow(0 0 12px #55eec744); transition: filter .6s; }
+    .orbit-trail { stroke: #7effd5; stroke-opacity: .4; stroke-width: 1.5; stroke-linecap: round; transition: stroke-opacity .6s; }
+    @media (hover: hover) {
+      #intro:has(#start:hover:not(:disabled)) .intro-orbit { filter: drop-shadow(0 0 6px #39ff9caa) drop-shadow(0 0 20px #39ff9c77); }
+      #intro:has(#start:hover:not(:disabled)) .orbit-trail { stroke-opacity: .85; }
+    }
+    @media (prefers-reduced-motion: reduce) { .intro-orbit, .orbit-trail { transition: none; } }
     .intro-card { width: 100%; max-width: 580px; text-align: center; color: #e9f8ff; }
-    .language-picker { display: flex; width: max-content; max-width: 100%; margin: 8px auto 0; padding: 4px; border: 1px solid #7effd533; border-radius: 999px; background: #071629b3; }
-    .language-picker label { position: relative; }
+    .language-picker { position: relative; display: grid; grid-template-columns: repeat(2, 1fr); width: max-content; max-width: 100%; margin: 8px auto 0; padding: 4px; border: 1px solid #7effd533; border-radius: 999px; background: #071629b3; }
+    .language-selection { position: absolute; inset: 4px; z-index: 2; display: grid; grid-template-columns: repeat(2, 1fr); background: #7effd5; pointer-events: none; clip-path: inset(0 50% 0 0 round 999px); transition: clip-path .45s cubic-bezier(.22, 1, .36, 1); }
+    .language-picker:has(input[value="de"]:checked) .language-selection { clip-path: inset(0 0 0 50% round 999px); }
+    .language-picker .language-selection span { color: #092438; }
+    .language-picker label { position: relative; z-index: 1; }
     .language-picker input { position: absolute; width: 1px; height: 1px; opacity: 0; }
     .language-picker span { display: block; min-width: 88px; padding: 9px 16px; border-radius: 999px; color: #a3b8c9; font-size: 12px; font-weight: 650; cursor: pointer; }
-    .language-picker input:checked + span { color: #092438; background: #7effd5; }
     .language-picker input:focus-visible + span { outline: 2px solid #7effd5; outline-offset: 3px; }
     .language-picker:disabled { opacity: .5; }
     .language-picker input:disabled + span { cursor: wait; }
@@ -144,11 +152,23 @@
     h1 { font-size: clamp(72px, min(12vw, 18vh), 136px); line-height: .92; letter-spacing: -.07em; margin: 20px 0; font-weight: 850; }
     h1 span { display: block; color: #7effd5; }
     .intro-card p { color: #b8cfde; line-height: 1.7; font-size: 15px; }
-    #start, #play-again { width: auto; min-width: 240px; padding: 0 26px; margin: 20px auto 10px; background: #7effd5; color: #092438; font-weight: 800; font-size: 12px; letter-spacing: .16em; box-shadow: 0 8px 40px #55eec733; }
-    #start { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: min(320px, 100%); min-width: 0; height: 52px; }
-    #start .icon { width: 18px; height: 18px; flex-shrink: 0; }
-    #start:disabled { opacity: .6; cursor: wait; }
-    #start:disabled .icon { display: none; }
+    #play-again { width: auto; min-width: 240px; padding: 0 26px; margin: 20px auto 10px; background: #7effd5; color: #092438; font-weight: 800; font-size: 12px; letter-spacing: .16em; box-shadow: 0 8px 40px #55eec733; }
+    .intro-logo { --logo-size: clamp(72px, min(12vw, 18vh), 136px); position: relative; font-size: var(--logo-size); }
+    .intro-logo h1 { margin: 0; font-size: inherit; line-height: .92; }
+    .intro-logo h1 span { margin-top: 0; }
+    #intro .language-picker { margin-top: 20px; }
+    #start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: clamp(52px, calc(var(--logo-size) * .52), 72px); height: auto; aspect-ratio: 1; padding: 0; margin: 0; border: 6px solid #071329; border-radius: 50%; background: #7effd5; color: #092438; box-shadow: 0 0 0 3px #071329; transition: transform .5s cubic-bezier(.2, 1.5, .35, 1), background .2s, box-shadow .3s; }
+    @media (hover: hover) {
+      #start:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.12); background: #b2ffe7; box-shadow: 0 0 0 3px #071329, 0 0 30px #55eec744; }
+    }
+    #start:active:not(:disabled) { transform: translate(-50%, -50%) scale(.97); transition: transform .12s ease-out; }
+    @media (prefers-reduced-motion: reduce) { #start { transition: none; } #start:active:not(:disabled) { transition: none; } .language-selection { transition: none; } }
+    #start:focus-visible { outline: 3px solid #e9f8ff; outline-offset: 5px; }
+    #start .icon { width: 46%; height: 46%; transform: translateX(calc(-8% + 1px)); }
+    #start-label { position: fixed; bottom: max(24px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: min(82vw, 480px); color: #b8cfde; font-size: 10px; font-weight: 750; letter-spacing: .1em; line-height: 1.4; }
+    #start-label[data-i18n="startFlight"] { width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    #start:disabled { cursor: wait; background: #507f7b; }
+    #start:disabled .icon { opacity: .5; }
     #silent-start:disabled { visibility: hidden; }
     #silent-start { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); display: block; width: auto; height: 30px; font-size: 11px; margin: 0; color: #a3b8c9; white-space: nowrap; }
     #audio-notice { position: fixed; z-index: 20; left: 50%; bottom: 110px; transform: translateX(-50%); width: min(90vw, 500px); height: auto; padding: 15px; color: #ffe3aa; background: #32283b; border: 1px solid #eeb16b66; font-size: 13px; }
@@ -308,15 +328,20 @@
   <div class="brand"><span>ORBIT RUSH</span><small>SPACE ARCADE</small></div>
   <section id="intro" class="intro" data-i18n-aria-label="startScreen" aria-label="Spiel starten">
     <svg class="intro-orbit" viewBox="0 0 800 600" aria-hidden="true">
-      <ellipse cx="400" cy="300" rx="350" ry="175" stroke="#7effd518" stroke-width="1"/>
-      <ellipse cx="400" cy="300" rx="350" ry="175" stroke="#7effd555" stroke-width="1.5" pathLength="100" stroke-dasharray="56 44" stroke-dashoffset="12"/>
+      <defs><ellipse id="intro-orbit-path" cx="400" cy="300" rx="350" ry="175" pathLength="100"/></defs>
+      <use href="#intro-orbit-path" stroke="#7effd518" stroke-width="1"/>
+      <use class="orbit-trail" href="#intro-orbit-path" stroke-dasharray="56 44" stroke-dashoffset="68"/>
     </svg>
     <div class="intro-card">
-      <h1>ORBIT<span>RUSH</span></h1>
-      <button id="start" disabled><span id="start-label" data-i18n="loadingSpace">WELTRAUM WIRD GELADEN …</span><svg class="icon" aria-hidden="true"><use href="#i-rocket"/></svg></button>
+      <div class="intro-logo">
+        <h1>ORBIT<span>RUSH</span></h1>
+        <button id="start" aria-labelledby="start-label" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <span id="start-label" data-i18n="loadingSpace" role="status">WELTRAUM WIRD GELADEN …</span>
+      </div>
       <fieldset id="language" class="language-picker" data-i18n-aria-label="language" aria-label="Sprache" disabled>
         <label><input type="radio" name="language" value="en"><span lang="en">English</span></label>
         <label><input type="radio" name="language" value="de"><span lang="de">Deutsch</span></label>
+        <div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>
       </fieldset>
       <button id="silent-start" data-i18n="silentStart" disabled>Ohne Ton starten</button>
     </div>
@@ -2996,6 +3021,25 @@
         sound.setPaused(paused || !started || document.hidden);
         sound.setMuted(!soundEnabled);
       }
+      const introOrbit = document.querySelector('.intro-orbit');
+      const orbitTrail = introOrbit.querySelector('.orbit-trail');
+      const introPlay = document.querySelector('#start');
+      const orbitHover = matchMedia('(hover: hover)');
+      let orbitPhase = 12, orbitTail = 68, orbitSpeed = 100 / 90, orbitTime = 0;
+      function updateIntroOrbit(dt) {
+        if (reducedMotion || document.hidden) return;
+        const hovering = orbitHover.matches && !introPlay.disabled && introPlay.matches(':hover');
+        orbitTime += dt;
+        const pulse = 1 + .35 * Math.sin(orbitTime * .9);
+        const targetSpeed = 100 / (hovering ? 10 : 90) * pulse;
+        orbitSpeed += (targetSpeed - orbitSpeed) * (1 - Math.exp(-3 * dt));
+        // Keep phases unwrapped so the tail never jumps when the light completes a lap.
+        orbitPhase -= orbitSpeed * dt;
+        orbitTail += (orbitPhase + 56 - orbitTail) * (1 - Math.exp(-.8 * dt));
+        const length = orbitTail - orbitPhase;
+        orbitTrail.setAttribute('stroke-dasharray', `${length} ${100 - length}`);
+        orbitTrail.setAttribute('stroke-dashoffset', String(orbitTail % 100));
+      }
       async function startGame(withSound = true) {
         // Fullscreen must be requested in the user gesture, before awaiting audio loading.
         if (document.fullscreenEnabled && !document.fullscreenElement) {
@@ -3924,6 +3968,7 @@
         if (!started) {
           if (!reducedMotion && !document.hidden) introTime += dt;
           updateIntroShips(introTime);
+          updateIntroOrbit(dt);
         }
         if (crashing && !document.hidden) {
           crashTime += dt;

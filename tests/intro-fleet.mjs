@@ -21,6 +21,7 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
       // Boot must not read flight state before it is initialized.
       const flightMotion = new THREE.Vector3();
       const document = {hidden: false}, started = false;
+      const updateIntroOrbit = () => {};
       return { ships, introFormation, camera, updateIntroShips,
         step: dt => { ${introStep} }, hide: () => { document.hidden = true; } };
     `)(THREE, width, height, reducedMotion);
