@@ -15,13 +15,19 @@ test() {
   node --test --test-concurrency=6 tests/*.mjs
 }
 
+deploy() {
+  test
+  bash "$PWD/scripts/deploy.sh"
+}
+
 usage() {
   printf '%s\n' \
-    'Usage: ./run {start|dev|stop|test|help}' \
+    'Usage: ./run {start|dev|stop|test|deploy|help}' \
     '' \
     '  start, dev  Serve locally in the foreground (Python 3)' \
     '  stop        Stop only this checkout’s tracked server' \
     '  test        Run all test suites in parallel (Python 3 and Node.js 20+)' \
+    '  deploy      Test and deploy to https://orbitrush.steffenbew.com (SSH/rsync)' \
     '  help        Show this help' \
     '' \
     'Default: port 8080, or a free port if occupied; prints the actual URL.' \
@@ -38,6 +44,7 @@ case "${1:-help}" in
   start|dev) start ;;
   stop) stop ;;
   test) test ;;
+  deploy) deploy ;;
   help|--help|-h) usage ;;
   *) usage >&2; exit 1 ;;
 esac
