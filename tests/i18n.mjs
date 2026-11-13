@@ -166,7 +166,7 @@ assert.ok(source.includes('.language-picker:disabled .language-selection { trans
 console.log('PASS browser-language preselection on each load, manual switching, native pill controls and active-run guard');
 
 // Exercise actual result-copy logic for every outcome in both languages.
-const resultCode = section('        if (roundEnded) return;\n        if (pauseMenu.open)', '        collisionAlert.hidden = true;');
+const resultCode = section('        if (roundEnded) return;\n        if (pauseMenu.open)', '        flightPath.hidden = true;');
 for (const locale of ['en', 'de']) {
   setLanguage(locale);
   for (const [reason, lives, titleKey, buttonKey, reasonKey] of [
@@ -189,6 +189,7 @@ for (const locale of ['en', 'de']) {
     assert.equal(elements.get('#play-again span').textContent, t(buttonKey, {level: buttonKey === 'nextLevel' ? 5 : 4}));
     assert.equal(elements.get('#round-reason').textContent, t(reasonKey));
   }
+  assert.equal(t('collisionWarning'), locale === 'en' ? 'COLLISION COURSE!' : 'KOLLISIONSKURS!');
   assert.equal(t('countdown', {seconds: 3}).includes('3'), true);
   assert.equal(t('powerLaserTitle').includes('3×'), true, 'Translations preserve the actual damage multiplier');
 }

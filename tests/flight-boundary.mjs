@@ -38,7 +38,7 @@ const makeGame = reducedMotion => new Function('THREE', 't', 'reducedMotion', `
   ${section('      function levelFlightSpeed(', '      const courseWorldOffset =')}
   ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
   ${section('      const shieldHud =', '      const repairMarker =')}
-  ${section('      const flightBoundaryNotice =', '      function collideWith(')}
+  ${section('      const flightBoundaryRadii =', '      function collideWith(')}
   resetFlightBoundary();
   function step(dt, steering = false) {
     if (!paused && !crashing && !roundEnded && started) { gameTime += dt; difficulty = Math.min(1, gameTime / roundDuration); }
@@ -50,7 +50,7 @@ const makeGame = reducedMotion => new Function('THREE', 't', 'reducedMotion', `
   }
   return {
     scene, camera, sounds, crashes, messages, target, flightMotion, flightOrientation, flightTurn, flightVelocity, flightViewOffset, courseWorldOffset, worldStep,
-    boundary: flightBoundary, radii: flightBoundaryRadii, notice: flightBoundaryNotice, normal: flightBoundaryNormal,
+    boundary: flightBoundary, radii: flightBoundaryRadii, normal: flightBoundaryNormal,
     uniforms: flightBoundaryMaterial.uniforms, reset: resetFlightBoundary, renderFeedback: renderFlightBoundaryFeedback,
     state: () => ({shield, shieldHitTime, time: gameTime, shake, speed, impactAt: flightBoundaryImpactAt, hud: document.querySelector('#shield-value').textContent}),
     configure(options) {
@@ -102,12 +102,11 @@ for (const reducedMotion of [false, true]) {
   assert.deepEqual(radii.toArray(), reducedMotion ? [600, 360] : [1800, 1100]);
   assert.equal(game.boundary.visible, false);
   game.flightMotion.set(0, 0, -400); game.step(.1);
-  assert.equal(game.boundary.visible, false); assert.equal(game.notice.hidden, true);
+  assert.equal(game.boundary.visible, false);
   assert.equal(game.state().shield, 100);
   const rx = radii.x - 26;
   game.flightMotion.set(rx / (.85 * 2), 0, -400); game.step(.1);
   assert.equal(game.boundary.visible, true, 'A projected collision two seconds away reveals the membrane');
-  assert.equal(game.notice.textContent, t('boundaryWarning'));
   assert.equal(game.state().shield, 100, 'A warning never damages the ship');
   assert.ok(Math.abs(uniforms.warningPoint.value.x - game.courseWorldOffset.x - radii.x) < 1e-8);
   assert.equal(uniforms.motion.value, reducedMotion ? 0 : 1);
@@ -137,9 +136,7 @@ for (const reducedMotion of [false, true]) {
 
   impact(game);
   assert.equal(game.state().shield, 90, 'One impact costs ten armor, not a continuous drain');
-  assert.equal(game.notice.textContent, t('boundaryContact'));
   assert.deepEqual(game.messages.at(-1), {message: '−10 SHIELD', negative: true});
-  assert.ok(game.notice.classList.contains('contact'));
   assert.equal(uniforms.contact.value, 1); assert.equal(uniforms.impactAge.value, 0);
   assert.ok(radius(game) < 1, 'The whole hull remains inside');
   assert.ok(game.flightMotion.x < 0 && game.flightOrientation.y > 0, 'Both velocity and heading point inward');
@@ -152,7 +149,7 @@ for (const reducedMotion of [false, true]) {
     'The ripple stays attached to the contacted surface, not the new heading or warning point');
   assert.ok(uniforms.contact.value < 1 && uniforms.contact.value > 0);
   separate(game, .72);
-  assert.equal(game.state().shield, 90); assert.equal(game.notice.hidden, true);
+  assert.equal(game.state().shield, 90);
   assert.equal(uniforms.contact.value, 0, 'The contact flash disappears within .75 seconds');
   assert.equal(game.boundary.visible, !reducedMotion, 'Travelling ripples remain visible after the contact glow and warning fade');
   game.step(.3); assert.equal(game.boundary.visible, false, 'All wavefronts expire in about 1.1 seconds');
@@ -196,7 +193,6 @@ for (const reducedMotion of [false, true]) {
   nearby.flightMotion.set(0, 0, -400);
   nearby.step(.2);
   assert.equal(nearby.boundary.visible, true, 'Show the wall before the old proximity threshold');
-  assert.equal(nearby.notice.hidden, false);
   assert.equal(nearby.state().shield, 100);
 
   const approach = makeGame(reducedMotion);
@@ -205,7 +201,6 @@ for (const reducedMotion of [false, true]) {
   approach.flightMotion.set(outward, 0, -400);
   approach.step(.1);
   assert.equal(approach.boundary.visible, true, 'Reveal a predicted contact before the original 2.5-second threshold');
-  assert.equal(approach.notice.hidden, false);
   assert.equal(approach.state().shield, 100);
 }
 console.log('PASS earlier proximity and predictive warnings without damage');
@@ -272,11 +267,11 @@ for (const reducedMotion of [false, true]) {
   assert.ok(game.courseWorldOffset.equals(offset)); assert.ok(game.flightMotion.equals(velocity));
   assert.ok(game.boundary.position.equals(position)); assert.equal(game.uniforms.phase.value, phase);
   assert.equal(game.uniforms.impactAge.value, age);
-  assert.equal(game.notice.hidden, true); assert.equal(game.boundary.visible, true);
+  assert.equal(game.boundary.visible, true);
   game.configure({paused: false}); separate(game, 1); game.configure({shield: 10}); impact(game);
   assert.equal(game.state().shield, 0); assert.equal(game.crashes.length, 1);
   assert.equal(game.crashes[0], game.boundary);
-  assert.equal(game.boundary.visible, false); assert.equal(game.notice.hidden, true);
+  assert.equal(game.boundary.visible, false);
   game.step(1); assert.equal(game.crashes.length, 1, 'Use the existing life-loss flow exactly once');
 
   const smooth = makeGame(reducedMotion);
@@ -321,7 +316,7 @@ for (const inactive of [{started: false}, {ended: true}, {crashing: true}]) {
   game.configure(inactive); game.step(5);
   assert.equal(game.state().shield, 100); assert.equal(game.crashes.length, 0);
   assert.ok(game.courseWorldOffset.equals(offset)); assert.ok(game.flightMotion.equals(velocity));
-  assert.equal(game.boundary.visible, false); assert.equal(game.notice.hidden, true);
+  assert.equal(game.boundary.visible, false);
 }
 assert.ok(source.includes('        resetFlightBoundary();'));
 assert.ok(source.includes('        updateFlightBoundary(dt);'));

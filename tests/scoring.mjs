@@ -17,16 +17,20 @@ function makeGame(storageBlocked = false) {
   return new Function('storageBlocked', 't', `
     let score = 0, best = 0, kills = 0, combo = 0, gameTime = 0, lastKill = -Infinity, roundEnded = false;
     const comboWindows = [0, 2.5, 1.8, 1.2, .8, .8], sounds = [], saved = [];
-    const classes = new Set();
-    const feedback = {textContent: '', classList: {add: key => classes.add(key), remove: key => classes.delete(key),
+    const classes = new Set(), feedbackValue = {textContent: ''}, feedbackDetail = {textContent: ''};
+    const feedback = {classList: {add: key => classes.add(key), remove: key => classes.delete(key),
       toggle: (key, value) => value ? classes.add(key) : classes.delete(key)}, offsetWidth: 0};
     ${feedbackCode}
     const localStorage = {setItem: (...args) => { if (storageBlocked) throw new Error('Blocked'); saved.push(args); }};
     const updateScore = () => {}, playSound = sound => sounds.push(sound);
     ${awardCode}
     return { award, time: value => { gameTime = value; }, end: () => { roundEnded = true; },
-      penalty: amount => showFeedback(t('shieldLost', { amount }), true), expire: () => { ${expireCode} },
-      state: () => ({score, best, kills, combo, lastKill, feedback: feedback.textContent, negative: classes.has('negative'),
+      penalty: amount => showFeedback(t('shieldLost', { amount }), true),
+      checkpoint: (passed, restored = 0) => showFeedback(passed
+        ? (restored > 0 ? t('repaired', {amount: restored}) : t('shieldFull')) + ' · ' + t('ringPassed') : t('ringMissed'), !passed),
+      expire: () => { ${expireCode} },
+      state: () => ({score, best, kills, combo, lastKill, value: feedbackValue.textContent, detail: feedbackDetail.textContent,
+        feedback: [feedbackValue.textContent, feedbackDetail.textContent].filter(Boolean).join(' · '), negative: classes.has('negative'),
         active: classes.has('pop'), until: feedbackUntil, sounds, saved}) };
   `)(storageBlocked, t);
 }
@@ -88,3 +92,29 @@ setLanguage('de'); penalties.penalty(12); assert.equal(penalties.state().feedbac
 assert.ok(source.includes('#feedback.negative { color: #ff7b86;'));
 assert.ok(source.includes("!feedback.classList.contains('negative') ? 'hidden' : 'visible'"), 'Danger warnings must not hide penalty feedback');
 console.log('PASS localized red penalty feedback, independent lifetime, unchanged score/combo, visible during danger and positive-color restoration');
+
+for (const locale of ['en', 'de']) {
+  setLanguage(locale);
+  const feedback = makeGame();
+  assert.equal(t('ringPassed'), 'CHECKPOINT', 'Keep checkpoint confirmation short in both languages');
+  assert.equal(t('shieldFull'), locale === 'de' ? '100% SCHILD' : '100% SHIELD');
+  for (const restored of [5, 3, 0]) {
+    feedback.checkpoint(true, restored);
+    assert.equal(feedback.state().value, restored ? t('repaired', {amount: restored}) : t('shieldFull'),
+      'Show actual repair or 100% shield as the main value—never checkpoint points');
+    assert.equal(feedback.state().detail, t('ringPassed'));
+    assert.equal(feedback.state().negative, false);
+  }
+  feedback.checkpoint(false);
+  assert.equal(feedback.state().value, t('shieldLost', {amount: 10}), 'Promote the damage amount even when the translation puts it last');
+  assert.ok(feedback.state().detail.includes('CHECKPOINT'));
+  assert.equal(feedback.state().negative, true);
+  feedback.penalty(25);
+  assert.equal(feedback.state().detail, '', 'A plain damage notification clears the previous context');
+  feedback.award(target(types[4]));
+  assert.equal(feedback.state().value, '+10000');
+  assert.equal(feedback.state().detail, types[4].name, 'Keep the complete ship name as secondary context');
+  assert.equal(feedback.state().negative, false);
+}
+setLanguage('en');
+console.log('PASS prominent reward/damage values, complete secondary context, localized checkpoint penalties and single-message replacement');

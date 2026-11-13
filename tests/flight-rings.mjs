@@ -62,6 +62,8 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
     configure(options) {
       if ('time' in options) gameTime = options.time;
       if ('shield' in options) shield = options.shield;
+      if ('score' in options) score = options.score;
+      if ('best' in options) best = options.best;
       if ('tutorialStage' in options) tutorialStage = options.tutorialStage;
       if ('paused' in options) paused = options.paused;
       if ('started' in options) started = options.started;
@@ -125,15 +127,15 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) {
   while (!game.sounds.length && game.state().time < 7) game.fly(1 / 60);
   assert.deepEqual(game.sounds, ['checkpoint']);
   assert.ok(Math.abs(game.state().time - 5) < .04, 'The opening checkpoint arrives after five seconds, with more time to read the instruction');
-  assert.equal(game.state().shield, 100); assert.equal(game.state().score, 100);
-  assert.deepEqual(game.messages.at(-1), {message: t('ringPassed'), negative: false}, 'Checkpoint points use the shared positive top feedback');
-  assert.equal(game.state().best, 100);
-  assert.equal(game.storage.get('sternflug-highscore'), '100');
+  assert.equal(game.state().shield, 100); assert.equal(game.state().score, 0, 'Checkpoints award no points');
+  assert.deepEqual(game.messages.at(-1), {message: `${t('shieldFull')} · ${t('ringPassed')}`, negative: false}, 'Full shield shows 100% instead of implying healing');
+  assert.equal(game.state().best, 0);
+  assert.equal(game.storage.size, 0, 'Checkpoint crossings do not write the highscore');
   assert.equal(game.rings[0].visible, false);
   assert.ok(game.rings[0].position.z >= game.camera.position.z, 'Passed ring stays behind, never reappears ahead');
   assert.equal(game.rings[0].scale.x, radius, 'The pulse must not change the opening');
 }
-console.log('PASS fixed full course at level start, deterministic placement, thick distant gates and +100 points/highscore on crossing');
+console.log('PASS fixed full course at level start, deterministic placement, thick distant gates and no score/highscore on crossing');
 
 function isolateGate(game, x = 0, z = -100, radius = 120) {
   game.rings.forEach(gate => { gate.visible = false; gate.userData.resolved = true; });
@@ -146,16 +148,19 @@ for (const reducedMotion of [false, true]) for (const kind of ['start', 'course'
   for (const initialShield of [40, 97, 100]) {
     const game = makeGame(reducedMotion), gate = isolateGate(game, 0, -10);
     gate.userData.kind = kind;
-    game.configure({shield: initialShield});
+    game.configure({shield: initialShield, score: 600, best: 600});
     game.flightMotion.set(0, 0, -200); game.move(.1);
     const restored = Math.min(5, 100 - initialShield);
     assert.equal(game.state().shield, initialShield + restored, 'Regular checkpoints restore up to five shield, capped at 100');
-    assert.equal(game.state().score, 100, 'Healing keeps the full checkpoint score');
+    assert.equal(game.state().score, 600, 'Healing leaves an existing score unchanged');
+    assert.equal(game.state().best, 600, 'Healing leaves an existing highscore unchanged');
+    assert.equal(game.storage.size, 0, 'Healing never writes the highscore');
     assert.deepEqual(game.messages.at(-1), {
-      message: t('ringPassed') + (restored ? ` · ${t('repaired', {amount: restored})}` : ''), negative: false
-    }, 'Show actual healing alongside checkpoint points; omit it at full shield');
+      message: `${restored ? t('repaired', {amount: restored}) : t('shieldFull')} · ${t('ringPassed')}`, negative: false
+    }, 'Show actual healing, including the final +3 to reach 100%, or full shield when already full');
     game.flightMotion.negate(); game.move(.2); game.flightMotion.negate(); game.move(.2);
     assert.equal(game.state().shield, initialShield + restored, 'Re-crossing cannot farm shield');
+    assert.equal(game.state().score, 600, 'Re-crossing also leaves the score unchanged');
     assert.equal(game.messages.length, 1);
   }
 }
@@ -167,7 +172,9 @@ for (const reducedMotion of [false, true]) {
   assert.equal(game.state().shield, 50, 'Tutorial misses still cost ten shield');
   isolateGate(game, 0, -10); game.move(.1);
   assert.equal(game.state().shield, 50, 'Passing the retried tutorial checkpoint must not heal');
-  assert.equal(game.state().score, 100);
+  assert.equal(game.state().score, 0, 'The tutorial checkpoint awards no points either');
+  assert.equal(game.state().best, 0);
+  assert.equal(game.storage.size, 0);
   assert.equal(game.messages.at(-1).message, t('ringPassed'));
 }
 console.log('PASS +5 checkpoint shield, cap and actual-heal feedback, no repeat healing and no tutorial healing');
@@ -202,7 +209,8 @@ for (const reducedMotion of [false, true]) {
   gate.position.z = -far - 100; game.updateFlightRing();
   assert.equal(gate.children[0].material.opacity, 0);
   game.flightMotion.set(0, 0, -(far + 200) / .85); game.move(1);
-  assert.equal(game.state().score, 200, 'A swept crossing still scores each gate, even if the previous frame was fully faded');
+  assert.deepEqual(game.sounds, ['checkpoint', 'checkpoint'], 'A swept crossing still passes each gate, even if the previous frame was fully faded');
+  assert.equal(game.state().score, 0);
 }
 console.log('PASS shared core/halo distance fade, no reset flash, dimmed later gates, fading direction guide, pause and unchanged crossing logic');
 
@@ -212,8 +220,8 @@ for (const fps of [5, 10, 30, 60, 144]) for (const offset of [0, 120, 121]) {
   game.flightMotion.set(400, 0, -400);
   for (let i = 0; i < Math.ceil(fps * .5); i++) game.move(1 / fps);
   assert.equal(game.state().shield, offset <= 120 ? 100 : 90, 'Interpolate the actual diagonal plane crossing');
-  assert.equal(game.state().score, offset <= 120 ? 100 : 0);
-  assert.equal(game.sounds.length, 1, 'Resolve only once, never farm a gate by reversing');
+  assert.equal(game.state().score, 0);
+  assert.deepEqual(game.sounds, [offset <= 120 ? 'checkpoint' : 'checkpointMiss'], 'Resolve the correct outcome only once');
   assert.equal(gate.visible, false);
   game.flightMotion.negate(); game.move(1); game.flightMotion.negate(); game.move(1);
   assert.equal(game.sounds.length, 1);
@@ -224,7 +232,9 @@ for (const yaw of [Math.PI / 2, Math.PI, -1.2]) {
   const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
   gate.position.applyQuaternion(rotation); gate.userData.normal.applyQuaternion(rotation);
   game.flightMotion.set(0, 0, -400).applyQuaternion(rotation);
-  game.move(.4); assert.equal(game.state().score, 100);
+  game.move(.4);
+  assert.deepEqual(game.sounds, ['checkpoint'], 'Rotated gates remain passable');
+  assert.equal(game.state().score, 0);
 }
 const lethal = makeGame(); lethal.configure({shield: 7}); isolateGate(lethal, 200, -1);
 lethal.flightMotion.set(0, 0, -200); lethal.move(1 / 60);
@@ -239,7 +249,7 @@ for (const reducedMotion of [false, true]) {
   assert.equal(game.sounds.length, 0);
   game.move(.1); assert.equal(gate.visible, false);
   assert.equal(gate.userData.passedAt, game.state().time, 'Successful crossings timestamp the ship-wave trigger');
-  assert.deepEqual(game.messages.at(-1), {message: t('ringPassed'), negative: false}, 'Keep successful checkpoint feedback at the top');
+  assert.deepEqual(game.messages.at(-1), {message: `${t('shieldFull')} · ${t('ringPassed')}`, negative: false}, 'Keep successful checkpoint feedback');
   assert.equal(Number(game.wash.style.opacity), reducedMotion ? .25 : 1);
   game.move(.2); assert.ok(Number(game.wash.style.opacity) > 0);
   game.move(.2); assert.equal(game.wash.style.opacity, '0');
@@ -314,7 +324,8 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) fo
   game.rings.slice(0, -1).forEach(gate => { gate.visible = false; gate.userData.resolved = true; });
   if (cruising) game.flightMotion.set(0, 0, -game.levelFlightSpeed(0));
   while (!finish.userData.resolved && game.state().time < 45) game.fly(1 / 60);
-  assert.equal(game.state().score, 100, 'The finish must be reachable before the level ends');
+  assert.deepEqual(game.sounds, ['checkpoint'], 'The finish must be reachable before the level ends');
+  assert.equal(game.state().score, 0);
   const remaining = 45 - game.state().time;
   assert.ok(remaining >= 4.5 && remaining <= 5.5,
     `Finish timing: reduced=${reducedMotion}, pressure=${pressure}, cruising=${cruising}, remaining=${remaining}`);
@@ -325,7 +336,7 @@ console.log('PASS final checkpoint with five seconds to spare at all cruise spee
 for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) for (const shape of [0, 1, 2]) {
   const game = makeGame(reducedMotion);
   game.configure({pressure, corridor: true, shape}); game.planAsteroidShower(); game.resetFlightRing();
-  const availablePoints = game.rings.filter(gate => gate.visible).length * 100;
+  const availableGates = game.rings.filter(gate => gate.visible).length;
   while (game.state().time < 45 && game.rings.some(gate => !gate.userData.resolved)) {
     const next = game.rings.find(gate => !gate.userData.resolved), delta = next.position.clone().sub(game.camera.position);
     const yaw = -Math.atan2(delta.x, -delta.z), pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
@@ -337,7 +348,8 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) fo
     );
     game.fly(1 / 60);
   }
-  assert.equal(game.state().score, availablePoints, `Entire course must be flyable: pressure=${pressure}, shape=${shape}, reduced=${reducedMotion}`);
+  assert.deepEqual(game.sounds, Array(availableGates).fill('checkpoint'), `Entire course must be flyable: pressure=${pressure}, shape=${shape}, reduced=${reducedMotion}`);
+  assert.equal(game.state().score, 0, 'Even an entire checkpoint course awards no score');
   assert.equal(game.state().shield, 100);
   assert.ok(45 - game.state().time >= 4 && 45 - game.state().time <= 5.5, 'Corridor routes also leave comfortable finish margin');
 }

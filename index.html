@@ -43,7 +43,9 @@
     #target.locked .target-brackets i { width: 18px; height: 18px; }
     @keyframes target-lock { 0%, 100% { transform: scale(1); } 50% { transform: scale(.9); } }
     @media (prefers-reduced-motion: reduce) { .target-brackets { inset: 0; } #target.locked .target-brackets { animation: none; } }
-    .hud { position: fixed; top: max(22px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; color: #e6f1ff; font-variant-numeric: tabular-nums; }
+    #flight-notices, #flight-alerts, #flight-messages, #action-feedback { display: contents; }
+    .hud { position: fixed; z-index: 3; top: max(22px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; color: #e6f1ff; font-variant-numeric: tabular-nums; }
+    .score-panel, .hud-right { position: relative; z-index: 2; }
     .scoreboard { display: grid; grid-template-columns: auto auto; gap: 10px 30px; padding: 16px 22px; border: 1px solid #a8caff25; border-radius: 18px; background: #091124b8; backdrop-filter: blur(16px); }
     .label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .22em; color: #8babc6; margin-bottom: 5px; }
     .number { font-size: 27px; font-weight: 650; letter-spacing: .03em; }
@@ -64,8 +66,6 @@
     #repair-marker { transform: translate(-50%, -50%); }
     #repair-notice { bottom: max(88px, calc(env(safe-area-inset-bottom) + 88px)); left: 50%; transform: translateX(-50%); }
     #repair-marker[hidden], #repair-notice[hidden] { display: none; }
-    #flight-boundary-notice { position: fixed; bottom: max(174px, calc(env(safe-area-inset-bottom) + 174px)); left: 50%; transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100% - 32px); text-align: center; pointer-events: none; color: #b4f7ff; background: #091629de; border: 1px solid #36dbff66; border-radius: 12px; padding: 7px 12px; font-size: 12px; letter-spacing: .05em; }
-    #flight-boundary-notice.contact { color: #ff938c; border-color: #ff493e99; }
     #flight-ring-wash { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, #6ef5ff29 0%, #33d9ff52 55%, #138dd499 100%); }
     #flight-ring-wash.missed { background: radial-gradient(ellipse at center, #ff493e14 0%, #ff493e33 55%, #c6233066 100%); }
     #flight-ring-guide { position: fixed; z-index: 3; color: #82efff; font-size: 30px; text-shadow: 0 0 14px #36dbff; pointer-events: none; }
@@ -95,7 +95,10 @@
     .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
     .hud-actions { display: flex; gap: 6px; pointer-events: auto; }
     .hud-actions button { background: #10172ca6; border: 1px solid #ffffff20; font-size: 21px; width: 42px; height: 42px; border-radius: 14px; }
-    #feedback { position: fixed; top: 25%; left: 50%; transform: translateX(-50%); color: #aaffdf; text-align: center; pointer-events: none; font-size: 24px; font-weight: 700; text-shadow: 0 0 25px #3bffc9; opacity: 0; }
+    #feedback { position: fixed; z-index: 2; top: 25%; left: 50%; transform: translateX(-50%); color: #aaffdf; text-align: center; pointer-events: none; font-size: 24px; font-weight: 700; text-shadow: 0 0 25px #3bffc9; opacity: 0; }
+    #feedback-value { display: block; font-weight: 800; }
+    #feedback-detail { display: block; margin-top: 3px; font-size: 13px; line-height: 1.3; }
+    #feedback-detail:empty { display: none; }
     #feedback.pop { animation: reward .9s ease-out; }
     #feedback.negative { color: #ff7b86; text-shadow: 0 0 25px #ff344f80; }
     @keyframes reward { 0% { opacity: 0; translate: 0 14px; } 15%, 65% { opacity: 1; } 100% { opacity: 0; translate: 0 -25px; } }
@@ -230,16 +233,26 @@
     #performance-hud { color: #a9bdce; font: 10px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; pointer-events: none; }
     #level-progress { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 4px; background: #93c7dc25; }
     #level-progress-fill { display: block; width: 100%; height: 100%; background: #7effd5; transform: scaleX(0); transform-origin: left; }
-    #time-left { grid-column: 3; color: #a9bfd0; font-size: 16px; }
+    #time-left { grid-column: 3; width: 88px; height: 24px; line-height: 24px; text-align: right; white-space: nowrap; color: #a9bfd0; font-size: 16px; }
     #level-label { color: #7effd5; letter-spacing: .03em; }
     #round-clock.urgent #time-left { color: #ffac73; }
+    #end-countdown { position: fixed; top: calc(20dvh + 4px); left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 4px; width: max-content; color: #7effd5; font-size: clamp(32px, 10dvh, 48px); font-weight: 800; line-height: 1; text-align: center; text-shadow: 0 0 22px #7effd566; pointer-events: none; }
+    /* Lower these without reflow; important HUD messages may cover them when space is tight. */
+    #end-countdown, #shower-warning { translate: 0 30px; z-index: 0; }
+    #countdown-number { display: block; width: 1.2em; }
+    .countdown-track { display: flex; align-items: center; gap: 4px; }
+    .countdown-track i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .countdown-track i.spent { opacity: .15; }
+    .countdown-track .icon { width: 16px; height: 16px; margin-left: 2px; }
+    .hud:has(#end-countdown:not([hidden])) #flight-state { display: none; }
     #round-end { margin: 0; padding: 0; }
     #round-end .intro-card { width: 100%; }
     #final-score { display: block; font-size: clamp(48px, 10vw, 80px); line-height: 1.2; font-weight: 800; color: #7effd5; font-variant-numeric: tabular-nums; }
     #round-end button { float: none; }
-    #round-end { position: fixed; z-index: 4; inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: min(340px, calc(100vw - 32px)); height: auto; max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid #7effd533; border-radius: 20px; background: #071629d9; pointer-events: none; }
+    #round-end { position: fixed; z-index: 4; inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: min(340px, calc(100vw - 32px)); height: auto; max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid #7effd533; border-radius: 20px; background: #071629d9; pointer-events: auto; }
     #round-end[open] { display: block; }
     #round-end .intro-card { padding: 20px; }
+    body #round-end, body #round-end * { touch-action: pan-y; }
     #round-end { --outcome-color: #7effd5; border-color: var(--outcome-color); }
     #round-end[data-outcome="retry"] { --outcome-color: #ffb15c; }
     #round-end[data-outcome="gameover"] { --outcome-color: #ff6470; }
@@ -254,13 +267,6 @@
     #round-end .retry-icons .spent::after { font-size: 36px; line-height: 34px; }
     #round-end #play-again { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 14px; min-height: 64px; height: auto; background: var(--outcome-color); letter-spacing: .06em; }
     #play-again .icon { width: 34px; height: 34px; flex-shrink: 0; }
-    #end-countdown { position: fixed; top: 26%; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none; text-align: center; color: #7effd5; }
-    #end-countdown[hidden] { display: none; }
-    #countdown-number { display: block; font-size: 48px; font-weight: 800; line-height: 1.1; text-shadow: 0 0 22px #7effd540; }
-    .countdown-track { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 8px; }
-    .countdown-track i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-    .countdown-track i.spent { opacity: .15; }
-    .countdown-track .icon { margin-left: 5px; width: 24px; height: 24px; }
     #success-burst { position: fixed; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; background: radial-gradient(ellipse, #7effd526, #ffd58c12 45%, transparent 75%); animation: victory-glow 1.4s ease-out both; }
     #success-burst[hidden] { display: none; }
     #success-burst::before { content: ''; position: absolute; left: 50%; top: 50%; width: min(65vw, 65vh); aspect-ratio: 1; border: 3px solid #7effd5; border-radius: 50%; animation: victory-ring 1.2s ease-out both; }
@@ -287,10 +293,9 @@
     @media (max-width: 450px) { .scoreboard { gap: 12px; } .scoreboard .number { font-size: 18px; } #best { font-size: 11px; } }
     #flight-path { position: fixed; left: 50%; top: 50%; width: 18px; height: 18px; border: 1px solid #d7edff99; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
     #flight-path::before { content: ''; position: absolute; top: 7px; left: -9px; width: 8px; height: 1px; background: #d7edff99; box-shadow: 25px 0 #d7edff99; }
-    #collision-alert { position: fixed; left: 50%; top: 183px; transform: translateX(-50%); padding: 10px 16px; border: 1px solid #ff997a77; border-radius: 12px; color: #ffd4b9; background: #351b20e8; font-size: 11px; letter-spacing: .12em; white-space: nowrap; pointer-events: none; }
-    @media (max-width: 600px) { #collision-alert { top: 208px; } }
+    #collision-alert { position: fixed; top: calc(50dvh + 64px); left: 50%; transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100vw - 24px); padding: 10px 16px; border: 1px solid #ff997a77; border-radius: 12px; color: #ffd4b9; background: #351b20e8; font-size: 11px; letter-spacing: .12em; text-align: center; pointer-events: none; }
+    .hud:has(#collision-alert:not([hidden])) #control-hints { visibility: hidden; }
     #danger-vignette { position: fixed; inset: 0; z-index: 2; background: #cd19183d; box-shadow: inset 0 0 125px #ef352b88; opacity: 0; pointer-events: none; transition: opacity .2s; }
-    #collision-alert, #impact-label { z-index: 3; }
     #danger-vignette.warning { animation: danger-pulse .84s ease-in-out infinite; }
     @keyframes danger-pulse { 0%, 100% { opacity: .25; } 50% { opacity: .8; } }
     #impact-label { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); color: #fff0d9; font-size: clamp(26px, 6vw, 50px); font-weight: 800; letter-spacing: .14em; text-shadow: 0 2px 25px #5b100a; pointer-events: none; }
@@ -347,7 +352,6 @@
     body.touch-device #capital-hud { bottom: calc(72px + env(safe-area-inset-bottom)); display: grid; gap: 2px; width: min(320px, calc(100vw - 24px)); padding: 5px 10px; border-radius: 8px; font-size: 9px; line-height: 12px; letter-spacing: 0; }
     body.touch-device #capital-health { display: block; height: 4px; margin: 0; }
     body.touch-device #capital-state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    body.touch-device #flight-boundary-notice { bottom: calc(366px + env(safe-area-inset-bottom)); }
     @media (orientation: landscape) and (max-height: 500px) {
       #touch-weapons { left: calc(32px + env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom)); }
       #touch-joystick { right: calc(32px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
@@ -356,10 +360,112 @@
       body.touch-device .hud-actions { flex-direction: row; }
       body.touch-device #capital-hud { width: min(320px, calc(100vw - 416px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
       body.touch-device #capital-hud strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      body.touch-device #flight-boundary-notice { bottom: calc(152px + env(safe-area-inset-bottom)); max-width: calc(100vw - 400px); }
     }
     body.touch-device #control-hints :is(#control-mouse, #control-cursor) { display: none; }
     body.touch-device #control-hints.space-key #control-input { min-width: 0; padding: 6px 10px; border: 0; background: #071629d9; box-shadow: none; }
+    @media (orientation: landscape) {
+      /* Center on the viewport; equal clearance on both sides keeps the HUD panels clear. */
+      body .hud { top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); }
+      #flight-notices, #action-feedback { position: fixed; left: 50%; width: max(0px, calc(100vw - 2 * var(--hud-clearance))); transform: translateX(-50%); }
+      body .hud-actions { flex-direction: row; }
+      #collision-alert { padding: 4px 8px; border-radius: 8px; font-size: 12px; line-height: 1.3; letter-spacing: .04em; }
+      .brand { display: none; }
+      #flight-notices { top: max(12px, env(safe-area-inset-top)); z-index: 1; display: grid; justify-items: center; gap: 4px; min-width: 0; }
+      #flight-alerts, #flight-messages { display: grid; justify-items: center; width: 100%; min-width: 0; }
+      #flight-notices :is(#shower-warning, #repair-notice, #control-hints, #flight-state) { position: static; inset: auto; transform: none; width: fit-content; min-width: 0; max-width: 100%; margin: 0; font-size: 12px; line-height: 1.3; letter-spacing: .04em; text-align: center; white-space: normal; overflow-wrap: anywhere; }
+      #flight-notices :is(#shower-warning, #repair-notice, #flight-state) { padding: 4px 8px; border-radius: 8px; }
+      #flight-notices #shower-warning span { display: inline; font-size: inherit; margin: 0; }
+      #flight-notices #shower-warning span[aria-hidden] { font-size: 16px; margin-right: 6px; }
+      #flight-notices #control-input { min-width: 0; max-width: 100%; }
+      /* The corridor takes priority over repair notices; collision warnings stay near the aim. */
+      #flight-alerts > :not([hidden]) ~ * { display: none; }
+      #flight-alerts:not(:has(> :not([hidden]))) { display: none; }
+      #flight-messages:not(:has(#control-hints:not([hidden]), #flight-state:not(:empty))) { display: none; }
+      #flight-messages:has(#control-hints:not([hidden])) #flight-state,
+      .hud:has(#feedback.pop) :is(#flight-state, #control-hints),
+      #flight-notices:has(#flight-alerts > :not([hidden])) :is(#flight-state, #control-hints) { display: none; }
+      /* Immediate feedback stays above the aiming area, independent of the HUD timer. */
+      #action-feedback { bottom: calc(50dvh + 32px); display: flex; justify-content: center; min-width: 0; z-index: 3; pointer-events: none; }
+      #action-feedback #feedback { position: static; inset: auto; transform: none; min-width: 0; width: max-content; max-width: min(420px, 100%); font-size: clamp(20px, 2.6vw, 28px); line-height: 1.2; overflow-wrap: anywhere; }
+      #action-feedback #feedback:not(.pop) { display: none; }
+      #action-feedback #feedback.pop { animation-name: action-reward; }
+      #action-feedback #feedback-detail { font-size: clamp(11px, 1.4vw, 13px); }
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      body .hud .scoreboard { padding: 8px 10px; gap: 6px 12px; border-radius: 12px; }
+      body .hud .scoreboard .label { font-size: 8px; margin-bottom: 3px; }
+      body .hud :is(#score, #level-label) { font-size: 20px; }
+      body .hud .personal-best { gap: 4px; margin-top: 4px; }
+      body .hud .personal-best .label { margin: 0; }
+      body .hud #best { font-size: 10px; }
+      body .hud #retry-hud { margin-top: 4px; }
+      body .hud #retry-hud .retry-icons span { width: 16px; font-size: 14px; line-height: 16px; }
+      body .hud #round-clock { gap: 5px; padding-top: 5px; }
+      body .hud #time-left { font-size: 13px; }
+      body .hud #level-progress { height: 3px; }
+      /* Keep the original vertical result card, with a little less height on short screens. */
+      body:has(#round-end[open]) :is(.score-panel, #flight-notices, #collision-alert, #action-feedback, #shield-hud) { visibility: hidden; }
+      #round-end { inset: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); margin: auto; transform: none; width: min(340px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))); height: fit-content; max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+      #round-end .intro-card { padding: 16px 20px; }
+      #round-end #round-symbol { width: 48px; height: 48px; margin: 0 auto 8px; }
+      #round-end #round-outcome { margin: 0; }
+      #round-end #round-title { margin: 4px 0 10px; font-size: 20px; line-height: 1.2; }
+      #round-end .label { margin-bottom: 2px; }
+      #round-end #final-score { font-size: 28px; }
+      #round-end #new-record { gap: 6px; margin: 8px 0; font-size: 10px; }
+      #round-end #new-record .icon { width: 20px; height: 20px; flex-shrink: 0; }
+      #round-end #retry-result { margin: 8px auto; }
+      #round-end .retry-icons span { width: 26px; font-size: 22px; line-height: 26px; }
+      #round-end .retry-icons .spent::after { font-size: 28px; line-height: 26px; }
+      #round-end #play-again { min-height: 48px; }
+      #round-end #play-again .icon { width: 26px; height: 26px; }
+    }
+    @media (orientation: landscape) and (max-height: 480px) {
+      body:has(#collision-alert:not([hidden])) #capital-hud { visibility: hidden; }
+    }
+    @media (orientation: landscape) and (max-height: 400px) {
+      #end-countdown { top: calc(20dvh + 8px); gap: 3px; }
+      .countdown-track { gap: 3px; }
+      .countdown-track i { width: 4px; height: 4px; }
+      .countdown-track .icon { width: 12px; height: 12px; }
+    }
+    @media (orientation: landscape) and (max-height: 360px) {
+      #collision-alert, #flight-notices #flight-alerts > * { font-size: 11px; letter-spacing: 0; }
+      #flight-notices #shower-warning span[aria-hidden] { display: none; }
+      #end-countdown { top: calc(20dvh + 2px); flex-direction: row; gap: 6px; font-size: 28px; }
+      #action-feedback { bottom: calc(50dvh + 20px); }
+      #round-end .intro-card { padding-block: 10px; }
+      #round-end #round-symbol { width: 32px; height: 32px; }
+    }
+    @media (orientation: landscape) and (max-width: 700px) {
+      body:has(#round-end[open]) .hud-actions { flex-direction: column; }
+    }
+    @media (orientation: landscape) and (min-width: 901px) and (min-height: 600px) {
+      /* Desktop keeps the larger, more spacious notices; touch layouts stay compact. */
+      body:not(.touch-device) .brand { display: block; }
+      /* Keep fixed tutorial coordinates relative to the viewport, not this rail. */
+      body:not(.touch-device) #flight-notices { top: 10dvh; left: 0; right: 0; margin-inline: auto; transform: none; }
+      body:not(.touch-device) #flight-notices #flight-messages #control-hints { display: flex; position: fixed; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px); }
+      body:not(.touch-device) #control-hints.space-key #control-input { min-width: 170px; }
+      body:not(.touch-device) #collision-alert,
+      body:not(.touch-device) #flight-notices :is(#repair-notice, #flight-state) { padding: 10px 16px; border-radius: 12px; font-size: 16px; letter-spacing: .08em; }
+      /* The 10vh notice rail + 11vh offset keeps the original shower anchor, now 15px lower. */
+      body:not(.touch-device) #flight-notices #shower-warning { translate: 0 calc(11dvh + 15px); padding: 10px 16px; border-radius: 16px; font-size: 12px; line-height: 1.15; }
+      body:not(.touch-device) #flight-notices #shower-warning span { display: block; font-size: inherit; margin: 0; }
+      body:not(.touch-device) #flight-notices #shower-warning span[aria-hidden] { font-size: 28px; margin-bottom: 4px; }
+      body:not(.touch-device) #end-countdown { top: 24dvh; transform: translateX(-50%); gap: 8px; font-size: clamp(36px, 6dvh, 48px); }
+      body:not(.touch-device) .countdown-track { gap: 7px; }
+      body:not(.touch-device) .countdown-track i { width: 7px; height: 7px; }
+      body:not(.touch-device) .countdown-track .icon { width: 24px; height: 24px; margin-left: 5px; }
+      body:not(.touch-device) #action-feedback { top: calc(25dvh + 45px); bottom: auto; }
+      body:not(.touch-device) #action-feedback #feedback { max-width: 100%; font-size: 40px; font-weight: 700; }
+      body:not(.touch-device) #action-feedback #feedback-detail { font-size: 20px; }
+      @media (prefers-reduced-motion: no-preference) {
+        body:not(.touch-device) #action-feedback #feedback.pop { animation-name: reward; }
+      }
+    }
+    @keyframes action-reward { 0% { opacity: 0; scale: .94; } 15%, 65% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 1; } }
+    @media (prefers-reduced-motion: reduce) { #action-feedback #feedback.pop { animation: none; opacity: 1; } }
   </style>
 </head>
 <body>
@@ -403,10 +509,6 @@
     </div>
   </section>
   <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
-  <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
-    <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
-    <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS LENKEN</span></span>
-  </aside>
   <div id="touch-controls" hidden>
     <div id="touch-weapons">
       <button id="touch-laser" type="button" data-i18n-aria-label="touchLaser" aria-label="Normalen Laser gedrückt halten">
@@ -420,8 +522,6 @@
     </div>
     <div id="touch-joystick" role="group" data-i18n-aria-label="touchSteering" aria-label="Joystick zum Lenken und Zielen"><span class="joystick-knob" aria-hidden="true"></span></div>
   </div>
-  <div id="flight-state"></div>
-  <div id="end-countdown" role="timer" data-i18n-aria-label="levelEnding" aria-label="Level endet bald" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
   <div id="success-burst" hidden aria-hidden="true"><span style="--dx:-40vw;--dy:-30vh">✦</span><span style="--dx:-22vw;--dy:-42vh">✦</span><span style="--dx:22vw;--dy:-42vh">✦</span><span style="--dx:40vw;--dy:-30vh">✦</span><span style="--dx:44vw;--dy:5vh">✦</span><span style="--dx:35vw;--dy:35vh">✦</span><span style="--dx:18vw;--dy:43vh">✦</span><span style="--dx:-18vw;--dy:43vh">✦</span><span style="--dx:-35vw;--dy:35vh">✦</span><span style="--dx:-44vw;--dy:5vh">✦</span></div>
   <dialog id="pause-menu" aria-labelledby="pause-title">
     <svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>
@@ -445,8 +545,6 @@
   </dialog>
   <div id="flight-path" hidden aria-hidden="true"></div>
   <div id="danger-vignette" aria-hidden="true"></div>
-  <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span><span data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span></div>
-  <div id="collision-alert" data-i18n="collisionWarning" hidden role="status">⚠ KOLLISIONSKURS · AUSWEICHEN!</div>
   <div id="capital-hud" hidden><strong>LEVIATHAN DREADNOUGHT</strong><progress id="capital-health" max="60" value="60" data-i18n-aria-label="capitalArmor" aria-label="Panzerung des Leviathan"></progress><span id="capital-state"></span></div>
   <div id="shield-hit" hidden aria-hidden="true"></div>
   <canvas id="crash-fire" hidden aria-hidden="true"></canvas>
@@ -473,6 +571,24 @@
       <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Verbleibende Spielzeit"><span class="label" data-i18n="time">Zeit</span><span id="performance-hud" aria-live="off" hidden data-i18n-title="frameStats" title="Gerenderte Bilder pro Sekunde und mittlere Framezeit, gemittelt über etwa eine Sekunde. Keine Simulationsrate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Levelfortschritt" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
     </div>
     </div>
+    <div id="flight-notices">
+      <div id="flight-alerts">
+        <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span><span data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span></div>
+        <div id="repair-notice" hidden role="status"></div>
+      </div>
+      <div id="flight-messages">
+        <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
+          <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
+          <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS LENKEN</span></span>
+        </aside>
+        <div id="flight-state"></div>
+      </div>
+    </div>
+    <div id="collision-alert" data-i18n="collisionWarning" hidden role="status" aria-atomic="true">KOLLISIONSKURS!</div>
+    <div id="end-countdown" role="timer" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
+    <div id="action-feedback">
+      <div id="feedback" aria-live="polite" aria-atomic="true"><strong id="feedback-value"></strong> <span id="feedback-detail"></span></div>
+    </div>
     <div class="hud-right">
       <div class="hud-actions" role="group" data-i18n-aria-label="gameControls" aria-label="Ton und Spielsteuerung">
         <button id="sound" data-i18n-aria-label="soundOff" aria-label="Ton ausschalten" data-i18n-title="soundOff" title="Ton ausschalten" aria-pressed="true"><svg class="icon audible" aria-hidden="true"><use href="#i-volume"/></svg><svg class="icon muted" aria-hidden="true"><use href="#i-muted"/></svg></button>
@@ -483,11 +599,8 @@
   </header>
   <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Schiffsschild"></progress><span id="shield-track" aria-hidden="true"><span id="shield-fill"></span></span><span id="shield-value" aria-hidden="true">100%</span></div>
   <div id="repair-marker" hidden data-i18n-aria-label="collectRepair" aria-label="Schildreparatur einsammeln">✚ +25</div>
-  <div id="repair-notice" hidden role="status"></div>
-  <div id="flight-boundary-notice" hidden role="status"></div>
   <div id="flight-ring-wash" aria-hidden="true"></div>
   <div id="flight-ring-guide" hidden aria-hidden="true">➤</div>
-  <div id="feedback" aria-live="polite"></div>
   <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio-Credits</a>
   <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><strong data-i18n="creditsEffects">Soundeffekte</strong></p><ul><li><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li><li><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Teilweise bearbeitet.</span></li></ul><p><strong data-i18n="creditsMusic">Musik</strong></p><ul><li><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li></ul></dialog>
   <div id="status" role="status"></div>
@@ -500,7 +613,7 @@
     <textarea id="render-report" readonly spellcheck="false" data-i18n-aria-label="diagnosticsReport" aria-label="Diagnosebericht zum Darstellungsfehler"></textarea>
   </dialog>
   <script type="module">
-    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=11';
+    import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=14';
     import { createTouchControls } from './touch-controls.js?v=8';
     import { createRenderDiagnostics } from './render-diagnostics.js?v=1';
     // Keep this helper with the entry point: the original PWA worker may still
@@ -558,6 +671,16 @@
     languagePicker.querySelector(`input[value="${language}"]`).checked = true;
     languagePicker.setAttribute('data-ready', '');
     const status = document.querySelector('#status');
+    const hud = document.querySelector('.hud'), scorePanel = document.querySelector('.score-panel'), hudActions = document.querySelector('.hud-actions');
+    function updateHudClearance() {
+      const left = scorePanel.getBoundingClientRect().right;
+      const right = innerWidth - hudActions.getBoundingClientRect().left;
+      hud.style.setProperty('--hud-clearance', `${Math.ceil(Math.max(left, right) + 12)}px`);
+    }
+    // Recalculate only when viewport, localized content or button visibility changes, not each frame.
+    const hudResizeObserver = new ResizeObserver(updateHudClearance);
+    for (const element of [hud, scorePanel, hudActions]) hudResizeObserver.observe(element);
+    updateHudClearance();
     let getRenderState = () => ({ phase: 'loading' });
     let stopRendering = () => {};
     let renderPhase = 'initializing';
@@ -2646,13 +2769,8 @@
             updateShield();
           }
           if (gate.userData.kind === 'start') completeTutorialStep('checkpoint');
-          score += 100;
-          if (score > best) {
-            best = score;
-            try { localStorage.setItem('sternflug-highscore', String(best)); } catch {}
-          }
-          updateScore();
-          showFeedback(t('ringPassed') + (restored > 0 ? ` · ${t('repaired', { amount: restored })}` : ''));
+          const reward = restored > 0 ? t('repaired', { amount: restored }) : shield === 100 ? t('shieldFull') : '';
+          showFeedback((reward ? `${reward} · ` : '') + t('ringPassed'));
           playSound('checkpoint');
         } else {
           if (tutorialStage === 0) tutorialRetryAt = gameTime + 1.2;
@@ -2819,7 +2937,6 @@
         data.courseUp.set(0, 1, 0).applyQuaternion(data.baseRotation);
         updateEngineThrust(ship, previousSpeed, dt);
       }
-      const flightBoundaryNotice = document.querySelector('#flight-boundary-notice');
       const flightBoundaryRadii = new THREE.Vector2(reducedMotion ? 600 : 1800, reducedMotion ? 360 : 1100);
       const flightBoundaryOrigin = new THREE.Vector3(), flightBoundaryPrevious = new THREE.Vector3();
       const flightBoundaryLocal = new THREE.Vector3(), flightBoundaryAim = new THREE.Vector3();
@@ -2920,11 +3037,9 @@
         uniforms.gridOffset.value = 0;
         flightBoundaryDamageAt = 0; flightBoundaryImpactAt = -Infinity; flightBoundaryTouching = false;
         flightBoundaryImpact.set(0, 0, 0); flightViewOffset.set(0, 0);
-        flightBoundary.visible = false; flightBoundaryNotice.hidden = true;
-        flightBoundaryNotice.classList.remove('contact');
+        flightBoundary.visible = false;
       }
       function renderFlightBoundaryFeedback() {
-        if (!started || paused || roundEnded || crashing) flightBoundaryNotice.hidden = true;
         if (!started || roundEnded || crashing) flightBoundary.visible = false;
       }
       const shipBoundaryBounds = new THREE.Box3(), shipBoundaryLocal = new THREE.Vector3();
@@ -3022,7 +3137,6 @@
         shield = Math.max(0, shield - 10); updateShield();
         showFeedback(t('shieldLost', { amount: 10 }), true);
         if (shield === 0) {
-          flightBoundaryNotice.hidden = true;
           startCrash(flightBoundary);
           return;
         }
@@ -3033,10 +3147,10 @@
       }
       function updateFlightBoundary(dt) {
         if (!started || roundEnded || crashing) {
-          flightBoundary.visible = false; flightBoundaryNotice.hidden = true;
+          flightBoundary.visible = false;
           return;
         }
-        if (paused) { flightBoundaryNotice.hidden = true; return; }
+        if (paused) return;
         if (dt <= 0) return;
         flightBoundary.position.copy(flightBoundaryOrigin).add(courseWorldOffset);
         // Recenter only the open tube's geometry; its cells and impact points remain world-anchored.
@@ -3067,11 +3181,6 @@
         if (aimRadius > 1e-8) { flightBoundaryAim.x /= aimRadius; flightBoundaryAim.y /= aimRadius; }
         uniforms.warningPoint.value.copy(flightBoundaryAim).add(flightBoundaryOrigin).add(courseWorldOffset);
         flightBoundary.visible = uniforms.strength.value > .005 || contact > .005 || (!reducedMotion && impactAge < 1.1);
-        flightBoundaryNotice.hidden = intensity < .03;
-        const touching = contact > .05;
-        const message = t(touching ? 'boundaryContact' : 'boundaryWarning');
-        if (flightBoundaryNotice.textContent !== message) flightBoundaryNotice.textContent = message;
-        flightBoundaryNotice.classList.toggle('contact', touching);
       }
       function collideWith(object) {
         if (paused || roundEnded || crashing || object.userData.collisionHandled) return;
@@ -3110,9 +3219,15 @@
       let bestAtLevelStart = best;
       const bestLabel = document.querySelector('#best');
       const feedback = document.querySelector('#feedback');
+      const feedbackValue = document.querySelector('#feedback-value'), feedbackDetail = document.querySelector('#feedback-detail');
       let feedbackUntil = 0;
       function showFeedback(message, negative = false) {
-        feedback.textContent = message;
+        // Make the amount prominent, even when localized checkpoint penalties put it last.
+        const parts = message.split(' · ');
+        const amountIndex = parts.findIndex(part => /^[+−]\d/.test(part));
+        if (amountIndex > 0) parts.unshift(...parts.splice(amountIndex, 1));
+        feedbackValue.textContent = parts.shift();
+        feedbackDetail.textContent = parts.join(' · ');
         feedbackUntil = gameTime + 1.2;
         feedback.classList.toggle('negative', negative);
         feedback.classList.remove('pop');
@@ -3293,23 +3408,26 @@
       const clock = document.querySelector('#round-clock');
       const levelProgress = document.querySelector('#level-progress');
       const levelProgressFill = document.querySelector('#level-progress-fill');
+      const timeLeft = document.querySelector('#time-left');
       const endCountdown = document.querySelector('#end-countdown');
+      const countdownNumber = document.querySelector('#countdown-number'), countdownDots = document.querySelectorAll('.countdown-track i');
       let lastCountdownSecond = null;
       function updateClock() {
         const elapsed = tutorialStage < 3 ? 0 : Math.min(roundDuration, Math.max(0, gameTime - courseStartTime));
         const remaining = Math.ceil(roundDuration - elapsed);
-        document.querySelector('#time-left').textContent = tutorialStage < 3 ? t('training')
+        const countingDown = started && tutorialStage >= 3 && !crashing && !roundEnded && remaining > 0 && remaining <= 5;
+        timeLeft.textContent = tutorialStage < 3 ? t('training')
           : `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+        timeLeft.setAttribute('aria-label', timeLeft.textContent);
         document.querySelector('#level-label').textContent = String(level);
         clock.classList.toggle('urgent', remaining <= roundDuration / 3 && !celebrating);
-        const countingDown = started && !paused && !crashing && !roundEnded && remaining > 0 && remaining <= 5;
         endCountdown.hidden = !countingDown;
         if (countingDown) {
-          document.querySelector('#countdown-number').textContent = remaining;
+          countdownNumber.textContent = String(remaining);
+          countdownDots.forEach((dot, index) => dot.classList.toggle('spent', index < 5 - remaining));
           endCountdown.setAttribute('aria-label', t('countdown', { seconds: remaining }));
-          endCountdown.querySelectorAll('i').forEach((dot, index) => dot.classList.toggle('spent', index < 5 - remaining));
-          if (remaining !== lastCountdownSecond) sound.playCountdownTick();
         }
+        if (countingDown && !paused && remaining !== lastCountdownSecond) sound.playCountdownTick();
         lastCountdownSecond = remaining;
         levelProgressFill.style.transform = `scaleX(${elapsed / roundDuration})`;
         levelProgress.setAttribute('aria-valuenow', elapsed.toFixed(1));
@@ -3333,9 +3451,9 @@
         ship.visible = false;
         clearEnemyBolts();
         capitalHud.hidden = true;
-        collisionAlert.hidden = true;
         flightPath.hidden = true;
-        endCountdown.hidden = true;
+        collisionAlert.hidden = true;
+        updateClock();
         feedback.classList.remove('pop');
         clearTargetLock();
         document.querySelector('#impact-label').textContent = t(ship.userData.flightRing ? 'shieldDepleted' : ship.userData.enemyBolt ? 'incomingFire' : 'collision');
@@ -3368,8 +3486,8 @@
           : t('nextLevel', { level: level + 1 });
         document.querySelector('#round-reason').textContent = t(crashed
           ? (retries > 0 ? 'retryReason' : 'gameOverReason') : 'victoryReason');
-        collisionAlert.hidden = true;
         flightPath.hidden = true;
+        collisionAlert.hidden = true;
         dangerVignette.style.opacity = 0;
         dangerVignette.classList.remove('warning');
         sound.setAlarm(false);
@@ -3462,7 +3580,8 @@
         flightMotion.set(0, 0, 0);
         flightDirection.set(0, 0, -1); flightOrientation.set(0, 0, 0, 'YXZ');
         worldStep.set(0, 0, 0);
-        collisionAlert.hidden = true; dangerVignette.style.opacity = 0;
+        collisionAlert.hidden = true;
+        dangerVignette.style.opacity = 0;
         dangerVignette.classList.remove('warning');
         crashing = false; crashTime = 0; sound.setAlarm(false);
         crashFire.hidden = true;
@@ -3765,6 +3884,9 @@
         const top = !touchMode && y + 64 + height <= innerHeight - 12 ? y + 64 : y - 64 - height;
         controlHints.style.left = `${Math.max(12 + width / 2, Math.min(innerWidth - 12 - width / 2, x))}px`;
         controlHints.style.top = `${Math.max(12, top)}px`;
+      }
+      function updateCollisionAlert() {
+        collisionAlert.hidden = !started || !danger || paused || crashing || roundEnded;
       }
       function fireRocket(manualAttempt = false, heavy = false) {
         const now = gameTime * 1000;
@@ -4163,7 +4285,7 @@
         updateWeaponHud();
         syncFullscreen();
       });
-      let danger = false, incomingFire = false;
+      let danger = false;
       function updateSimulation(dt) {
         if (!started) {
           if (!reducedMotion && !document.hidden) introTime += dt;
@@ -4294,7 +4416,7 @@
             return crossesPlayer(p.object, p.object.position, future, 3);
           });
         }
-        incomingFire = updateEnemyBolts(dt);
+        const incomingFire = updateEnemyBolts(dt);
         if (tutorialStage === 3) updateRepairPickup(dt);
         updateFlightRing();
         updateFlightBoundary(dt);
@@ -4503,8 +4625,7 @@
         reticle.classList.toggle('hit', hitMarker > 0);
         document.querySelector('#flash').style.opacity = flash;
         sound.updateEngine(speed);
-        collisionAlert.textContent = t(incomingFire ? 'incomingWarning' : 'collisionWarning');
-        collisionAlert.hidden = !danger || paused || roundEnded;
+        updateCollisionAlert();
         feedback.style.visibility = danger && !paused && !roundEnded && !feedback.classList.contains('negative') ? 'hidden' : 'visible';
         dangerVignette.classList.toggle('warning', danger && !paused && !roundEnded);
         dangerVignette.style.opacity = crashing ? (reducedMotion ? .35 : .7) : danger && !paused && !roundEnded ? .4 : 0;
