@@ -90,7 +90,8 @@ for (const locale of ['en', 'de']) {
   assert.equal(document.querySelector('#start-label').textContent, messages[locale].loadingSpace);
   assert.equal(document.querySelector('#effects').attributes['aria-label'], messages[locale].controls);
 }
-assert.ok(source.includes('data-i18n="creditsEffectsChanges"') && source.includes('data-i18n="creditsComboChanges"'));
+assert.ok(source.includes('data-i18n="creditsComboChanges"'));
+assert.ok(!source.includes('data-i18n="creditsEffectsChanges"') && !source.includes('data-i18n="creditsMusicChanges"'));
 console.log('PASS translated static text, accessibility labels, tooltips, document language and preserved credits links');
 
 function makeLanguagePicker(browserLanguage, fallbackLanguage = 'en-US') {

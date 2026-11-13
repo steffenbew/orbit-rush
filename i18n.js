@@ -92,12 +92,9 @@ export const messages = {
     finalSprint: 'HYPERSPEED · FINAL STRETCH',
     audioCredits: 'Audio credits',
     close: 'Close',
-    creditsEffects: 'Lasers, empty-magazine clicks, hits, outer-shield contacts, checkpoint passes and explosions: ',
-    creditsEffectsChanges: '. Converted to MP3 and volume-matched; variable pitch in-game. The empty-magazine click is a short, filtered WAV excerpt with a softened tail and fixed pitch. Outer-shield contacts and checkpoint passes use separate WAV-converted samples with fixed pitch; glancing and hard contacts share one sample at different volumes.',
-    creditsCombo: 'GO, checkpoint-miss and combo sounds and collision alarm: ',
-    creditsComboChanges: '. Combo file unchanged. Checkpoint-miss sample converted to WAV and volume-matched, with fixed pitch. Alarm shortened, pitched down, treble reduced and mixed quieter; cut edges smoothed briefly.',
-    creditsMusic: 'Music: ',
-    creditsMusicChanges: ' (volume-matched, treble slightly reduced), '
+    creditsEffects: 'Sound effects',
+    creditsComboChanges: '. Some sounds modified.',
+    creditsMusic: 'Music'
   },
   de: {
     language: 'Sprache',
@@ -191,12 +188,9 @@ export const messages = {
     finalSprint: 'HYPERSPEED · ENDSPURT',
     audioCredits: 'Audio-Credits',
     close: 'Schließen',
-    creditsEffects: 'Laser, Leermagazin-Klick, Treffer, Außenwandkontakte, Checkpoint-Durchflüge und Explosionen: ',
-    creditsEffectsChanges: '. Nach MP3 konvertiert und Lautstärke angeglichen; variable Tonhöhe im Spiel. Leermagazin-Klick als kurzer, gefilterter WAV-Ausschnitt mit gedämpftem Ausklang und fester Tonhöhe. Außenwandkontakte und Checkpoint-Durchflüge verwenden getrennte WAV-Samples mit fester Tonhöhe; streifende und harte Kontakte teilen sich ein Sample bei unterschiedlicher Lautstärke.',
-    creditsCombo: 'LOS!-, Checkpoint-Fehlton, Combo-Sound und Kollisionsalarm: ',
-    creditsComboChanges: '. Combo-Datei unverändert. Checkpoint-Fehlton nach WAV konvertiert, Lautstärke angeglichen, feste Tonhöhe. Alarm gekürzt, tiefer gestimmt, höhengedämpft und leiser gemischt; kurze Glättung der Schnittkanten.',
-    creditsMusic: 'Musik: ',
-    creditsMusicChanges: ' (Lautstärke angeglichen, Höhen leicht abgesenkt), '
+    creditsEffects: 'Soundeffekte',
+    creditsComboChanges: '. Teilweise bearbeitet.',
+    creditsMusic: 'Musik'
   }
 };
 
