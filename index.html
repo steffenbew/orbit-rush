@@ -1550,7 +1550,7 @@
           const size = showerCorridor ? 4 + Math.pow(Math.random(), 3) * (maxShowerGritSize - 4) : random(.6, 2);
           const depth = random(-showerLength, 0);
           const x = showerCorridor ? corridorRockX() : random(-showerHalfWidth, showerHalfWidth);
-          // Solid ring layers stay outside the flight gap; only shootable hazards enter it.
+          // Wall rocks stay outside the flight gap; individual hazards also enter the passage.
           const clearance = size * 1.7 * (1 + corridorSlope());
           transform.position.set(x, showerCorridor
             ? corridorCenter(-depth) + side * (showerHalfGap + clearance + random(6, 65 + corridorFringe(x) * 100))
@@ -1559,7 +1559,8 @@
           transform.scale.set(size, size * random(.4, .9), size * random(1, 1.7));
           transform.updateMatrix();
           showerGrit.setMatrixAt(i, transform.matrix);
-          const rock = { index: i, position: transform.position.clone(), seen: false, hit: false };
+          const rock = { index: i, position: transform.position.clone(), seen: false, hit: false,
+            health: size < 10 ? 1 : size < 18 ? 2 : 3, destroyed: false };
           showerRocks.push(rock);
           const key = `${Math.floor(rock.position.x / 128)},${Math.floor(rock.position.y / 128)},${Math.floor(rock.position.z / 128)}`;
           if (!showerRockCells.has(key)) showerRockCells.set(key, []);
@@ -1621,6 +1622,56 @@
         showerRockCollider.userData.instanceIndex = rock.index;
         return showerRockCollider;
       }
+      const showerLaserRay = new THREE.Ray(), showerLaserPoint = new THREE.Vector3();
+      const showerLaserFrom = new THREE.Vector3(), showerLaserTo = new THREE.Vector3();
+      const showerLaserImpact = new THREE.Vector3(), showerLaserInverseMatrix = new THREE.Matrix4();
+      const showerHiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+      function findShowerLaserHit(from, to, maxDistance = Infinity) {
+        if (!started || paused || roundEnded || crashing || !showerCorridor || !showerGrit.visible
+          || showerGritMaterial.opacity < .25) return null;
+        showerInverse.copy(showerRotation).invert();
+        showerLaserFrom.copy(from).sub(showerOrigin).applyQuaternion(showerInverse);
+        showerLaserTo.copy(to).sub(showerOrigin).applyQuaternion(showerInverse);
+        let nearest = Math.min(from.distanceTo(to), maxDistance), hit = null;
+        if (nearest <= 0) return null;
+        showerLaserTo.sub(showerLaserFrom).normalize().multiplyScalar(nearest).add(showerLaserFrom);
+        for (const rock of nearbyShowerRocks(showerLaserFrom, showerLaserTo, maxShowerGritSize * 1.7)) {
+          if (rock.destroyed) continue;
+          showerGrit.getMatrixAt(rock.index, showerInstanceMatrix);
+          showerLaserInverseMatrix.copy(showerInstanceMatrix).invert();
+          showerLaserRay.origin.copy(showerLaserFrom).applyMatrix4(showerLaserInverseMatrix);
+          showerLaserRay.direction.subVectors(showerLaserTo, showerLaserFrom)
+            .transformDirection(showerLaserInverseMatrix);
+          // Reuse the base triangles and scratch vectors; no per-rock meshes or raycaster scan.
+          for (const triangle of showerBaseTriangles) {
+            if (!showerLaserRay.intersectTriangle(triangle.a, triangle.b, triangle.c, false, showerLaserPoint)) continue;
+            showerLaserPoint.applyMatrix4(showerInstanceMatrix);
+            const distance = showerLaserPoint.distanceTo(showerLaserFrom);
+            if (distance >= nearest) continue;
+            nearest = distance; hit = rock;
+            showerLaserImpact.copy(showerLaserPoint).applyQuaternion(showerRotation).add(showerOrigin);
+          }
+        }
+        return hit;
+      }
+      function damageShowerRock(rock, damage) {
+        if (rock.destroyed) return;
+        rock.health -= damage;
+        hitMarker = .16;
+        if (rock.health <= 0) {
+          const collider = prepareShowerRock(rock);
+          collider.userData.asteroidTier = 1; // Wall rubble gives the small-asteroid reward.
+          rock.destroyed = true;
+          showerGrit.setMatrixAt(rock.index, showerHiddenMatrix);
+          showerGrit.instanceMatrix.needsUpdate = true;
+          award(collider);
+          playSound('explosion', 1);
+          explode(showerLaserImpact, 16, false, true, .4, false);
+        } else {
+          playSound('hit');
+          explode(showerLaserImpact, 6, false, true, .2, false);
+        }
+      }
       function recordVisibleShowerRocks() {
         if (!showerGrit.visible || showerGritMaterial.opacity < .25) return;
         showerInverse.copy(showerRotation).invert();
@@ -1630,7 +1681,7 @@
         const reach = Math.max(350, relativeSpeed * .3 + playerHullRadius);
         showerGrit.updateMatrixWorld(true);
         for (const rock of nearbyShowerRocks(showerQueryStart, showerQueryStart, reach)) {
-          if (rock.seen) continue;
+          if (rock.seen || rock.destroyed) continue;
           showerGrit.getMatrixAt(rock.index, showerInstanceMatrix);
           showerWorldMatrix.multiplyMatrices(showerGrit.matrixWorld, showerInstanceMatrix);
           if (viewFrustum.intersectsBox(visibleBox.copy(showerGrit.geometry.boundingBox).applyMatrix4(showerWorldMatrix))) rock.seen = true;
@@ -1645,7 +1696,7 @@
         let danger = false, damaged = false;
         // Include the largest stretched boulder, even if its center is outside the flight path.
         for (const rock of nearbyShowerRocks(showerQueryStart, showerQueryEnd, playerHullRadius + maxShowerGritSize * 1.7 + 8)) {
-          if (!rock.seen || rock.hit) continue;
+          if (!rock.seen || rock.hit || rock.destroyed) continue;
           const collider = prepareShowerRock(rock);
           showerRockPrevious.copy(collider.position).add(showerPreviousOrigin).sub(showerOrigin);
           if (!damaged && crossesPlayer(collider, showerRockPrevious, collider.position)) {
@@ -3891,7 +3942,7 @@
           const closest = new THREE.Vector3();
           rocketRay.set(previous, rocket.object.position.clone().sub(previous).normalize());
           rocketRay.far = previous.distanceTo(rocket.object.position);
-          const hit = ships.find(ship => {
+          let hit = ships.find(ship => {
             if (!ship.visible) return false;
             path.closestPointToPoint(ship.position, true, closest);
             if (closest.distanceTo(ship.position) >= ship.userData.type.radius * ship.scale.x + rocket.radius) return false;
@@ -3900,6 +3951,21 @@
             ship.updateMatrixWorld(true);
             return rocketRay.intersectObjects(ship.children.filter(part => part.isMesh), false).length > 0;
           });
+          // A wall in front of a ship absorbs the laser; do not shoot through solid corridor rocks.
+          let shipDistance = Infinity;
+          if (hit !== undefined) {
+            const sphere = new THREE.Sphere(hit.position, hit.userData.type.radius * hit.scale.x + rocket.radius);
+            const entry = rocketRay.ray.intersectSphere(sphere, closest);
+            shipDistance = sphere.containsPoint(previous) ? 0 : entry ? previous.distanceTo(entry) : Infinity;
+            if (hit.userData.type.capital) {
+              shipDistance = rocketRay.intersectObjects(hit.children.filter(part => part.isMesh), false)[0]?.distance ?? Infinity;
+            }
+          }
+          const wallHit = findShowerLaserHit(previous, rocket.object.position, shipDistance);
+          if (wallHit) {
+            damageShowerRock(wallHit, rocket.damage);
+            hit = undefined;
+          }
           if (hit) {
             hitMarker = .16;
             const lessonWeapon = hit.userData.tutorialTarget;
@@ -3921,7 +3987,7 @@
             }
           }
           // Long-range capital retreats must remain reachable; don't cut lasers off at z = -2200.
-          if (hit || rocket.age > 8 || rocket.object.position.distanceToSquared(camera.position) > 6500 * 6500) {
+          if (wallHit || hit || rocket.age > 8 || rocket.object.position.distanceToSquared(camera.position) > 6500 * 6500) {
             scene.remove(rocket.object);
             rockets.splice(i, 1);
           }

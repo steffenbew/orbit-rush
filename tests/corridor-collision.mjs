@@ -20,10 +20,12 @@ function makeGame(seed = 12345, reducedMotion = false) {
     const shipTypes = [null, null, null, {asteroid: true}], fadeAsteroidShader = () => {};
     const document = {querySelector: () => ({})};
     let started = true, paused = false, roundEnded = false, crashing = false, gameTime = 0;
-    let shield = 100, shieldHitTime = 0, shake = 0, speed = 400;
+    let shield = 100, shieldHitTime = 0, shake = 0, speed = 400, hitMarker = 0;
     const shieldHit = {hidden: true, style: {}}, hits = [];
     const updateShield = () => hits.push({index: showerRockCollider.userData.instanceIndex, shield});
-    const startCrash = () => { crashing = true; }, playSound = () => {};
+    const effects = [], awards = [], sounds = [];
+    const startCrash = () => { crashing = true; }, playSound = (...args) => sounds.push(args);
+    const explode = (...args) => effects.push(args), award = collider => awards.push(collider.userData.instanceIndex);
     const showFeedback = () => {}, t = () => ''; // Feedback rendering is covered by scoring.mjs.
     ${section('      const inverseRotation =', '      const mouseAim =')}
     ${section('      const showerPool =', '      let spawnQueue =')}
@@ -31,7 +33,8 @@ function makeGame(seed = 12345, reducedMotion = false) {
     return {
       camera, scene, flightMotion, playerHullRotation, rocks: showerRocks, cells: showerRockCells,
       grit: showerGrit, origin: showerOrigin, previousOrigin: showerPreviousOrigin, rotation: showerRotation, velocity: showerVelocity,
-      hits, prepareShowerRock, nearbyShowerRocks, update: updateShowerRockCollisions, corridorCenter,
+      hits, effects, awards, sounds, findShowerLaserHit, damageShowerRock,
+      prepareShowerRock, nearbyShowerRocks, update: updateShowerRockCollisions, corridorCenter,
       get shield() { return shield; }, setPaused: value => { paused = value; },
       seed: (strength = 2, shape = 0, corridor = true) => {
         showerCorridor = corridor; showerStrength = strength; showerShape = shape;
@@ -42,6 +45,15 @@ function makeGame(seed = 12345, reducedMotion = false) {
         seedShowerGrit(); showerGritMaterial.opacity = 1;
       },
       opacity: value => { showerGritMaterial.opacity = value; },
+      shoot: (previous, end, damage = 1, ships = []) => {
+        const rocket = {object: new THREE.Object3D(), damage, radius: 1, age: 0};
+        rocket.object.position.copy(end);
+        const rocketRay = new THREE.Raycaster(), rockets = [rocket], i = 0;
+        const updateShipHitFlash = () => {}, queueShip = ship => { ship.visible = false; };
+        const shatterAsteroid = () => {}, completeTutorialStep = () => {};
+        ${section('          // Test the entire step so fast rockets', '        }\n        for (let i = shockwaves.length')}
+        return rockets.length === 0;
+      },
       render: () => {
         showerGrit.position.copy(showerOrigin); showerGrit.quaternion.copy(showerRotation);
         camera.updateMatrixWorld();
@@ -227,3 +239,62 @@ assert.ok(byStrength.every(count => count >= 12), 'Both light and dense layers n
 console.log(`PASS real corridor traversal: ${wallHits}/${wallRuns} wall crossings hit; centered runs stay clear (${byStrength.join('/')} by strength)`);
 assert.ok(source.includes('danger = updateShowerRockCollisions() || danger;'), 'The gameplay loop must actually apply ring collisions and warnings');
 assert.ok(source.includes('recordVisibleObjects();\n        recordVisibleShowerRocks();'), 'Visibility must be recorded on rendered frames, not simulation ticks');
+
+// Controlled instances exercise the real spatial query, transformed triangles and destruction.
+for (const rotated of [false, true]) for (const damage of [1, 3]) {
+  const laser = makeGame(); laser.seed();
+  laser.cells.clear();
+  for (const rock of laser.rocks) rock.destroyed = true;
+  if (rotated) laser.rotation.setFromEuler(new THREE.Euler(.3, -.6, .2));
+  laser.origin.set(120, -40, 500); laser.previousOrigin.copy(laser.origin);
+  const world = point => point.clone().applyQuaternion(laser.rotation).add(laser.origin);
+  const transform = new THREE.Object3D();
+  const [front, rear] = laser.rocks;
+  [front, rear].forEach((rock, index) => {
+    rock.position.set(0, 0, -100 - index * 120);
+    rock.health = 3; rock.destroyed = false; rock.seen = true; rock.hit = false;
+    transform.position.copy(rock.position); transform.scale.set(12, 18, 24);
+    transform.rotation.set(.2, .4, .1); transform.updateMatrix();
+    laser.grit.setMatrixAt(rock.index, transform.matrix);
+    const key = `0,0,${Math.floor(rock.position.z / 128)}`;
+    laser.cells.set(key, [rock]);
+  });
+  const from = world(new THREE.Vector3()), to = world(new THREE.Vector3(0, 0, -300));
+  assert.equal(laser.findShowerLaserHit(from, to), front, 'Nearest actual surface wins');
+  assert.equal(laser.findShowerLaserHit(from, to, 30), null, 'A nearer ship limits the wall query');
+  assert.equal(laser.findShowerLaserHit(world(new THREE.Vector3(70, 0, 0)), world(new THREE.Vector3(70, 0, -300))), null,
+    'Empty space beside a mesh is not an invisible wall');
+  laser.setPaused(true); assert.equal(laser.findShowerLaserHit(from, to), null); laser.setPaused(false);
+  laser.opacity(.1); assert.equal(laser.findShowerLaserHit(from, to), null); laser.opacity(1);
+  const ship = new THREE.Object3D();
+  ship.userData = {type: {radius: 10, asteroid: true}, health: 10};
+  ship.position.copy(world(new THREE.Vector3(0, 0, -40)));
+  assert.equal(laser.shoot(from, to, 1, [ship]), true);
+  assert.equal(ship.userData.health, 9); assert.equal(front.health, 3, 'A nearer ship absorbs the shot first');
+  ship.position.copy(world(new THREE.Vector3(0, 0, -260)));
+  assert.equal(laser.shoot(from, to, 1, [ship]), true);
+  assert.equal(ship.userData.health, 9, 'A wall protects a ship behind it');
+  assert.equal(front.health, 2); front.health = 3;
+  for (let shot = 0; shot < 3 / damage; shot++) {
+    assert.equal(laser.findShowerLaserHit(from, to), front);
+    assert.equal(laser.shoot(from, to, damage), true, 'The actual projectile loop consumes the laser on contact');
+  }
+  assert.equal(front.destroyed, true); assert.deepEqual(laser.awards, [front.index]);
+  laser.grit.getMatrixAt(front.index, matrix);
+  assert.equal(matrix.determinant(), 0, 'Destroyed instances disappear without a new mesh');
+  assert.equal(laser.findShowerLaserHit(from, to), rear, 'The next shot passes through the cleared hole');
+  laser.damageShowerRock(front, 3); assert.equal(laser.awards.length, 1, 'No duplicate rewards');
+  assert.ok(laser.effects.every(args => args[1] <= 16), 'Small effects only, no full destruction/debris cascade');
+  assert.equal(laser.scene.children.length, 1, 'Retain the instanced renderer');
+  rear.destroyed = true;
+  laser.camera.position.copy(world(front.position));
+  laser.flightMotion.set(0, 0, 0);
+  assert.equal(laser.update(), false, 'Destroyed wall rocks no longer collide or warn');
+  assert.equal(laser.shield, 100);
+  laser.seed();
+  assert.ok(laser.rocks.every(rock => !rock.destroyed && rock.health >= 1 && rock.health <= 3), 'Reset restores all instances and health');
+}
+assert.ok(source.includes('const wallHit = findShowerLaserHit(previous, rocket.object.position, shipDistance);'));
+assert.ok(source.includes('damageShowerRock(wallHit, rocket.damage);'));
+assert.ok(source.includes('if (wallHit || hit || rocket.age > 8'), 'A wall hit consumes the projectile');
+console.log('PASS wall lasers: nearest transformed mesh, ship occlusion, normal/heavy damage, holes, no collisions, bounded effects and reset');
