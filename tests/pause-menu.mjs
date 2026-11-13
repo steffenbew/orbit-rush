@@ -26,6 +26,8 @@ const game = new Function('document', 'pauseMenu', 't', `
   let started = true, paused = false, roundEnded = false, celebrating = false, crashing = false;
   let pointer = {id: 1}, spaceHeld = true, speed = 400, clockResets = 0;
   const resetSimulationClock = () => { clockResets++; };
+  let touchResets = 0;
+  const touchControls = {reset() { touchResets++; }};
   const lastPointerPosition = {clientX: 300, clientY: 250};
   let audioResumes = 0, musicSyncs = 0, steered = null;
   const sound = {resumeAudio: () => { audioResumes++; return Promise.resolve(); }};
@@ -35,7 +37,7 @@ const game = new Function('document', 'pauseMenu', 't', `
   ${source.slice(start, end)}
   return {
     togglePause,
-    state: () => ({paused, pointer, spaceHeld, audioResumes, musicSyncs, steered, speed, clockResets}),
+    state: () => ({paused, pointer, spaceHeld, audioResumes, musicSyncs, steered, speed, clockResets, touchResets}),
     mode: value => {
       started = value !== 'intro'; crashing = value === 'crash';
       roundEnded = value === 'defeat' || value === 'victory'; celebrating = value === 'victory';
@@ -71,6 +73,7 @@ assert.equal(menu.open, false);
 assert.equal(game.state().paused, false);
 assert.equal(elements.get('#pause').attributes['aria-pressed'], 'false');
 assert.equal(game.state().audioResumes, 1);
+assert.equal(game.state().touchResets, 2, 'Pause and resume clear all held touch input');
 assert.equal(game.state().clockResets, 2, 'Resume must not simulate time spent in the menu');
 assert.deepEqual(game.state().steered, {clientX: 300, clientY: 250});
 assert.equal(document.activeElement, body);
@@ -100,7 +103,7 @@ const hud = source.slice(source.indexOf('<div class="hud-actions"'), source.inde
 assert.ok(!hud.includes('id="restart"'));
 const menuMarkup = source.slice(source.indexOf('<dialog id="pause-menu"'), source.indexOf('<dialog id="round-end"'));
 assert.ok(menuMarkup.includes('id="restart"') && menuMarkup.includes('id="continue-flight"'));
-assert.ok(source.includes('<div class="brand"><span>ORBIT RUSH</span><small>SPACE ARCADE</small></div>'));
+assert.ok(source.includes('<div class="brand"><span>ORBIT RUSH</span></div>'));
 assert.ok(!source.includes('FREE FLIGHT'));
 assert.ok(!source.includes('PAUSE · KLICK ZUM WEITERFLIEGEN'));
-console.log('PASS restart moved out of the HUD, shorter two-line branding and no obsolete click-to-resume hint');
+console.log('PASS restart moved out of the HUD, Orbit Rush-only branding and no obsolete click-to-resume hint');

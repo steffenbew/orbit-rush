@@ -1,12 +1,16 @@
 Options -Indexes
 DirectoryIndex index.html
 
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
 
-  # Revalidate entry point and modules after each deployment.
-  <FilesMatch "\.(html|js)$">
+  # Revalidate entry point, modules, service worker and install metadata.
+  <FilesMatch "\.(html|js|webmanifest)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>

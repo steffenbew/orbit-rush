@@ -4,13 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#030511">
-  <title>Orbit Rush · Space Arcade</title>
+  <title>Orbit Rush</title>
+  <meta name="application-name" content="Orbit Rush">
+  <meta name="apple-mobile-web-app-title" content="Orbit Rush">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/icons/apple-touch-icon.png">
+  <script src="./pwa.js" defer></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20256%20256%22%3E%3Crect%20width%3D%22256%22%20height%3D%22256%22%20rx%3D%2264%22%20fill%3D%22%230b1630%22%2F%3E%3Cg%20fill%3D%22%237effd5%22%3E%3Cpath%20d%3D%22M223.85%2C47.12a16%2C16%2C0%2C0%2C0-15-15c-12.58-.75-44.73.4-71.41%2C27.07L132.69%2C64H74.36A15.91%2C15.91%2C0%2C0%2C0%2C63%2C68.68L28.7%2C103a16%2C16%2C0%2C0%2C0%2C9.07%2C27.16l38.47%2C5.37%2C44.21%2C44.21%2C5.37%2C38.49a15.94%2C15.94%2C0%2C0%2C0%2C10.78%2C12.92%2C16.11%2C16.11%2C0%2C0%2C0%2C5.1.83A15.91%2C15.91%2C0%2C0%2C0%2C153%2C227.3L187.32%2C193A15.91%2C15.91%2C0%2C0%2C0%2C192%2C181.64V123.31l4.77-4.77C223.45%2C91.86%2C224.6%2C59.71%2C223.85%2C47.12ZM74.36%2C80h42.33L77.16%2C119.52%2C40%2C114.34Zm74.41-9.45a76.65%2C76.65%2C0%2C0%2C1%2C59.11-22.47%2C76.46%2C76.46%2C0%2C0%2C1-22.42%2C59.16L128%2C164.68%2C91.32%2C128ZM176%2C181.64%2C141.67%2C216l-5.19-37.17L176%2C139.31Zm-74.16%2C9.5C97.34%2C201%2C82.29%2C224%2C40%2C224a8%2C8%2C0%2C0%2C1-8-8c0-42.29%2C23-57.34%2C32.86-61.85a8%2C8%2C0%2C0%2C1%2C6.64%2C14.56c-6.43%2C2.93-20.62%2C12.36-23.12%2C38.91%2C26.55-2.5%2C36-16.69%2C38.91-23.12a8%2C8%2C0%2C1%2C1%2C14.56%2C6.64Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #030511; font-family: system-ui, sans-serif; }
     canvas { display: block; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     html, body { overscroll-behavior: none; }
+    body > :not(#audio-credits, #render-diagnostics), body > :not(#audio-credits, #render-diagnostics) * { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; }
     #space, #effects { position: fixed; inset: 0; width: 100%; height: 100%; }
     #effects { position: fixed; inset: 0; cursor: none; }
     body:is(.celebrating, .defeated) #effects { cursor: default; }
@@ -131,6 +140,7 @@
     .intro { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at center, #071329c9, #07132940 58%, #03071133); padding: 24px; }
     .intro-card { width: 100%; max-width: 580px; text-align: center; color: #e9f8ff; }
     .language-picker { position: relative; display: grid; grid-template-columns: repeat(2, 1fr); width: max-content; max-width: 100%; margin: 8px auto 0; padding: 4px; border: 1px solid #7effd533; border-radius: 999px; background: #071629b3; }
+    .language-picker:not([data-ready]) { visibility: hidden; }
     .language-selection { position: absolute; inset: 4px; z-index: 2; display: grid; grid-template-columns: repeat(2, 1fr); background: #7effd5; pointer-events: none; clip-path: inset(0 50% 0 0 round 999px); transition: clip-path .45s cubic-bezier(.22, 1, .36, 1); }
     .language-picker:has(input[value="de"]:checked) .language-selection { clip-path: inset(0 0 0 50% round 999px); }
     .language-picker .language-selection span { color: #092438; }
@@ -139,6 +149,7 @@
     .language-picker span { display: block; min-width: 88px; padding: 9px 16px; border-radius: 999px; color: #a3b8c9; font-size: 12px; font-weight: 650; cursor: pointer; }
     .language-picker input:focus-visible + span { outline: 2px solid #7effd5; outline-offset: 3px; }
     .language-picker:disabled { opacity: .5; }
+    .language-picker:disabled .language-selection { transition: none; }
     .language-picker input:disabled + span { cursor: wait; }
     #intro .intro-card { position: relative; z-index: 1; }
     body:not(.playing) :is(.brand, .hud, .credits, .reticle, #flight-state, #flight-path, #target, #shield-hud) { visibility: hidden; }
@@ -168,7 +179,6 @@
     #audio-notice { position: fixed; z-index: 20; left: 50%; bottom: 110px; transform: translateX(-50%); width: min(90vw, 500px); height: auto; padding: 15px; color: #ffe3aa; background: #32283b; border: 1px solid #eeb16b66; font-size: 13px; }
     .brand { position: fixed; top: 32px; left: 50%; transform: translateX(-50%); color: #d3f7ff; font-weight: 750; font-size: 14px; letter-spacing: .3em; text-align: center; white-space: nowrap; pointer-events: none; }
     .brand > span { display: block; text-indent: .3em; }
-    .brand small { display: block; font-size: 8px; letter-spacing: .2em; text-indent: .2em; color: #80a5be; margin-top: 6px; }
     .reticle.hit { box-shadow: 0 0 24px #ffd67f88; }
     .reticle.overheated { color: #ff3d48; border-color: transparent; box-shadow: 0 0 12px #ff334466; }
     .reticle.overheated::before, .reticle.overheated::after { opacity: 0; }
@@ -297,6 +307,48 @@
     #render-report { display: block; width: 100%; height: 120px; padding: 8px; resize: vertical; border: 1px solid #a8caff55; border-radius: 6px; background: #071329; color: #d5e6ff; font: 11px/1.4 ui-monospace, monospace; user-select: text; -webkit-user-select: text; }
     #render-copy-status:empty { display: none; }
     @media (max-width: 450px) { button { width: 40px; height: 44px; font-size: 22px; } }
+    #touch-controls { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+    #touch-weapons { position: absolute; left: calc(48px + env(safe-area-inset-left)); bottom: calc(130px + env(safe-area-inset-bottom)); }
+    #touch-joystick { position: absolute; bottom: calc(120px + env(safe-area-inset-bottom)); }
+    #touch-controls button, #touch-joystick { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    #touch-controls button { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 92px; height: 92px; padding: 0; border-radius: 50%; background: #091629d9; color: #ffb24d; }
+    #touch-controls #touch-laser { left: -12px; }
+    #touch-controls #touch-power { position: absolute; left: 36px; bottom: 96px; width: 64px; height: 64px; color: #38baff; }
+    #touch-controls button.held { background: #17334ce8; box-shadow: 0 0 20px #ffffff18; }
+    #touch-controls button.unavailable { color: #7790a1; }
+    .touch-charge { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 3; transform: rotate(-90deg); }
+    .touch-charge-track { opacity: .2; }
+    .touch-charge-fill { stroke-linecap: round; }
+    .laser-dot { width: 32px; height: 32px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px #ffb24d55; }
+    .power-dot { width: 34px; height: 34px; border-radius: 50%; background: currentColor; box-shadow: 0 0 16px #38baff88; }
+    #touch-joystick { right: calc(48px + env(safe-area-inset-right)); display: grid; place-items: center; width: 120px; height: 120px; border: 1px solid #a5dcff66; border-radius: 50%; background: radial-gradient(circle, #7effd510 2px, #09162980 3px); box-shadow: inset 0 0 0 22px #a5dcff08; }
+    .joystick-knob { width: 44px; height: 44px; border: 1px solid #b8f4e5aa; border-radius: 50%; background: #74c9bd55; pointer-events: none; }
+    #touch-joystick.held .joystick-knob { background: #7effd577; transition: transform 40ms linear; }
+    @media (prefers-reduced-motion: reduce) { #touch-joystick.held .joystick-knob { transition: none; } }
+    body.touch-device.playing .credits { display: none; }
+    body.touch-device .scoreboard { padding: 8px 10px; gap: 6px 14px; border-radius: 12px; }
+    body.touch-device .scoreboard .label { font-size: 8px; margin-bottom: 3px; }
+    body.touch-device .scoreboard .number { font-size: 16px; }
+    body.touch-device .personal-best { gap: 4px; margin-top: 4px; }
+    body.touch-device .personal-best .label { margin: 0; }
+    body.touch-device #best { font-size: 10px; }
+    body.touch-device #retry-hud { margin-top: 4px; }
+    body.touch-device #retry-hud .retry-icons span { width: 16px; font-size: 14px; line-height: 16px; }
+    body.touch-device #retry-hud .retry-icons .spent::after { font-size: 16px; line-height: 16px; }
+    body.touch-device #round-clock { gap: 5px; padding-top: 5px; }
+    body.touch-device #round-clock .label { margin: 0; }
+    body.touch-device #time-left { font-size: 13px; }
+    body.touch-device #level-progress { height: 3px; }
+    body.touch-device #shield-hud { bottom: calc(24px + env(safe-area-inset-bottom)); }
+    body.touch-device #capital-hud { bottom: calc(72px + env(safe-area-inset-bottom)); display: grid; gap: 2px; width: min(320px, calc(100vw - 24px)); padding: 5px 10px; border-radius: 8px; font-size: 9px; line-height: 12px; letter-spacing: 0; }
+    body.touch-device #capital-health { display: block; height: 4px; margin: 0; }
+    body.touch-device #capital-state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body.touch-device #flight-boundary-notice { bottom: calc(366px + env(safe-area-inset-bottom)); }
+    @media (orientation: landscape) and (min-width: 600px) and (max-height: 500px) {
+      body.touch-device #flight-boundary-notice { bottom: calc(174px + env(safe-area-inset-bottom)); max-width: calc(100vw - 400px); }
+    }
+    body.touch-device #control-hints :is(#control-mouse, #control-cursor) { display: none; }
+    body.touch-device #control-hints.space-key #control-input { min-width: 0; padding: 6px 10px; border: 0; background: #071629d9; box-shadow: none; }
   </style>
 </head>
 <body>
@@ -322,8 +374,8 @@
     <symbol id="i-close" data-phosphor="x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
   </defs></svg>
   <canvas id="space" data-i18n-aria-label="spaceScene" aria-label="3D-Weltraumflug mit Sternen und Raumschiffen"></canvas>
-  <canvas id="effects" data-i18n-aria-label="controls" aria-label="Mit Maus oder Touch lenken und zielen. Klicken oder gedrückt halten zum Lasern. Leertaste feuert den starken Laser; danach lädt er kurz auf."></canvas>
-  <div class="brand"><span>ORBIT RUSH</span><small>SPACE ARCADE</small></div>
+  <canvas id="effects" data-i18n-aria-label="controls" aria-label="Mit der Maus lenken und zielen. Klicken oder gedrückt halten zum Lasern. Leertaste feuert den starken Laser; danach lädt er kurz auf."></canvas>
+  <div class="brand"><span>ORBIT RUSH</span></div>
   <section id="intro" class="intro" data-i18n-aria-label="startScreen" aria-label="Spiel starten">
     <div class="intro-card">
       <div class="intro-logo">
@@ -342,8 +394,21 @@
   <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
   <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
     <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
-    <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS / TOUCH LENKEN</span></span>
+    <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS LENKEN</span></span>
   </aside>
+  <div id="touch-controls" hidden>
+    <div id="touch-weapons">
+      <button id="touch-laser" type="button" data-i18n-aria-label="touchLaser" aria-label="Normalen Laser gedrückt halten">
+        <svg class="touch-charge" viewBox="0 0 84 84" role="progressbar" data-i18n-aria-label="laserEnergy" aria-label="Laserenergie" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="touch-charge-track" cx="42" cy="42" r="38"/><circle class="touch-charge-fill" cx="42" cy="42" r="38" pathLength="100" stroke-dasharray="100"/></svg>
+        <span class="laser-dot" aria-hidden="true"></span>
+      </button>
+      <button id="touch-power" type="button" data-i18n-aria-label="touchPower" aria-label="Power-Laser gedrückt halten (3× Schaden)">
+        <svg class="touch-charge" viewBox="0 0 84 84" role="progressbar" data-i18n-aria-label="powerCharge" aria-label="Schwerlaser-Ladung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="touch-charge-track" cx="42" cy="42" r="38"/><circle class="touch-charge-fill" cx="42" cy="42" r="38" pathLength="100" stroke-dasharray="100"/></svg>
+        <span class="power-dot" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div id="touch-joystick" role="group" data-i18n-aria-label="touchSteering" aria-label="Joystick zum Lenken und Zielen"><span class="joystick-knob" aria-hidden="true"></span></div>
+  </div>
   <div id="flight-state"></div>
   <div id="end-countdown" role="timer" data-i18n-aria-label="levelEnding" aria-label="Level endet bald" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
   <div id="success-burst" hidden aria-hidden="true"><span style="--dx:-40vw;--dy:-30vh">✦</span><span style="--dx:-22vw;--dy:-42vh">✦</span><span style="--dx:22vw;--dy:-42vh">✦</span><span style="--dx:40vw;--dy:-30vh">✦</span><span style="--dx:44vw;--dy:5vh">✦</span><span style="--dx:35vw;--dy:35vh">✦</span><span style="--dx:18vw;--dy:43vh">✦</span><span style="--dx:-18vw;--dy:43vh">✦</span><span style="--dx:-35vw;--dy:35vh">✦</span><span style="--dx:-44vw;--dy:5vh">✦</span></div>
@@ -425,12 +490,17 @@
   </dialog>
   <script type="module">
     import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=11';
+    import { createTouchControls } from './touch-controls.js?v=5';
     import { createRenderDiagnostics } from './render-diagnostics.js?v=1';
+    const touchMode = matchMedia('(any-pointer: coarse)').matches;
+    document.body.classList.toggle('touch-device', touchMode);
+    if (touchMode) document.querySelector('#effects').dataset.i18nAriaLabel = 'touchControls';
 
     setLanguage(detectLanguage(navigator.languages?.[0] || navigator.language));
     applyTranslations();
     const languagePicker = document.querySelector('#language');
     languagePicker.querySelector(`input[value="${language}"]`).checked = true;
+    languagePicker.setAttribute('data-ready', '');
     const status = document.querySelector('#status');
     let getRenderState = () => ({ phase: 'loading' });
     let stopRendering = () => {};
@@ -3188,6 +3258,7 @@
       function startCrash(ship) {
         if (crashing || roundEnded) return;
         crashing = true; crashTime = 0; paused = true; speed = 0;
+        touchControls.reset();
         if (pauseMenu.open) pauseMenu.close();
         showerWarning.hidden = true;
         repairPickup.visible = false; repairMarker.hidden = true; repairNotice.hidden = true;
@@ -3250,6 +3321,7 @@
         document.querySelector('#flash').classList.remove('impact');
         document.querySelector('#flash').style.opacity = 0;
         roundEnded = true; celebrating = !crashed; paused = crashed;
+        touchControls.reset();
         clearEnemyBolts();
         capitalHud.hidden = true;
         showerWarning.hidden = true;
@@ -3285,6 +3357,7 @@
       }
       roundDialog.addEventListener('cancel', event => event.preventDefault());
       function restartRound(mode = 'new') {
+        touchControls.reset();
         if (!started || crashing) return;
         if (mode === 'next') {
           if (!celebrating) return;
@@ -3350,7 +3423,10 @@
         clearTargetLock();
         updateScore();
         updateClock();
-        if (lastPointerPosition) steer(lastPointerPosition);
+        if (touchMode) {
+          lastPointerPosition = null;
+          steer({ clientX: innerWidth / 2, clientY: innerHeight / 2 });
+        } else if (lastPointerPosition) steer(lastPointerPosition);
         document.activeElement.blur();
         resetSimulationClock();
       }
@@ -3601,9 +3677,9 @@
       const controlTitle = document.querySelector('#control-hints-title');
       const controlInput = document.querySelector('#control-input-label');
       const controlSteps = [
-        { action: 'checkpoint', title: 'checkpointTitle', input: 'steerInput' },
-        { action: 'laser', title: 'laserTitle', input: 'mouseClick' },
-        { action: 'heavy', title: 'powerLaserTitle', input: 'spaceKey' }
+        { action: 'checkpoint', title: 'checkpointTitle', input: touchMode ? 'touchSteerInput' : 'steerInput' },
+        { action: 'laser', title: 'laserTitle', input: touchMode ? 'touchLaserInput' : 'mouseClick' },
+        { action: 'heavy', title: 'powerLaserTitle', input: touchMode ? 'touchPowerInput' : 'spaceKey' }
       ];
       function showControlStep() {
         const step = controlSteps[tutorialStage];
@@ -3622,11 +3698,11 @@
         if (controlHints.hidden) return;
         controlHints.classList.toggle('complete', showingGo || tutorialStepCompletedAt !== null);
         controlHints.classList.toggle('finished', !showingGo && tutorialStage === 2 && tutorialStepCompletedAt !== null && gameTime - tutorialStepCompletedAt >= .8);
-        // Follow the aiming cursor, flipping above it only near the bottom edge.
-        const x = (mouseAim.x * .5 + .5) * innerWidth;
-        const y = (-mouseAim.y * .5 + .5) * innerHeight;
+        // On touch, keep instructions above the thumb controls rather than chasing the aim.
+        const x = touchMode ? innerWidth / 2 : (mouseAim.x * .5 + .5) * innerWidth;
+        const y = touchMode ? innerHeight / 2 : (-mouseAim.y * .5 + .5) * innerHeight;
         const width = controlHints.offsetWidth, height = controlHints.offsetHeight;
-        const top = y + 64 + height <= innerHeight - 12 ? y + 64 : y - 64 - height;
+        const top = !touchMode && y + 64 + height <= innerHeight - 12 ? y + 64 : y - 64 - height;
         controlHints.style.left = `${Math.max(12 + width / 2, Math.min(innerWidth - 12 - width / 2, x))}px`;
         controlHints.style.top = `${Math.max(12, top)}px`;
       }
@@ -3875,6 +3951,18 @@
           scene.add(object);
         }
       }
+      const touchControls = createTouchControls({
+        root: document.querySelector('#touch-controls'),
+        canPlay: () => touchMode && started && !paused && !crashing && !roundEnded && !document.hidden
+          && !document.querySelector('dialog[open]:not(.victory)'),
+        onSteer: (x, y) => {
+          lastPointerPosition = null;
+          // Use one pixel scale for both axes so the aiming area stays circular.
+          const scale = Math.min(innerWidth, innerHeight) / 2;
+          steer({ clientX: innerWidth / 2 + x * scale, clientY: innerHeight / 2 - y * scale });
+        },
+        onFire: heavy => fireRocket(true, heavy)
+      });
       function steer(event) {
         mouseAim.set(
           THREE.MathUtils.clamp(event.clientX / innerWidth * 2 - 1, -1, 1),
@@ -3884,21 +3972,22 @@
         reticle.style.left = `${event.clientX}px`;
         reticle.style.top = `${event.clientY}px`;
       }
-      // Suppress accidental secondary clicks without disabling links in the credits.
-      document.addEventListener('contextmenu', event => {
-        if (event.target.closest('#audio-credits, #render-diagnostics')) return;
-        event.preventDefault();
-      });
-      for (const name of ['auxclick', 'dblclick', 'dragstart', 'selectstart', 'wheel', 'gesturestart', 'gesturechange', 'gestureend']) {
-        canvas.addEventListener(name, event => event.preventDefault(), { passive: false });
+      // Suppress accidental secondary clicks and native gestures across the game UI, except credits.
+      for (const name of ['contextmenu', 'auxclick', 'dblclick', 'dragstart', 'selectstart', 'wheel', 'gesturestart', 'gesturechange', 'gestureend']) {
+        document.addEventListener(name, event => {
+          if (event.target.closest('#audio-credits, #render-diagnostics')) return;
+          event.preventDefault();
+        }, { passive: false });
       }
       // Track the real pointer even over the intro, controls, and result dialog.
       // Keyboard activation keeps the last known position rather than using click (0, 0).
       for (const name of ['pointermove', 'pointerdown']) window.addEventListener(name, event => {
+        if ((event.pointerType === 'touch' && !celebrating) || event.target.closest('#touch-controls')) return;
         if (!event.isPrimary || (event.type === 'pointerdown' && (event.button !== 0 || event.ctrlKey))) return;
         lastPointerPosition = { clientX: event.clientX, clientY: event.clientY };
       }, { capture: true });
       canvas.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'touch' && !celebrating) return;
         if (!event.isPrimary || event.button !== 0 || event.ctrlKey) {
           event.preventDefault();
           return;
@@ -3913,6 +4002,7 @@
       });
       // HUD controls sit above the canvas, but hovering them must not interrupt steering.
       window.addEventListener('pointermove', event => {
+        if ((event.pointerType === 'touch' && !celebrating) || event.target.closest('#touch-controls')) return;
         if (!event.isPrimary || (pointer && pointer.id !== event.pointerId)) return;
         if (!started || paused || crashing || (roundEnded && !celebrating)
           || document.querySelector('dialog[open]:not(.victory)')) return;
@@ -3937,6 +4027,7 @@
         if (paused) speed = 0;
         resetSimulationClock();
         pointer = null; spaceHeld = false;
+        touchControls.reset();
         const button = document.querySelector('#pause');
         button.setAttribute('aria-pressed', String(paused));
         button.setAttribute('aria-label', t(paused ? 'resumeFlight' : 'pauseFlight'));
@@ -4148,8 +4239,8 @@
         if (roundEnded && !celebrating) return;
         updateTargetLock(dt);
         if (!paused && !roundEnded) {
-          if (pointer) fireRocket();
-          if (spaceHeld && heavyEnergy === 1) fireRocket(false, true);
+          if (pointer || touchControls.normalHeld) fireRocket();
+          if ((spaceHeld || touchControls.heavyHeld) && heavyEnergy === 1) fireRocket(false, true);
         }
         if (celebrating && !paused && (pointer || spaceHeld)) {
           emission += dt * (reducedMotion ? 15 : 30);
@@ -4330,6 +4421,7 @@
         }
       }
       function renderFrame() {
+        touchControls.update(weaponHeat, overheated, heavyEnergy);
         introAsteroids.visible = !started;
         updateControlHints();
         recordVisibleObjects();
@@ -4398,7 +4490,7 @@
         renderer.render(scene, camera);
       }
       getRenderState = () => ({
-        phase: renderPhase, level, gameTime, started, paused, roundEnded, crashing, reducedMotion,
+        phase: renderPhase, level, gameTime, started, paused, roundEnded, crashing, reducedMotion, touchMode,
         effects: { particles: particles.length, shockwaves: shockwaves.length, rockets: rockets.length, enemyBolts: enemyBolts.length },
         visibleShips: ships.filter(ship => ship.visible).length,
         renderer: { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, points: renderer.info.render.points,
@@ -4409,6 +4501,7 @@
         queueMicrotask(() => renderer.setAnimationLoop(null));
         paused = true; speed = 0; pointer = null; spaceHeld = false;
         sound.suspendAudio().catch(error => console.error('Could not suspend audio after render failure:', error));
+        touchControls.reset();
       };
       resetSimulationClock();
       renderer.setAnimationLoop(time => {

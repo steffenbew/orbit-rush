@@ -59,7 +59,7 @@ Die Quellen und Lizenzlinks der aktiven Sounds sind zusätzlich im Spiel über �
 
 - Phosphor Icons (`@phosphor-icons/core` 2.1.1), https://phosphoricons.com/
 - Originalpaket: https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz
-- Regular-SVGs für die Oberfläche, einschließlich Rakete, Maus, Ton, Pause, Vollbild und Ergebnissymbole. Die Rakete wird auch als Favicon verwendet.
+- Regular-SVGs für die Oberfläche, einschließlich Rakete, Maus, Ton, Pause, Vollbild und Ergebnissymbole. Die Rakete wird auch als Favicon und für die PWA-/Home-Bildschirm-Icons verwendet. SVG-Quelle und PNG-Varianten liegen unter `assets/icons/`; das maskierbare Icon hat zusätzlichen Sicherheitsabstand.
 - Unveränderte SVG-Pfade als lokaler Symbol-Satz in `index.html`; keine Bibliothek, Webfont oder CDN-Anfrage zur Laufzeit.
 - MIT-Lizenz: `assets/vendor/PHOSPHOR-LICENSE.txt`
 

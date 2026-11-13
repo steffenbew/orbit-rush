@@ -170,6 +170,19 @@ function pointerEvent(receiver, type, target = canvas, overrides = {}) {
   receiver.dispatchEvent(event);
   return event;
 }
+const creditLink = new Element();
+creditLink.closest = selector => selector === '#audio-credits, #render-diagnostics' ? creditLink : null;
+const reportField = new Element();
+reportField.closest = selector => selector === '#audio-credits, #render-diagnostics' ? reportField : null;
+for (const type of ['contextmenu', 'auxclick', 'dblclick', 'dragstart', 'selectstart', 'wheel', 'gesturestart', 'gesturechange', 'gestureend']) {
+  for (const target of [canvas, hud]) {
+    assert.equal(pointerEvent(document, type, target).defaultPrevented, true, `${type} is blocked across game surfaces and overlays`);
+  }
+  assert.equal(pointerEvent(document, type, creditLink).defaultPrevented, false, `${type} remains available inside credits`);
+  assert.equal(pointerEvent(document, type, reportField).defaultPrevented, false, `${type} remains available for diagnostic report copying`);
+}
+assert.equal(pointerEvent(document, 'click', hud).defaultPrevented, false, 'Normal taps/clicks still activate UI controls');
+assert.match(source, /body > :not\(#audio-credits, #render-diagnostics\), body > :not\(#audio-credits, #render-diagnostics\) \* \{[^}]*touch-action: none;[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*-webkit-touch-callout: none;[^}]*-webkit-user-drag: none;/, 'Native touch suppression covers all game UI from first paint, excluding credits');
 pointerEvent(window, 'pointermove');
 assert.ok(Math.abs(input.target.x - .8) < 1e-8);
 pointerEvent(canvas, 'pointerleave', canvas);
@@ -200,9 +213,18 @@ assert.ok(input.target.equals(before), 'An unrelated pointer must not override a
 pointerEvent(canvas, 'pointercancel'); assert.equal(input.target.length(), 0); assert.equal(input.state().pointer, null);
 pointerEvent(canvas, 'pointerdown', canvas, {pointerType: 'touch'});
 pointerEvent(canvas, 'pointerup', canvas, {pointerType: 'touch'});
-assert.equal(input.target.length(), 0, 'Releasing touch still stops lateral steering');
+assert.equal(input.target.length(), 0, 'Touch on the canvas must not steer');
+assert.equal(input.state().pointer, null, 'Touch must use the dedicated controls, not canvas capture');
+assert.equal(input.state().shots, 1, 'Canvas touch must not fire');
+pointerEvent(window, 'pointermove', canvas, {pointerType: 'touch', clientX: 100, clientY: 100});
+assert.equal(input.target.length(), 0, 'Touch anywhere outside the joystick must not steer');
 pointerEvent(window, 'pointermove', hud); window.dispatchEvent(new Event('blur'));
 assert.equal(input.target.length(), 0); assert.equal(input.state().paused, true);
+input.mode('victory');
+pointerEvent(canvas, 'pointerdown', canvas, {pointerType: 'touch'});
+assert.equal(input.state().drawings, 1, 'Touch still draws emojis during the victory flight');
+pointerEvent(canvas, 'pointerup', canvas, {pointerType: 'touch'});
+assert.equal(input.state().pointer, null);
 console.log('PASS continuous HUD steering, page exit, inactive/modal guards, no accidental shots, touch/capture and blur safety');
 
 const makeStart = () => new Function('THREE', `

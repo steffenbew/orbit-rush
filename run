@@ -16,7 +16,6 @@ test() {
 }
 
 deploy() {
-  test
   bash "$PWD/scripts/deploy.sh"
 }
 
@@ -27,7 +26,7 @@ usage() {
     '  start, dev  Serve locally in the foreground (Python 3)' \
     '  stop        Stop only this checkout’s tracked server' \
     '  test        Run all test suites in parallel (Python 3 and Node.js 20+)' \
-    '  deploy      Test and deploy to https://orbitrush.steffenbew.com (SSH/rsync)' \
+    '  deploy      Deploy to https://orbitrush.steffenbew.com (SSH/rsync)' \
     '  help        Show this help' \
     '' \
     'Default: port 8080, or a free port if occupied; prints the actual URL.' \

@@ -10,7 +10,7 @@ function section(start, end) {
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 }
-const makeGame = () => new Function('THREE', 't', `
+const makeGame = (touchMode = false) => new Function('THREE', 't', 'touchMode', `
   const elements = new Map();
   const document = {querySelector(selector) {
     if (!elements.has(selector)) {
@@ -91,8 +91,21 @@ const makeGame = () => new Function('THREE', 't', `
       ${section('          if (hit) {', '          // Long-range capital retreats')}
     }
   };
-`)(THREE, t);
+`)(THREE, t, touchMode);
 
+for (const locale of ['en', 'de']) {
+  setLanguage(locale);
+  const mobile = makeGame(true);
+  assert.equal(mobile.input.textContent, t('touchSteerInput'));
+  mobile.aim(1, -1);
+  assert.equal(mobile.hints.style.left, '500px');
+  assert.equal(mobile.hints.style.top, '272px', 'Mobile hints stay above the centered aim and thumb controls');
+  mobile.action('checkpoint'); mobile.tick(.71);
+  assert.equal(mobile.input.textContent, t('touchLaserInput'));
+  mobile.action('laser'); mobile.tick(.71);
+  assert.equal(mobile.input.textContent, t('touchPowerInput'));
+}
+console.log('PASS localized joystick and both fire-button tutorial hints with stable mobile positioning');
 const game = makeGame();
 assert.equal(game.title.textContent, t('checkpointTitle'));
 assert.equal(game.input.textContent, t('steerInput'));

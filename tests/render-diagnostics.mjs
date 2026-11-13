@@ -101,6 +101,7 @@ try {
     let stopRendering, paused = false, speed = 500, pointer = {}, spaceHeld = true;
     const queueMicrotask = fn => deferred.push(fn);
     const renderer = {setAnimationLoop: value => calls.push(['loop', value])};
+    const touchControls = {reset: () => calls.push(['touch'])};
     const sound = {suspendAudio: async () => calls.push(['audio'])};
     ${source.slice(shutdownFrom, shutdownTo)}
     stopRendering();
@@ -108,6 +109,7 @@ try {
   `)(calls, deferred);
   assert.deepEqual(shutdown, {paused: true, speed: 0, pointer: null, spaceHeld: false});
   assert.ok(calls.some(([name]) => name === 'audio'));
+  assert.ok(calls.some(([name]) => name === 'touch'));
   assert.equal(deferred.length, 1, 'Cancel the next animation frame after Three.js schedules it');
   deferred[0]();
   assert.deepEqual(calls.at(-1), ['loop', null]);

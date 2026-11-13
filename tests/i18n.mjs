@@ -96,6 +96,14 @@ console.log('PASS translated static text, accessibility labels, tooltips, docume
 
 function makeLanguagePicker(browserLanguage, fallbackLanguage = 'en-US') {
   const document = makeDocument(), updates = [];
+  document.picker.setAttribute = function (name, value) {
+    if (name === 'data-ready') {
+      const expected = detectLanguage(browserLanguage || fallbackLanguage);
+      assert.equal(document.documentElement.lang, expected, 'Apply browser language before revealing the picker');
+      assert.equal(document.radios[expected].checked, true, 'Select the correct radio before revealing the picker');
+    }
+    this.attributes[name] = value;
+  };
   const game = new Function('document', 'navigator', 'i18n', 'updates', `
     let language, started = false;
     const detectLanguage = i18n.detectLanguage;
@@ -108,6 +116,7 @@ function makeLanguagePicker(browserLanguage, fallbackLanguage = 'en-US') {
     ${section("      languagePicker.addEventListener('change'", '      let danger =')}
     return { start: () => { started = true; } };
   `)(document, {languages: [browserLanguage], language: fallbackLanguage}, i18n, updates);
+  assert.equal(document.picker.getAttribute('data-ready'), '', 'Reveal the picker after initialization');
   return { document, updates, game };
 }
 function chooseLanguage(document, value) {
@@ -137,6 +146,8 @@ assert.equal(makeLanguagePicker(undefined, 'de-DE').document.radios.de.checked, 
 assert.ok(!source.includes('orbit-rush-language'), 'Previously saved choices must not override browser detection');
 const intro = section('  <section id="intro"', '  <button id="audio-notice"');
 assert.ok(intro.indexOf('id="language"') > intro.indexOf('id="start"'), 'Place the language pill below the logo and play button');
+assert.ok(!intro.match(/<fieldset id="language"[^>]*>/)[0].includes('data-ready'), 'Initial HTML must not reveal an uninitialized picker');
+assert.ok(source.includes('.language-picker:not([data-ready]) { visibility: hidden; }'), 'Reserve layout space while hiding the picker until browser language is ready');
 const startButton = intro.match(/<button id="start"[\s\S]*?<\/button>/)[0];
 assert.ok(startButton.includes('aria-labelledby="start-label"') && startButton.includes('href="#i-play"') && startButton.includes('aria-hidden="true"'));
 assert.ok(intro.includes('<span id="start-label"'), 'Localized loading status also names the play button');
@@ -151,6 +162,7 @@ assert.ok(intro.includes('<div class="language-selection" aria-hidden="true"><sp
 assert.ok(!source.includes('transition: color .25s'), 'Text contrast follows the pill position, never a word-wide fade');
 assert.ok(source.includes('transition: clip-path .45s cubic-bezier(.22, 1, .36, 1);'), 'Language movement settles without overshoot');
 assert.ok(source.includes('.language-selection { transition: none; }'), 'Language animation respects reduced motion');
+assert.ok(source.includes('.language-picker:disabled .language-selection { transition: none; }'), 'Automatic language selection during loading must not slide');
 console.log('PASS browser-language preselection on each load, manual switching, native pill controls and active-run guard');
 
 // Exercise actual result-copy logic for every outcome in both languages.
