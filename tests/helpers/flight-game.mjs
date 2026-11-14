@@ -37,7 +37,8 @@ const code = `
   let combo = 0, lastKill = -Infinity;
   const explosions = [], hits = [], sounds = [], particles = [];
   const explode = (...args) => explosions.push(args), playSound = name => sounds.push(name);
-  const collideWith = object => hits.push(object), showFeedback = () => {};
+  const messages = [];
+  const collideWith = object => hits.push(object), showFeedback = (message, negative = false) => messages.push({message, negative});
   const rocketGeometry = new THREE.CylinderGeometry(.22, .22, 10, 8);
   rocketGeometry.rotateX(-Math.PI / 2);
   ${section('      const dark =', '      // Reuse one ship of each type')}
@@ -51,7 +52,7 @@ const code = `
     setAsteroidCrossing = (rock, time) => crossing(rock, time, crossingDanger);
   }
   return {
-    scene, sounds, ships, activeAsteroids, camera, flightMotion, flightOrientation, worldStep, explosions, hits, enemyBolts, target,
+    scene, sounds, messages, ships, activeAsteroids, camera, flightMotion, flightOrientation, worldStep, explosions, hits, enemyBolts, target,
     flightTurn, flightVelocity, advanceFlightHeading, forecastFlightPosition, flightDistanceAt,
     ringShips, flightRings, resetRingShips, updateRingShipCourse, updateRingShipArrivals, courseWorldOffset,
     beginFlightTutorial, completeTutorialStep, spawnTutorialTarget, updateFlightTutorial, updateFlightRing, flightBoundary,
@@ -72,7 +73,7 @@ const code = `
     updateShipHitFlash, updateEngineThrust, updateEngineVisuals, collideShipsWithAsteroids,
     clearEnemyBolts, playerLaserSpeed, setupLevelFleet, updateAsteroidShower, updateShipArrivals, queueShip,
     showerPool, maxShowerRocks, eventAsteroid, fadeAsteroidShader, asteroidShader, encounterRest, corridorCenter, corridorSlope,
-    repairPickup, repairRing, repairMarker, repairNotice, updateRepairPickup, resetRepairPickup,
+    repairPickup, repairRing, repairMarker, updateRepairPickup, resetRepairPickup,
     get shield() { return shield; }, setShield: value => { shield = value; },
     get repairPending() { return repairPending; }, setRepairPending: value => { repairPending = value; },
     hazardPool, updateCollisionHazard, levelFlightSpeed, crossesHull, crossesPlayer, playerHullRotation, hasPassedCamera, asteroidArrivalDistance, setAsteroidCrossing,

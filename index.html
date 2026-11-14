@@ -43,8 +43,7 @@
     #target.locked .target-brackets i { width: 18px; height: 18px; }
     @keyframes target-lock { 0%, 100% { transform: scale(1); } 50% { transform: scale(.9); } }
     @media (prefers-reduced-motion: reduce) { .target-brackets { inset: 0; } #target.locked .target-brackets { animation: none; } }
-    #flight-notices, #flight-alerts, #flight-messages, #action-feedback { display: contents; }
-    .hud { position: fixed; z-index: 3; top: max(22px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; color: #e6f1ff; font-variant-numeric: tabular-nums; }
+    .hud { --hud-top: max(22px, env(safe-area-inset-top)); position: fixed; z-index: 3; top: var(--hud-top); left: max(24px, env(safe-area-inset-left)); right: max(24px, env(safe-area-inset-right)); display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; color: #e6f1ff; font-variant-numeric: tabular-nums; }
     .score-panel, .hud-right { position: relative; z-index: 2; }
     .scoreboard { display: grid; grid-template-columns: auto auto; gap: 10px 30px; padding: 16px 22px; border: 1px solid #a8caff25; border-radius: 18px; background: #091124b8; backdrop-filter: blur(16px); }
     .label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .22em; color: #8babc6; margin-bottom: 5px; }
@@ -62,10 +61,7 @@
     @media (prefers-reduced-motion: reduce) { #shield-hud.low { animation: none; } }
     #shield-hud.low #shield-fill { background: #ff6470; }
     #shield-value { font-size: 11px; }
-    #repair-marker, #repair-notice { position: fixed; z-index: 3; pointer-events: none; color: #a7ffe0; background: #092b28e8; border: 1px solid #7effd599; border-radius: 12px; padding: 6px 10px; font-size: 12px; letter-spacing: .05em; }
-    #repair-marker { transform: translate(-50%, -50%); }
-    #repair-notice { bottom: max(88px, calc(env(safe-area-inset-bottom) + 88px)); left: 50%; transform: translateX(-50%); }
-    #repair-marker[hidden], #repair-notice[hidden] { display: none; }
+    #repair-marker { position: fixed; z-index: 3; transform: translate(-50%, -50%); pointer-events: none; color: #a7ffe0; background: #092b28e8; border: 1px solid #7effd599; border-radius: 12px; padding: 6px 10px; font-size: 12px; letter-spacing: .05em; }
     #flight-ring-wash { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, #6ef5ff29 0%, #33d9ff52 55%, #138dd499 100%); }
     #flight-ring-wash.missed { background: radial-gradient(ellipse at center, #ff493e14 0%, #ff493e33 55%, #c6233066 100%); }
     #flight-ring-guide { position: fixed; z-index: 3; color: #82efff; font-size: 30px; text-shadow: 0 0 14px #36dbff; pointer-events: none; }
@@ -80,9 +76,6 @@
     #capital-hud.charging { border-color: #ffcc77; color: #ffe1a8; }
     #shield-hit { position: fixed; inset: 0; z-index: 5; pointer-events: none; border: 5px solid #ffab52; box-shadow: inset 0 0 100px #ff692966; }
     #shield-hit[hidden] { display: none; }
-    #shower-warning { position: fixed; top: 21%; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none; color: #ffd58c; background: #171c2bdd; padding: 10px 16px; border-radius: 16px; font-size: 12px; text-align: center; }
-    #shower-warning span { display: block; font-size: 28px; margin-bottom: 4px; }
-    #shower-warning[hidden] { display: none; }
     #retry-hud .retry-icons { gap: 3px; }
     #retry-hud .retry-icons span { width: 18px; font-size: 16px; line-height: 20px; }
     #retry-hud .retry-icons .spent::after { font-size: 20px; line-height: 20px; }
@@ -95,13 +88,13 @@
     .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
     .hud-actions { display: flex; gap: 6px; pointer-events: auto; }
     .hud-actions button { background: #10172ca6; border: 1px solid #ffffff20; font-size: 21px; width: 42px; height: 42px; border-radius: 14px; }
-    #feedback { position: fixed; z-index: 2; top: 25%; left: 50%; transform: translateX(-50%); color: #aaffdf; text-align: center; pointer-events: none; font-size: 24px; font-weight: 700; text-shadow: 0 0 25px #3bffc9; opacity: 0; }
+    #action-feedback { position: fixed; bottom: calc(50dvh + 32px); left: 50%; transform: translateX(-50%); width: calc(100% - 24px); display: flex; justify-content: center; z-index: 3; pointer-events: none; }
+    #feedback { width: max-content; max-width: 100%; color: #aaffdf; text-align: center; pointer-events: none; font-size: 24px; font-weight: 700; line-height: 1.2; text-shadow: 0 0 25px #3bffc9; opacity: 0; overflow-wrap: anywhere; }
     #feedback-value { display: block; font-weight: 800; }
     #feedback-detail { display: block; margin-top: 3px; font-size: 13px; line-height: 1.3; }
     #feedback-detail:empty { display: none; }
-    #feedback.pop { animation: reward .9s ease-out; }
+    #feedback.pop { animation: action-reward .9s ease-out; }
     #feedback.negative { color: #ff7b86; text-shadow: 0 0 25px #ff344f80; }
-    @keyframes reward { 0% { opacity: 0; translate: 0 14px; } 15%, 65% { opacity: 1; } 100% { opacity: 0; translate: 0 -25px; } }
     #flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse, #ffb65e18, transparent 75%); opacity: 0; }
     #target .health { position: absolute; left: 8px; right: 8px; bottom: -24px; display: flex; gap: 4px; }
     #target .health i { flex: 1; height: 3px; background: #c4a0ff26; border-radius: 3px; overflow: hidden; }
@@ -137,7 +130,7 @@
     #control-hints.go h2 { font-size: 24px; }
     #control-hints.go #control-input { display: none; }
     @media (prefers-reduced-motion: reduce) { #control-hints { transition: none; } }
-    @media (max-width: 600px) { .hud { left: 12px; right: 12px; top: 12px; } .scoreboard { gap: 15px; padding: 12px; } .number { font-size: 20px; } .label { font-size: 8px; } .hud-actions { flex-direction: column; } }
+    @media (max-width: 600px) { .hud { --hud-top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); } .scoreboard { gap: 15px; padding: 12px; } .number { font-size: 20px; } .label { font-size: 8px; } .hud-actions { flex-direction: column; } }
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; opacity: 1; } }
     [hidden] { display: none !important; }
     .intro { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at center, #071329c9, #07132940 58%, #03071133); padding: 24px; }
@@ -196,7 +189,6 @@
     .reticle.firing { background: #ffb24d35; box-shadow: 0 0 16px currentColor; }
     .reticle.empty { border-style: solid; background: #ff303050; box-shadow: 0 0 18px #ff3030b0; }
     #hit-cross { position: fixed; width: 36px; height: 36px; pointer-events: none; opacity: 0; transform: translate(-50%, -50%) rotate(45deg); border: 3px solid #ffe4a0; border-radius: 7px; }
-    #flight-state { position: fixed; left: 50%; top: 130px; transform: translateX(-50%); color: #9ac9dc; font-size: 10px; letter-spacing: .25em; pointer-events: none; }
     @media (max-width: 900px) { .brand { display: none; } }
     @media (prefers-reduced-motion: reduce) { #feedback.pop { animation: none; } }
     button:hover { background: #b9dfff14; }
@@ -224,8 +216,14 @@
     .number { font-variant-numeric: tabular-nums; }
     #score { color: #f0fcff; }
     .scoreboard { background: #0b1628c9; border-color: #93c7dc25; border-radius: 16px; gap: 26px; }
-    #flight-state { background: #091629c9; border-radius: 20px; padding: 10px 16px; text-align: center; line-height: 1.6; }
-    #flight-state:empty { display: none; }
+    /* Routine status and countdown have separate, reserved rows. No floating offsets. */
+    #flight-overview { position: fixed; top: calc(var(--hud-panels-bottom) + 12px); left: 50%; transform: translateX(-50%); width: calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)); display: grid; justify-items: center; gap: 12px; z-index: 1; }
+    #flight-notices { display: grid; justify-items: center; align-items: start; min-height: 34px; width: 100%; }
+    #flight-notices > *, #collision-alert { width: fit-content; min-width: 0; max-width: 100%; padding: 8px 12px; border: 1px solid #93c7dc33; border-radius: 10px; background: #0b1628e6; font-size: 12px; line-height: 1.3; letter-spacing: .04em; text-align: center; text-wrap: balance; overflow-wrap: anywhere; }
+    #flight-state { color: #9ac9dc; }
+    #flight-state:empty, #flight-notices:has(#shower-warning:not([hidden])) #flight-state { display: none; }
+    #shower-warning { color: #ffd58c; border-color: #ffd58c55; }
+    #shower-warning span[aria-hidden] { margin-right: 6px; }
     .credits { color: #91aabd; text-underline-offset: 3px; }
     @media (max-width: 600px) { .scoreboard { gap: 17px; } .label { font-size: 8px; } }
     #round-clock { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; border-top: 1px solid #93c7dc20; padding-top: 8px; font-variant-numeric: tabular-nums; }
@@ -236,9 +234,7 @@
     #time-left { grid-column: 3; width: 88px; height: 24px; line-height: 24px; text-align: right; white-space: nowrap; color: #a9bfd0; font-size: 16px; }
     #level-label { color: #7effd5; letter-spacing: .03em; }
     #round-clock.urgent #time-left { color: #ffac73; }
-    #end-countdown { position: fixed; top: calc(20dvh + 4px); left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 4px; width: max-content; color: #7effd5; font-size: clamp(32px, 10dvh, 48px); font-weight: 800; line-height: 1; text-align: center; text-shadow: 0 0 22px #7effd566; pointer-events: none; }
-    /* Lower these without reflow; important HUD messages may cover them when space is tight. */
-    #end-countdown, #shower-warning { translate: 0 30px; z-index: 0; }
+    #end-countdown { display: flex; flex-direction: column; align-items: center; gap: 6px; width: max-content; color: #7effd5; font-size: clamp(32px, 6dvh, 48px); font-weight: 800; line-height: 1; text-align: center; text-shadow: 0 0 22px #7effd566; pointer-events: none; }
     #countdown-number { display: block; width: 1.2em; }
     .countdown-track { display: flex; align-items: center; gap: 4px; }
     .countdown-track i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
@@ -289,16 +285,17 @@
     #new-record .icon { width: 28px; height: 28px; }
     #round-end #play-again { width: 100%; min-width: 0; margin: 10px 0 0; pointer-events: auto; }
     body.defeated .reticle { visibility: hidden; }
-    @media (max-width: 600px) { #flight-state { top: 174px; } }
     @media (max-width: 450px) { .scoreboard { gap: 12px; } .scoreboard .number { font-size: 18px; } #best { font-size: 11px; } }
     #flight-path { position: fixed; left: 50%; top: 50%; width: 18px; height: 18px; border: 1px solid #d7edff99; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
     #flight-path::before { content: ''; position: absolute; top: 7px; left: -9px; width: 8px; height: 1px; background: #d7edff99; box-shadow: 25px 0 #d7edff99; }
-    #collision-alert { position: fixed; top: calc(50dvh + 64px); left: 50%; transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100vw - 24px); padding: 10px 16px; border: 1px solid #ff997a77; border-radius: 12px; color: #ffd4b9; background: #351b20e8; font-size: 11px; letter-spacing: .12em; text-align: center; pointer-events: none; }
+    #collision-alert { position: fixed; top: calc(50dvh + 64px); left: 50%; transform: translateX(-50%); z-index: 3; max-width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)); color: #ffd4b9; border-color: #ff997a77; background: #351b20e8; pointer-events: none; }
     .hud:has(#collision-alert:not([hidden])) #control-hints { visibility: hidden; }
+    .hud:has(#control-hints:not([hidden])) #action-feedback { display: none; }
     #danger-vignette { position: fixed; inset: 0; z-index: 2; background: #cd19183d; box-shadow: inset 0 0 125px #ef352b88; opacity: 0; pointer-events: none; transition: opacity .2s; }
     #danger-vignette.warning { animation: danger-pulse .84s ease-in-out infinite; }
     @keyframes danger-pulse { 0%, 100% { opacity: .25; } 50% { opacity: .8; } }
-    #impact-label { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); color: #fff0d9; font-size: clamp(26px, 6vw, 50px); font-weight: 800; letter-spacing: .14em; text-shadow: 0 2px 25px #5b100a; pointer-events: none; }
+    #impact-label { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); width: min(720px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))); color: #fff0d9; font-size: clamp(24px, 5vw, 42px); font-weight: 800; line-height: 1.2; letter-spacing: .06em; text-align: center; text-wrap: balance; text-shadow: 0 2px 25px #5b100a; pointer-events: none; }
+    body:has(#impact-label:not([hidden])) :is(.hud, #shield-hud, .reticle, #flight-path, #touch-controls) { visibility: hidden; }
     #crash-fire { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 6; pointer-events: none; }
     #impact-label { z-index: 7; }
     #flash.impact { background: radial-gradient(ellipse, #ffab4844 0%, #ff773333 45%, #49111b44 100%); }
@@ -356,7 +353,7 @@
       #touch-weapons { left: calc(32px + env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom)); }
       #touch-joystick { right: calc(32px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
       #touch-controls #touch-power { left: 88px; bottom: 48px; }
-      body.touch-device .hud { top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); }
+      body.touch-device .hud { --hud-top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); }
       body.touch-device .hud-actions { flex-direction: row; }
       body.touch-device #capital-hud { width: min(320px, calc(100vw - 416px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
       body.touch-device #capital-hud strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -364,32 +361,38 @@
     body.touch-device #control-hints :is(#control-mouse, #control-cursor) { display: none; }
     body.touch-device #control-hints.space-key #control-input { min-width: 0; padding: 6px 10px; border: 0; background: #071629d9; box-shadow: none; }
     @media (orientation: landscape) {
-      /* Center on the viewport; equal clearance on both sides keeps the HUD panels clear. */
-      body .hud { top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); }
-      #flight-notices, #action-feedback { position: fixed; left: 50%; width: max(0px, calc(100vw - 2 * var(--hud-clearance))); transform: translateX(-50%); }
+      /* Equal side clearance keeps the central lanes clear of score and toolbar. */
+      body .hud { --hud-top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); }
+      #flight-overview, #action-feedback { width: max(0px, min(480px, calc(100vw - 2 * var(--hud-clearance)))); }
+      #flight-overview { top: var(--hud-top); }
       body .hud-actions { flex-direction: row; }
-      #collision-alert { padding: 4px 8px; border-radius: 8px; font-size: 12px; line-height: 1.3; letter-spacing: .04em; }
       .brand { display: none; }
-      #flight-notices { top: max(12px, env(safe-area-inset-top)); z-index: 1; display: grid; justify-items: center; gap: 4px; min-width: 0; }
-      #flight-alerts, #flight-messages { display: grid; justify-items: center; width: 100%; min-width: 0; }
-      #flight-notices :is(#shower-warning, #repair-notice, #control-hints, #flight-state) { position: static; inset: auto; transform: none; width: fit-content; min-width: 0; max-width: 100%; margin: 0; font-size: 12px; line-height: 1.3; letter-spacing: .04em; text-align: center; white-space: normal; overflow-wrap: anywhere; }
-      #flight-notices :is(#shower-warning, #repair-notice, #flight-state) { padding: 4px 8px; border-radius: 8px; }
-      #flight-notices #shower-warning span { display: inline; font-size: inherit; margin: 0; }
-      #flight-notices #shower-warning span[aria-hidden] { font-size: 16px; margin-right: 6px; }
-      #flight-notices #control-input { min-width: 0; max-width: 100%; }
-      /* The corridor takes priority over repair notices; collision warnings stay near the aim. */
-      #flight-alerts > :not([hidden]) ~ * { display: none; }
-      #flight-alerts:not(:has(> :not([hidden]))) { display: none; }
-      #flight-messages:not(:has(#control-hints:not([hidden]), #flight-state:not(:empty))) { display: none; }
-      #flight-messages:has(#control-hints:not([hidden])) #flight-state,
-      .hud:has(#feedback.pop) :is(#flight-state, #control-hints),
-      #flight-notices:has(#flight-alerts > :not([hidden])) :is(#flight-state, #control-hints) { display: none; }
-      /* Immediate feedback stays above the aiming area, independent of the HUD timer. */
-      #action-feedback { bottom: calc(50dvh + 32px); display: flex; justify-content: center; min-width: 0; z-index: 3; pointer-events: none; }
-      #action-feedback #feedback { position: static; inset: auto; transform: none; min-width: 0; width: max-content; max-width: min(420px, 100%); font-size: clamp(20px, 2.6vw, 28px); line-height: 1.2; overflow-wrap: anywhere; }
-      #action-feedback #feedback:not(.pop) { display: none; }
-      #action-feedback #feedback.pop { animation-name: action-reward; }
-      #action-feedback #feedback-detail { font-size: clamp(11px, 1.4vw, 13px); }
+      #feedback { font-size: clamp(20px, 2.6vw, 28px); }
+      #feedback-detail { font-size: clamp(11px, 1.4vw, 13px); }
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      #flight-overview { gap: 8px; }
+      body.touch-device #control-hints { max-width: max(0px, min(420px, calc(100vw - 2 * var(--hud-clearance)))); }
+      #flight-notices { min-height: 26px; }
+      #flight-notices > *, #collision-alert { padding: 4px 8px; border-radius: 8px; }
+      #end-countdown { flex-direction: row; gap: 6px; font-size: 28px; }
+      #collision-alert { top: calc(50dvh + 28px); }
+    }
+    @media (orientation: portrait) and (max-height: 700px) {
+      #flight-overview { top: calc(var(--hud-panels-bottom) + 8px); grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+      #flight-notices { align-items: center; }
+      #flight-notices > * { padding: 6px 8px; font-size: 11px; }
+      #shower-warning span[aria-hidden] { display: none; }
+      #end-countdown { flex-direction: row; font-size: 28px; }
+      #action-feedback { bottom: calc(50dvh + 24px); }
+      #feedback { font-size: 20px; }
+      #feedback-detail { font-size: 11px; }
+      #collision-alert { top: calc(50dvh + 28px); padding: 4px 8px; font-size: 11px; }
+      #touch-weapons { left: calc(32px + env(safe-area-inset-left)); bottom: calc(114px + env(safe-area-inset-bottom)); }
+      #touch-controls #touch-power { left: -12px; }
+      #touch-joystick { right: calc(32px + env(safe-area-inset-right)); bottom: calc(104px + env(safe-area-inset-bottom)); }
+      body.touch-device #capital-hud { bottom: calc(56px + env(safe-area-inset-bottom)); }
+      #capital-state { display: none; }
     }
     @media (orientation: landscape) and (max-height: 600px) {
       body .hud .scoreboard { padding: 8px 10px; gap: 6px 12px; border-radius: 12px; }
@@ -404,7 +407,7 @@
       body .hud #time-left { font-size: 13px; }
       body .hud #level-progress { height: 3px; }
       /* Keep the original vertical result card, with a little less height on short screens. */
-      body:has(#round-end[open]) :is(.score-panel, #flight-notices, #collision-alert, #action-feedback, #shield-hud) { visibility: hidden; }
+      body:has(#round-end[open]) :is(.score-panel, #flight-overview, #collision-alert, #action-feedback, #shield-hud) { visibility: hidden; }
       #round-end { inset: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); margin: auto; transform: none; width: min(340px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))); height: fit-content; max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
       #round-end .intro-card { padding: 16px 20px; }
       #round-end #round-symbol { width: 48px; height: 48px; margin: 0 auto 8px; }
@@ -420,19 +423,18 @@
       #round-end #play-again { min-height: 48px; }
       #round-end #play-again .icon { width: 26px; height: 26px; }
     }
-    @media (orientation: landscape) and (max-height: 480px) {
-      body:has(#collision-alert:not([hidden])) #capital-hud { visibility: hidden; }
-    }
     @media (orientation: landscape) and (max-height: 400px) {
-      #end-countdown { top: calc(20dvh + 8px); gap: 3px; }
+      body.touch-device #capital-hud { bottom: calc(56px + env(safe-area-inset-bottom)); }
+      #capital-state { display: none; }
       .countdown-track { gap: 3px; }
       .countdown-track i { width: 4px; height: 4px; }
       .countdown-track .icon { width: 12px; height: 12px; }
     }
     @media (orientation: landscape) and (max-height: 360px) {
-      #collision-alert, #flight-notices #flight-alerts > * { font-size: 11px; letter-spacing: 0; }
-      #flight-notices #shower-warning span[aria-hidden] { display: none; }
-      #end-countdown { top: calc(20dvh + 2px); flex-direction: row; gap: 6px; font-size: 28px; }
+      #collision-alert, #flight-notices > * { font-size: 11px; letter-spacing: 0; }
+      #flight-overview { gap: 4px; }
+      #end-countdown { font-size: 24px; }
+      #shower-warning span[aria-hidden] { display: none; }
       #action-feedback { bottom: calc(50dvh + 20px); }
       #round-end .intro-card { padding-block: 10px; }
       #round-end #round-symbol { width: 32px; height: 32px; }
@@ -440,29 +442,14 @@
     @media (orientation: landscape) and (max-width: 700px) {
       body:has(#round-end[open]) .hud-actions { flex-direction: column; }
     }
-    @media (orientation: landscape) and (min-width: 901px) and (min-height: 600px) {
-      /* Desktop keeps the larger, more spacious notices; touch layouts stay compact. */
-      body:not(.touch-device) .brand { display: block; }
-      /* Keep fixed tutorial coordinates relative to the viewport, not this rail. */
-      body:not(.touch-device) #flight-notices { top: 10dvh; left: 0; right: 0; margin-inline: auto; transform: none; }
-      body:not(.touch-device) #flight-notices #flight-messages #control-hints { display: flex; position: fixed; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px); }
-      body:not(.touch-device) #control-hints.space-key #control-input { min-width: 170px; }
-      body:not(.touch-device) #collision-alert,
-      body:not(.touch-device) #flight-notices :is(#repair-notice, #flight-state) { padding: 10px 16px; border-radius: 12px; font-size: 16px; letter-spacing: .08em; }
-      /* The 10vh notice rail + 11vh offset keeps the original shower anchor, now 15px lower. */
-      body:not(.touch-device) #flight-notices #shower-warning { translate: 0 calc(11dvh + 15px); padding: 10px 16px; border-radius: 16px; font-size: 12px; line-height: 1.15; }
-      body:not(.touch-device) #flight-notices #shower-warning span { display: block; font-size: inherit; margin: 0; }
-      body:not(.touch-device) #flight-notices #shower-warning span[aria-hidden] { font-size: 28px; margin-bottom: 4px; }
-      body:not(.touch-device) #end-countdown { top: 24dvh; transform: translateX(-50%); gap: 8px; font-size: clamp(36px, 6dvh, 48px); }
-      body:not(.touch-device) .countdown-track { gap: 7px; }
-      body:not(.touch-device) .countdown-track i { width: 7px; height: 7px; }
-      body:not(.touch-device) .countdown-track .icon { width: 24px; height: 24px; margin-left: 5px; }
-      body:not(.touch-device) #action-feedback { top: calc(25dvh + 45px); bottom: auto; }
-      body:not(.touch-device) #action-feedback #feedback { max-width: 100%; font-size: 40px; font-weight: 700; }
-      body:not(.touch-device) #action-feedback #feedback-detail { font-size: 20px; }
-      @media (prefers-reduced-motion: no-preference) {
-        body:not(.touch-device) #action-feedback #feedback.pop { animation-name: reward; }
-      }
+    @media (orientation: landscape) and (min-width: 901px) and (min-height: 601px) {
+      /* The same zones on desktop, with more breathing room rather than new anchors. */
+      body:not(.touch-device) #flight-overview { gap: 16px; }
+      body:not(.touch-device) #flight-notices { min-height: 40px; }
+      body:not(.touch-device) #flight-notices > *, body:not(.touch-device) #collision-alert { padding: 10px 16px; font-size: 14px; }
+      body:not(.touch-device) #action-feedback { bottom: calc(50dvh + 64px); }
+      body:not(.touch-device) #feedback { font-size: 36px; }
+      body:not(.touch-device) #feedback-detail { font-size: 16px; }
     }
     @keyframes action-reward { 0% { opacity: 0; scale: .94; } 15%, 65% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 1; } }
     @media (prefers-reduced-motion: reduce) { #action-feedback #feedback.pop { animation: none; opacity: 1; } }
@@ -571,21 +558,18 @@
       <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Verbleibende Spielzeit"><span class="label" data-i18n="time">Zeit</span><span id="performance-hud" aria-live="off" hidden data-i18n-title="frameStats" title="Gerenderte Bilder pro Sekunde und mittlere Framezeit, gemittelt über etwa eine Sekunde. Keine Simulationsrate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Levelfortschritt" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
     </div>
     </div>
-    <div id="flight-notices">
-      <div id="flight-alerts">
+    <div id="flight-overview">
+      <div id="flight-notices">
         <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span><span data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span></div>
-        <div id="repair-notice" hidden role="status"></div>
+        <div id="flight-state" role="status"></div>
       </div>
-      <div id="flight-messages">
-        <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
-          <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
-          <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS LENKEN</span></span>
-        </aside>
-        <div id="flight-state"></div>
-      </div>
+      <div id="end-countdown" role="timer" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
     </div>
+    <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
+      <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS LENKEN</span></span>
+    </aside>
     <div id="collision-alert" data-i18n="collisionWarning" hidden role="status" aria-atomic="true">KOLLISIONSKURS!</div>
-    <div id="end-countdown" role="timer" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
     <div id="action-feedback">
       <div id="feedback" aria-live="polite" aria-atomic="true"><strong id="feedback-value"></strong> <span id="feedback-detail"></span></div>
     </div>
@@ -673,9 +657,10 @@
     const status = document.querySelector('#status');
     const hud = document.querySelector('.hud'), scorePanel = document.querySelector('.score-panel'), hudActions = document.querySelector('.hud-actions');
     function updateHudClearance() {
-      const left = scorePanel.getBoundingClientRect().right;
-      const right = innerWidth - hudActions.getBoundingClientRect().left;
-      hud.style.setProperty('--hud-clearance', `${Math.ceil(Math.max(left, right) + 12)}px`);
+      const scoreBounds = scorePanel.getBoundingClientRect(), actionsBounds = hudActions.getBoundingClientRect();
+      const right = innerWidth - actionsBounds.left;
+      hud.style.setProperty('--hud-clearance', `${Math.ceil(Math.max(scoreBounds.right, right) + 12)}px`);
+      hud.style.setProperty('--hud-panels-bottom', `${Math.ceil(Math.max(scoreBounds.bottom, actionsBounds.bottom))}px`);
     }
     // Recalculate only when viewport, localized content or button visibility changes, not each frame.
     const hudResizeObserver = new ResizeObserver(updateHudClearance);
@@ -2558,7 +2543,6 @@
         shieldHud.style.animationPlayState = paused || document.hidden ? 'paused' : 'running';
       }
       const repairMarker = document.querySelector('#repair-marker');
-      const repairNotice = document.querySelector('#repair-notice');
       const repairPickup = new THREE.Group();
       const repairShell = new THREE.MeshStandardMaterial({ color: 0x123d37, metalness: .45, roughness: .4 });
       const repairLight = new THREE.MeshStandardMaterial({ color: 0xb8ffe4, emissive: 0x56eeb2, emissiveIntensity: 1.4 });
@@ -2576,19 +2560,17 @@
       repairPickup.userData.collisionBox = new THREE.Box3(new THREE.Vector3(-18, -18, -3), new THREE.Vector3(18, 18, 3));
       repairPickup.visible = false;
       scene.add(repairPickup);
-      let repairPending = false, repairNoticeUntil = 0;
+      let repairPending = false;
       const repairPrevious = new THREE.Vector3(), repairClosest = new THREE.Vector3(), repairProjected = new THREE.Vector3();
       const repairPath = new THREE.Line3();
       function resetRepairPickup() {
         repairPending = Math.random() < .6;
         repairPickup.visible = false;
         repairRing.rotation.z = 0;
-        repairNoticeUntil = 0;
-        repairMarker.hidden = true; repairNotice.hidden = true;
+        repairMarker.hidden = true;
       }
       function updateRepairPickup(dt) {
         repairMarker.hidden = true;
-        repairNotice.hidden = paused || !started || roundEnded || crashing || gameTime >= repairNoticeUntil;
         if (!started || paused || roundEnded || crashing) return;
         if (repairPending && !repairPickup.visible && shield < 100 && encounterRest() && flightMotion.length() > 25) {
           const distance = Math.max(reducedMotion ? 140 : 500, flightMotion.length() * .85 * 3.5);
@@ -2610,9 +2592,7 @@
           shield += restored;
           updateShield();
           repairPickup.visible = false;
-          repairNotice.textContent = t('repaired', { amount: restored });
-          repairNoticeUntil = gameTime + 1.5;
-          repairNotice.hidden = false;
+          showFeedback(t('repaired', { amount: restored }));
           playSound('reward');
           return;
         }
@@ -3439,7 +3419,7 @@
         touchControls.reset();
         if (pauseMenu.open) pauseMenu.close();
         showerWarning.hidden = true;
-        repairPickup.visible = false; repairMarker.hidden = true; repairNotice.hidden = true;
+        repairPickup.visible = false; repairMarker.hidden = true;
         shieldHitTime = 0; shieldHit.hidden = true;
         updateShield(false);
         crashFlames = Array.from({ length: 24 }, () => ({
@@ -3504,7 +3484,7 @@
         capitalHud.hidden = true;
         showerWarning.hidden = true;
         showerGrit.visible = false;
-        repairPickup.visible = false; repairMarker.hidden = true; repairNotice.hidden = true;
+        repairPickup.visible = false; repairMarker.hidden = true;
         updateRetries();
         updateClock();
         if (crashed) speed = 0;
@@ -4618,7 +4598,9 @@
         shieldHit.hidden = shieldHitTime === 0;
         shieldHit.style.opacity = reducedMotion ? '.6' : String(shieldHitTime / .55);
         renderShieldHud();
-        document.querySelector('#flight-state').textContent = !started || paused || crashing || roundEnded ? '' : speed > 650 ? t('finalSprint') : '';
+        const flightState = document.querySelector('#flight-state');
+        const flightStatus = !started || paused || crashing || roundEnded ? '' : speed > 650 ? t('finalSprint') : '';
+        if (flightState.textContent !== flightStatus) flightState.textContent = flightStatus;
         const cross = document.querySelector('#hit-cross');
         cross.style.opacity = hitMarker > 0 ? 1 : 0;
         cross.style.left = reticle.style.left || '50%'; cross.style.top = reticle.style.top || '50%';
@@ -4637,7 +4619,6 @@
           flightPath.style.top = `${(-heading.y * .5 + .5) * innerHeight}px`;
         }
         repairMarker.hidden = repairMarker.hidden || paused || roundEnded || crashing;
-        repairNotice.hidden = paused || !started || roundEnded || crashing || gameTime >= repairNoticeUntil;
         renderFlightRingFeedback();
         renderFlightBoundaryFeedback();
         capitalHud.hidden = !started || paused || roundEnded || crashing || !capitalShip?.visible;

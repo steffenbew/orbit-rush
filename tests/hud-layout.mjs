@@ -18,15 +18,29 @@ assert.match(hud, /id="time-left"[^>]*role="timer"/);
 assert.match(hud, /id="end-countdown"[^>]*role="timer"/);
 console.log('PASS accessible tutorial/feedback announcements and countdown timer');
 
+const overview = section('    <div id="flight-overview">', '    <aside id="control-hints"');
+assert.ok(overview.includes('id="flight-notices"') && overview.includes('id="end-countdown"'));
+assert.doesNotMatch(overview, /id="(?:feedback|collision-alert|control-hints|capital-hud)"/, 'Routine status and countdown stay separate from action/danger/tutorial/boss overlays');
+assert.doesNotMatch(source, /repair-notice|repairNoticeUntil/, 'Repairs use shared action feedback, not a second notification');
+assert.doesNotMatch(source, /translate: 0 30px/, 'No arbitrary downward offsets for countdown or corridor notices');
+const countdownStyle = section('    #end-countdown {', '    #countdown-number {');
+assert.doesNotMatch(countdownStyle, /position: fixed|translate/, 'Countdown stays in its reserved layout row, not an independent floating overlay');
+assert.ok(source.includes('.hud:has(#control-hints:not([hidden])) #action-feedback { display: none; }'), 'Tutorial takes precedence even when feedback has inline visibility');
+assert.ok(source.includes('if (flightState.textContent !== flightStatus)'), 'Do not re-announce unchanged live status every frame');
+assert.match(source, /#impact-label \{[^}]*width: min\(720px,[^}]*text-align: center/, 'Long crash labels have a bounded, centered layout');
+assert.ok(source.includes('body:has(#impact-label:not([hidden]))'), 'Crash presentation clears competing gameplay overlays');
+console.log('PASS separate HUD zones, shared repairs and bounded crash labels');
+
 // Execute the actual resize handling: toolbar changes must change width, never the centerline.
 const clearanceCode = section('    function updateHudClearance()', '    let getRenderState =');
-let geometry = {scoreRight: 232, actionsLeft: 704}, clearance, onResize;
+let geometry = {scoreRight: 232, actionsLeft: 704, scoreBottom: 136, actionsBottom: 60}, clearance, panelsBottom, onResize;
 const observed = [];
 const header = {style: {setProperty(name, value) {
-  assert.equal(name, '--hud-clearance'); clearance = parseFloat(value);
+  if (name === '--hud-clearance') clearance = parseFloat(value);
+  else { assert.equal(name, '--hud-panels-bottom'); panelsBottom = parseFloat(value); }
 }}};
-const scorePanel = {getBoundingClientRect: () => ({right: geometry.scoreRight})};
-const actions = {getBoundingClientRect: () => ({left: geometry.actionsLeft})};
+const scorePanel = {getBoundingClientRect: () => ({right: geometry.scoreRight, bottom: geometry.scoreBottom})};
+const actions = {getBoundingClientRect: () => ({left: geometry.actionsLeft, bottom: geometry.actionsBottom})};
 class Observer {
   constructor(callback) { onResize = callback; }
   observe(element) { observed.push(element); }
@@ -37,15 +51,18 @@ const resize = new Function('hud', 'scorePanel', 'hudActions', 'ResizeObserver',
 `)(header, scorePanel, actions, Observer, 912);
 assert.deepEqual(observed, [header, scorePanel, actions], 'Observe viewport width and both actual side-panel sizes');
 assert.equal(clearance, 244);
+assert.equal(panelsBottom, 136, 'Portrait notices clear the actual score panel');
+geometry.actionsBottom = 176.2; onResize();
+assert.equal(panelsBottom, 177, 'A vertical toolbar or safe area also contributes to portrait clearance');
 geometry.actionsLeft = 762; onResize();
 assert.equal(clearance, 244, 'Hiding Fullscreen does not move the message center or widen past the score panel');
-geometry = {scoreRight: 204, actionsLeft: 668}; onResize();
+geometry = {scoreRight: 204, actionsLeft: 668, scoreBottom: 128, actionsBottom: 60}; onResize();
 assert.equal(clearance, 256, 'A wider right side or asymmetric notch reserves equal space on both sides');
-geometry = {scoreRight: 240.2, actionsLeft: 762}; onResize();
+geometry = {scoreRight: 240.2, actionsLeft: 762, scoreBottom: 128, actionsBottom: 60}; onResize();
 assert.equal(clearance, 253, 'Round subpixel panel edges outward to preserve the gap');
 geometry.scoreRight = 300; onResize();
 assert.equal(clearance, 312, 'Longer localized text or scores cannot run into a centered notice');
-geometry = {scoreRight: 204, actionsLeft: 388}; resize(568);
+geometry = {scoreRight: 204, actionsLeft: 388, scoreBottom: 128, actionsBottom: 60}; resize(568);
 assert.equal(clearance, 216, 'Rotation recomputes clearance using the current viewport');
 console.log('PASS resize-driven symmetric clearance, optional toolbar buttons, unequal safe areas, longer content and rotation');
 

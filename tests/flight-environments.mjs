@@ -497,20 +497,21 @@ for (const reducedMotion of [false, true]) {
   assert.ok(repairs.repairPickup.position.equals(position)); repairs.setRoundEnded(false);
   repairs.repairPickup.position.set(0, 0, -60); repairs.updateRepairPickup(1 / 60);
   assert.equal(repairs.shield, 75, 'Swept collection must work even when a frame crosses the pickup');
-  assert.equal(repairs.repairPickup.visible, false); assert.equal(repairs.repairNotice.textContent, '+25 SCHILD');
+  assert.equal(repairs.repairPickup.visible, false);
+  assert.deepEqual(repairs.messages.at(-1), {message: '+25 SCHILD', negative: false}, 'Repairs use the same action feedback as checkpoints');
   assert.deepEqual(repairs.sounds, ['reward']); repairs.updateRepairPickup(0);
   assert.deepEqual(repairs.sounds, ['reward'], 'Collection must happen only once');
   repairs.resetRepairPickup(); repairs.setRepairPending(true); repairs.setShield(100); repairs.worldStep.set(0, 0, 0);
   repairs.updateRepairPickup(0); assert.equal(repairs.repairPickup.visible, false, 'Save the opportunity while shield is full');
   repairs.setShield(90); repairs.setTime(28); repairs.updateRepairPickup(0);
   repairs.repairPickup.position.set(0, 0, -60); repairs.worldStep.set(0, 0, 140); repairs.updateRepairPickup(1 / 60);
-  assert.equal(repairs.shield, 100); assert.equal(repairs.repairNotice.textContent, '+10 SCHILD');
+  assert.equal(repairs.shield, 100); assert.deepEqual(repairs.messages.at(-1), {message: '+10 SCHILD', negative: false});
   repairs.resetRepairPickup(); repairs.setRepairPending(true); repairs.setShield(50); repairs.worldStep.set(0, 0, 0);
   repairs.updateRepairPickup(0); repairs.repairPickup.position.set(100, 0, 200); repairs.updateRepairPickup(0);
   assert.equal(repairs.repairPickup.visible, false); assert.equal(repairs.shield, 50, 'Missed pickups do not repair automatically');
   repairs.setTime(29); repairs.updateRepairPickup(0); assert.equal(repairs.repairPickup.visible, false, 'A missed pickup does not respawn');
   repairs.setupLevelFleet();
-  assert.equal(repairs.repairPickup.visible, false); assert.equal(repairs.repairNotice.hidden, true);
+  assert.equal(repairs.repairPickup.visible, false); assert.equal(repairs.repairMarker.hidden, true);
   assert.equal(repairs.scene.children.filter(object => object === repairs.repairPickup).length, 1, 'Reuse one pickup model across attempts');
 }
 const litRockShader = { fragmentShader: THREE.ShaderLib.standard.fragmentShader };

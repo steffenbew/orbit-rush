@@ -199,7 +199,7 @@ assert.ok(section('      function updateShipArrivals(', '      function updateRe
 assert.ok(section('      async function startGame(', "      document.querySelector('#start')").includes('beginFlightTutorial();'));
 assert.ok(!section('      function fireRocket(', '        camera.updateMatrixWorld();').includes('completeTutorialStep'));
 assert.ok(source.includes('if (tutorialStage === 3 && gameTime >= courseStartTime + roundDuration - 1e-9) finishRound();'));
-const markup = section('  <aside id="control-hints"', '  <div id="flight-state"');
+const markup = section('    <aside id="control-hints"', '    <div id="collision-alert"');
 assert.ok(markup.includes('role="status"') && markup.includes('aria-atomic="true"'));
 assert.ok(markup.includes('data-i18n="checkpointTitle"'));
 assert.ok(source.includes('#control-hints.checkpoint-step #control-mouse { display: none; }'));
