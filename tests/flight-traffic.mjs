@@ -569,6 +569,19 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   const handoffOffset = lesson.courseWorldOffset.clone();
   const nextGate = lesson.flightRings.find(gate => !gate.userData.resolved);
   const checkpointDistance = lesson.camera.position.z - nextGate.position.z;
+  assert.equal(nextGate.userData.fadeStart, Infinity, 'Hold the closer checkpoint hidden until the first enemy arrives');
+  if (!lesson.corridorPlan) {
+    assert.ok(Math.abs(checkpointDistance - lesson.flightDistanceAt(10)) < 1e-8, 'Pull only the first post-tutorial gate forward to the ten-second course position');
+    assert.ok(Math.abs(nextGate.userData.reinforcementDepth - lesson.flightDistanceAt(12) / 6) < 1e-8, 'Keep the approved first-enemy arrival distance');
+    for (const [index, time] of [[2, 22], [3, 32], [4, 40]]) {
+      assert.ok(Math.abs(lesson.camera.position.z - lesson.flightRings[index].position.z - lesson.flightDistanceAt(time)) < 1e-8,
+        'Later checkpoint depths stay unchanged');
+    }
+  }
+  lesson.flightMotion.set(0, 0, -lesson.levelFlightSpeed(0));
+  const leadDistance = -lesson.flightMotion.z * .85 * .5;
+  const arrivalFraction = (nextGate.userData.reinforcementDepth - leadDistance) / checkpointDistance;
+  assert.ok(arrivalFraction < nextGate.userData.reinforcementDepth / checkpointDistance, 'Release the first enemy half a second of forward travel earlier');
   const advanceToCheckpoint = fraction => {
     const travel = lesson.courseWorldOffset.z - handoffOffset.z;
     lesson.worldStep.set(0, 0, (checkpointDistance * fraction - travel) / .85);
@@ -586,9 +599,11 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   const earlyShips = queued.filter(ship => !ship.userData.type.asteroid).slice(0, 2);
   lesson.setTime(55.59); lesson.updateShipArrivals(.05);
   assert.equal(earlyShips[0].visible, false, 'Elapsed time alone must not release the first post-tutorial ship');
-  advanceToCheckpoint(1 / 3 - .001); lesson.updateShipArrivals(.05);
-  assert.equal(earlyShips[0].visible, false, 'Keep the first third of the checkpoint approach clear');
-  advanceToCheckpoint(1 / 3 + .001);
+  advanceToCheckpoint(arrivalFraction - .001); lesson.updateShipArrivals(.05);
+  assert.equal(earlyShips[0].visible, false, 'Wait until half a second before the original arrival point');
+  assert.equal(nextGate.children[0].material.opacity, 0, 'No checkpoint rim before the first enemy');
+  assert.equal(nextGate.children[1].material.uniforms.brightness.value, 0, 'No checkpoint halo before the first enemy');
+  advanceToCheckpoint(arrivalFraction + .001);
   lesson.flightOrientation.set(.2, -.3, 0, 'YXZ'); // Spawn beside the fixed gate, not along this new heading.
   for (const [slot, ship] of earlyShips.entries()) {
     if (slot > 0) {
@@ -627,6 +642,25 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     if (slot === 0) assert.ok(lesson.targetInfo(ship), 'The first ship is large enough for immediate targeting once visible');
     lesson.recordVisibleObjects(); assert.equal(ship.userData.lastVisibleTime, 55.6 + slot * 3);
     lesson.updateShipCourse(ship, .6); assert.equal(ship.userData.arrivalOpacity, 1);
+    if (slot === 0) {
+      assert.equal(nextGate.userData.fadeStart, 55.6 + 1.4, 'Reveal the checkpoint 0.2 seconds after the first enemy finishes fading in');
+      const position = nextGate.position.clone();
+      lesson.worldStep.set(0, 0, 0);
+      for (const elapsed of [1.19, 1.2, 1.39]) {
+        lesson.setTime(55.6 + elapsed); lesson.updateFlightRing();
+        assert.equal(nextGate.children[0].material.opacity, 0, 'Keep the checkpoint hidden through the enemy fade and brief pause');
+        assert.equal(nextGate.children[1].material.uniforms.brightness.value, 0);
+      }
+      lesson.setTime(55.6 + 1.4); lesson.updateFlightRing();
+      assert.equal(nextGate.children[0].material.opacity, 0, 'Start the checkpoint fade at zero, without a pop-in');
+      lesson.setTime(55.6 + 1.6); lesson.updateFlightRing();
+      const brightness = nextGate.children[1].material.uniforms.brightness.value;
+      assert.ok(brightness > 0 && brightness < 1, 'Fade in the checkpoint smoothly after the enemy is fully visible');
+      assert.ok(nextGate.position.equals(position), 'Reveal timing must not move the closer checkpoint');
+      lesson.setPaused(true); lesson.updateFlightRing();
+      assert.equal(nextGate.children[1].material.uniforms.brightness.value, brightness, 'Pause holds the reveal');
+      lesson.setPaused(false);
+    }
   }
   assert.equal(lesson.ships.filter(ship => !ship.userData.scheduledHazard && !ship.userData.shower).length, allocated,
     'The two arrivals reuse planned fleet members; distant scheduled hazards and fields keep their own pools');

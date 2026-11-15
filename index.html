@@ -164,6 +164,7 @@
     .intro-logo { --logo-size: clamp(72px, min(12vw, 18vh), 136px); position: relative; font-size: var(--logo-size); }
     .intro-logo h1 { margin: 0; font-size: inherit; line-height: .92; }
     .intro-logo h1 span { margin-top: 0; }
+    .intro-options { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 100%; }
     #intro .language-picker { margin-top: 20px; }
     #start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: clamp(52px, calc(var(--logo-size) * .52), 72px); height: auto; aspect-ratio: 1; padding: 0; margin: 0; border: 6px solid #071329; border-radius: 50%; background: #7effd5; color: #092438; box-shadow: 0 0 0 3px #071329; transition: transform .5s cubic-bezier(.2, 1.5, .35, 1), background .2s, box-shadow .3s; }
     @media (hover: hover) {
@@ -450,10 +451,16 @@
       body:has(#round-end[open]) .hud-actions { flex-direction: column; }
     }
     @media (orientation: landscape) and (min-width: 901px) and (min-height: 601px) {
-      /* The same zones on desktop, with more breathing room rather than new anchors. */
+      /* Urgent desktop notices sit above the action-feedback lane, not at the top edge. */
       body:not(.touch-device) #flight-overview { gap: 16px; }
+      body:not(.touch-device) #flight-overview:has(:is(#shower-warning, #end-countdown):not([hidden])) { top: auto; bottom: calc(50dvh + 160px); width: max(0px, min(720px, calc(100vw - 2 * var(--hud-clearance)))); }
       body:not(.touch-device) #flight-notices { min-height: 40px; }
       body:not(.touch-device) #flight-notices > *, body:not(.touch-device) #collision-alert { padding: 10px 16px; font-size: 14px; }
+      body:not(.touch-device) #shower-warning { padding: 12px 20px; font-size: clamp(24px, 2vw, 28px); font-weight: 750; border-color: #ffd58c99; text-shadow: 0 0 18px #ffd58c44; }
+      body:not(.touch-device) #end-countdown { font-size: clamp(80px, 9dvh, 96px); gap: 10px; }
+      body:not(.touch-device) .countdown-track { gap: 6px; }
+      body:not(.touch-device) .countdown-track i { width: 7px; height: 7px; }
+      body:not(.touch-device) .countdown-track .icon { width: 22px; height: 22px; }
       body:not(.touch-device) #action-feedback { bottom: calc(50dvh + 64px); }
       body:not(.touch-device) #feedback { font-size: 36px; }
       body:not(.touch-device) #feedback-detail { font-size: 16px; }
@@ -495,12 +502,14 @@
         <button id="start" aria-labelledby="start-label" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
         <span id="start-label" data-i18n="loadingSpace" role="status">WELTRAUM WIRD GELADEN …</span>
       </div>
-      <fieldset id="language" class="language-picker" data-i18n-aria-label="language" aria-label="Sprache" disabled>
-        <label><input type="radio" name="language" value="en"><span lang="en">English</span></label>
-        <label><input type="radio" name="language" value="de"><span lang="de">Deutsch</span></label>
-        <div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>
-      </fieldset>
-      <button id="silent-start" data-i18n="silentStart" disabled>Ohne Ton starten</button>
+      <div class="intro-options">
+        <fieldset id="language" class="language-picker" data-i18n-aria-label="language" aria-label="Sprache" disabled>
+          <label><input type="radio" name="language" value="en"><span lang="en">English</span></label>
+          <label><input type="radio" name="language" value="de"><span lang="de">Deutsch</span></label>
+          <div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>
+        </fieldset>
+        <button id="silent-start" data-i18n="silentStart" disabled>Ohne Ton starten</button>
+      </div>
     </div>
   </section>
   <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
@@ -2103,7 +2112,7 @@
           gate.userData.previous.copy(gate.position);
           gate.userData.resolved = false; gate.visible = true; gate.userData.fadeStart = gameTime;
         }
-        if (tutorialStepCompletedAt === null || gameTime - tutorialStepCompletedAt < (tutorialStage === 2 ? 1.4 : .7)) return;
+        if (tutorialStepCompletedAt === null || gameTime - tutorialStepCompletedAt < (tutorialStage === 2 ? 1.3 : .7)) return;
         tutorialStage++; tutorialStepCompletedAt = null;
         if (tutorialStage < 3) { spawnTutorialTarget(); showControlStep(); return; }
         tutorialCompleted = true;
@@ -2553,8 +2562,12 @@
         showerStrength = event.strength; showerShape = event.shape; showerBend = event.bend; showerCourse = event.direction;
         planAsteroidShower();
         showerPending = true; showerTravel = 0; nextShowerSlice = 0;
-        showerWarning.innerHTML = '<span aria-hidden="true">' + (showerKind === 'field' ? '🪨 ' : '☄️ ').repeat(showerStrength + 1)
-          + '</span>' + t(showerCorridor ? 'asteroidCorridor' : showerKind === 'field' ? 'asteroidField' : 'asteroidShower');
+        setAsteroidWarning(showerKind, showerStrength);
+      }
+      function setAsteroidWarning(kind, strength) {
+        const text = '<span aria-hidden="true">' + (kind === 'field' ? '🪨 ' : '☄️ ').repeat(strength + 1)
+          + '</span>' + t(kind === 'corridor' ? 'asteroidCorridor' : kind === 'field' ? 'asteroidField' : 'asteroidShower');
+        if (showerWarning.innerHTML !== text) showerWarning.innerHTML = text;
       }
       function planAsteroidShower() {
         const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
@@ -2702,7 +2715,14 @@
           if (gameTime >= showerStart) advanceAsteroidShower(dt);
           if (level === 1 && !lateAsteroidsSeeded && gameTime - courseStartTime >= 29) seedLateAsteroids();
         }
-        showerWarning.hidden = paused || roundEnded || crashing || !started || gameTime < showerEntry - 2 || gameTime > showerEntry + 4;
+        // Corridors get an extra second to line up; warning timing is independent of geometry preparation.
+        const next = asteroidEncounters[asteroidEncounterIndex + 1];
+        const upcoming = next && gameTime >= courseStartTime + next.entry - (next.kind === 'corridor' ? 5 : 4) ? next : null;
+        const warningEntry = upcoming ? courseStartTime + upcoming.entry : showerEntry;
+        const warningKind = upcoming ? upcoming.kind : showerKind;
+        const warningLead = warningKind === 'corridor' ? 5 : 4;
+        showerWarning.hidden = paused || roundEnded || crashing || !started || gameTime < warningEntry - warningLead || gameTime > warningEntry + 1;
+        if (!showerWarning.hidden) setAsteroidWarning(warningKind, upcoming ? upcoming.strength : showerStrength);
       }
       function queueShip(ship) {
         if (ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital && !ship.userData.tutorialTarget) {
@@ -2903,10 +2923,11 @@
         updateCountdownShips();
         if (!spawnQueue.length || gameTime < nextShipTime) return;
         if (tutorialReinforcements === 2) {
-          // Start the fade-in one-third into the checkpoint approach, leaving more time to engage.
+          // Lead the original arrival point by half a second at the current forward speed.
           const gate = flightRings.find(gate => !gate.userData.resolved);
           const startZ = courseOrigin.z + courseWorldOffset.z;
-          if (camera.position.z > THREE.MathUtils.lerp(startZ, gate.position.z, 1 / 3)) return;
+          const leadDistance = Math.max(0, -flightMotion.z) * .85 * .5;
+          if (camera.position.z > startZ - gate.userData.reinforcementDepth + leadDistance) return;
         }
         let index = tutorialReinforcements > 0 ? spawnQueue.findIndex(ship => !ship.userData.type.asteroid) : 0;
         const activeShips = ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).length;
@@ -2934,6 +2955,8 @@
           data.courseRight.set(1, 0, 0).applyQuaternion(data.baseRotation);
           data.courseUp.set(0, 1, 0).applyQuaternion(data.baseRotation);
           if (tutorialReinforcements === 2) {
+            // Reveal the checkpoint shortly after the enemy's 1.2-second fade-in.
+            gate.userData.fadeStart = gameTime + 1.4;
             // Preserve shooting distance on the shorter remaining approach, without spawning beyond the gate.
             const fraction = Math.min(.8, (reducedMotion ? 160 : 550) / camera.position.distanceTo(gate.position));
             ship.position.copy(camera.position).lerp(gate.position, fraction)
@@ -3164,8 +3187,12 @@
           }
           depths.sort((a, b) => a - b);
         }
+        const reinforcementDepth = depths[1] / 6;
+        // Shorten only the first post-tutorial approach; keep corridor clearance and later gates intact.
+        if (openingComplete && !corridorPlan) depths[1] = flightDistanceAt(10);
         flightRings.forEach((gate, index) => {
           if (openingComplete && index === 0) return; // Leave the passed opening checkpoint behind.
+          if (openingComplete && index === 1) gate.userData.reinforcementDepth = reinforcementDepth;
           const depth = depths[index];
           const exitHeight = corridorPlan && depth > exitDepth ? corridorCenter(corridorPlan.length, corridorPlan) : 0;
           // Steering matters from level 1; add vertical navigation from level 3.
@@ -3186,7 +3213,8 @@
           gate.userData.normal.set(0, 0, 1); gate.quaternion.identity();
           gate.userData.previous.copy(gate.position);
           gate.visible = true;
-          gate.userData.resolved = false; gate.userData.passedAt = -Infinity; gate.userData.fadeStart = gameTime;
+          gate.userData.resolved = false; gate.userData.passedAt = -Infinity;
+          gate.userData.fadeStart = openingComplete && index === 1 ? Infinity : gameTime;
           const brightness = (index === (openingComplete ? 1 : 0) ? 1 : .3) * flightRingOpacity(gate);
           gate.children[0].material.opacity = brightness;
           gate.children[1].material.uniforms.brightness.value = brightness;

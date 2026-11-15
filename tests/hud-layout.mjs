@@ -31,6 +31,13 @@ assert.match(source, /#impact-label \{[^}]*width: min\(720px,[^}]*text-align: ce
 assert.ok(source.includes('body:has(#impact-label:not([hidden]))'), 'Crash presentation clears competing gameplay overlays');
 console.log('PASS separate HUD zones, shared repairs and bounded crash labels');
 
+const desktopNotices = section('    @media (orientation: landscape) and (min-width: 901px) and (min-height: 601px) {', '    @keyframes action-reward');
+assert.match(desktopNotices, /body:not\(\.touch-device\) #flight-overview:has\(:is\(#shower-warning, #end-countdown\):not\(\[hidden\]\)\) \{ top: auto; bottom: calc\(50dvh \+ 160px\)/, 'Only active urgent desktop notices move above the crosshair and feedback lane');
+assert.match(desktopNotices, /min\(720px, calc\(100vw - 2 \* var\(--hud-clearance\)\)\)/, 'Large localized warnings retain symmetric side-panel clearance');
+assert.match(desktopNotices, /body:not\(\.touch-device\) #shower-warning \{[^}]*font-size: clamp\(24px, 2vw, 28px\)/, 'Desktop encounter warnings are prominent without changing touch layouts');
+assert.match(desktopNotices, /body:not\(\.touch-device\) #end-countdown \{[^}]*font-size: clamp\(80px, 9dvh, 96px\)/, 'Desktop countdown is roughly twice its previous size');
+console.log('PASS desktop-only urgent notice placement and larger warning/countdown sizes');
+
 // Execute the actual resize handling: toolbar changes must change width, never the centerline.
 const clearanceCode = section('    function updateHudClearance()', '    let getRenderState =');
 let geometry = {scoreRight: 232, actionsLeft: 704, scoreBottom: 136, actionsBottom: 60}, clearance, panelsBottom, onResize;

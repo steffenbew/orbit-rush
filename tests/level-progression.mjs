@@ -1,5 +1,6 @@
 // Fixed encounter pacing and increasingly three-dimensional checkpoint navigation.
 import assert from 'node:assert/strict';
+import { t } from '../i18n.js';
 import { THREE, makeGame, makeFlightClock, randomState, section } from './helpers/flight-game.mjs';
 
 const planFor = new Function('level', 'reducedMotion', `
@@ -136,6 +137,10 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
       }
       previousIndex = game.encounterIndex;
     }
+    const announced = events.find(event => time >= event.entry - (event.kind === 'corridor' ? 5 : 4) && time <= event.entry + 1);
+    assert.equal(game.warningHidden, !announced, `Five-second corridor/four-second field and shower warning lead and one-second cutoff: level=${level}, reduced=${reduced}, time=${time}`);
+    if (announced) assert.ok(game.warningText.includes(t(announced.kind === 'corridor' ? 'asteroidCorridor'
+      : announced.kind === 'field' ? 'asteroidField' : 'asteroidShower')), 'Announce the upcoming type even before its geometry is prepared');
     if (!game.warningHidden && frame % 60 === 0) warningTimes.push(time);
     if (frame === 22 * 60) {
       const before = game.coursePlan(); game.setPaused(true); game.updateAsteroidShower(10);
@@ -147,7 +152,9 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
   }
   assert.deepEqual(transitions, events.map((_, index) => index), `Every scheduled phase appears: level=${level}, reduced=${reduced}`);
   for (const event of events) {
-    assert.ok(warningTimes.includes(event.entry - 2) && warningTimes.includes(event.entry));
+    const warningLead = event.kind === 'corridor' ? 5 : 4;
+    assert.ok(warningTimes.includes(Math.max(1, event.entry - warningLead)) && warningTimes.includes(event.entry + 1),
+      'Warn five seconds ahead for corridors, four for fields/showers, through one second after entry');
   }
   if (!events.length) assert.deepEqual(warningTimes, []);
   game.setupLevelFleet();

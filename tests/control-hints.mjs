@@ -149,14 +149,15 @@ assert.deepEqual(game.feedbackMessages, [], 'Wait until the tutorial finishes be
 game.worldStep.set(3, -2, 5); game.courseWorldOffset.set(-100, 20, 6000);
 game.markCombat(); const combat = game.combat(), previousTime = game.state().time;
 const projectile = {object: new THREE.Group()}; game.rockets.push(projectile);
-game.tick(.61);
+game.tick(.48); assert.equal(game.state().stage, 2, 'Keep a 1.3-second success beat before GO');
+game.tick(.02);
 assert.equal(game.state().stage, 3); assert.equal(game.state().completed, true);
 assert.deepEqual(game.feedbackMessages, [], 'GO no longer appears in the top feedback banner');
 assert.equal(game.title.textContent, t('flightGo'));
 assert.equal(game.sounds.filter(kind => kind === 'go').length, 1, 'One bing when GO appears');
 assert.equal(game.input.textContent, '', 'The GO prompt has no stale mouse/spacebar instruction');
 assert.ok(game.hints.classes.has('go') && !game.hints.classes.has('finished'));
-assert.equal(game.state().time, previousTime + .61, 'Simulation time must continue, not restart');
+assert.ok(Math.abs(game.state().time - previousTime - .5) < 1e-9, 'Simulation time continues; GO starts 1.3 seconds after the final hit');
 assert.equal(game.state().courseStartTime, game.state().time, 'Only the remaining timed encounters get an offset');
 assert.equal(game.state().normalStarts, 0, 'Completing training must not set up a second fleet');
 assert.equal(game.hints.hidden, false); assert.ok(game.ships.every(ship => !ship.visible));
@@ -180,7 +181,7 @@ game.retry(); assert.equal(game.state().stage, 3); assert.equal(game.hints.hidde
 assert.deepEqual(game.feedbackMessages, [], 'No duplicate GO announcement in the top banner');
 assert.equal(game.sounds.filter(kind => kind === 'go').length, 1, 'No repeat bing on updates, pause/resume or retry');
 const quickRetry = makeGame();
-for (const [action, delay] of [['checkpoint', .71], ['laser', .71], ['heavy', 1.41]]) {
+for (const [action, delay] of [['checkpoint', .71], ['laser', .71], ['heavy', 1.31]]) {
   quickRetry.action(action); quickRetry.tick(delay);
 }
 assert.equal(quickRetry.hints.hidden, false);
