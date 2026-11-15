@@ -38,6 +38,18 @@ assert.match(desktopNotices, /body:not\(\.touch-device\) #shower-warning \{[^}]*
 assert.match(desktopNotices, /body:not\(\.touch-device\) #end-countdown \{[^}]*font-size: clamp\(80px, 9dvh, 96px\)/, 'Desktop countdown is roughly twice its previous size');
 console.log('PASS desktop-only urgent notice placement and larger warning/countdown sizes');
 
+const touchNotices = section('    /* Touch notices share', '    @keyframes action-reward');
+assert.match(touchNotices, /body\.touch-device #flight-overview:has\(:is\(#shower-warning, #end-countdown\):not\(\[hidden\]\)\) \{ top: auto;/, 'Only urgent notices move on touch devices');
+assert.match(touchNotices, /grid-template-columns: minmax\(0, 1fr\)/, 'Urgent notices override the short portrait two-column layout');
+assert.match(touchNotices, /#flight-notices:not\(:has\(#shower-warning:not\(\[hidden\]\)\)\) \{ display: none; \}/, 'Countdown has no empty status row above it');
+assert.match(touchNotices, /#shower-warning \{[^}]*font-size: clamp\(18px, 3vw, 22px\)/, 'Touch encounter warnings are larger and bounded');
+assert.match(touchNotices, /#end-countdown \{ flex-direction: column;[^}]*font-size: clamp\(56px, 9dvh, 72px\)/, 'Tall touch screens use a prominent stacked countdown');
+assert.match(touchNotices, /top: max\(calc\(var\(--hud-panels-bottom\) \+ 20px\), calc\(50dvh - 210px\)\)/, 'Portrait urgent notices clear the actual top panels');
+assert.match(touchNotices, /@media \(orientation: portrait\) and \(max-height: 650px\)[\s\S]*?#end-countdown \{ flex-direction: row; font-size: 48px;/, 'Short portrait phones retain feedback clearance');
+assert.match(touchNotices, /bottom: calc\(50dvh \+ 96px\)/, 'Short landscape notices leave room for two-line feedback');
+assert.match(touchNotices, /#end-countdown \{ flex-direction: row;[^}]*font-size: clamp\(44px, 12dvh, 60px\)/, 'Short landscape screens use a larger but compact horizontal countdown');
+console.log('PASS touch urgent notice hierarchy, portrait panel clearance and compact short-screen countdowns');
+
 // Execute the actual resize handling: toolbar changes must change width, never the centerline.
 const clearanceCode = section('    function updateHudClearance()', '    let getRenderState =');
 let geometry = {scoreRight: 232, actionsLeft: 704, scoreBottom: 136, actionsBottom: 60}, clearance, panelsBottom, onResize;

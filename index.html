@@ -465,6 +465,26 @@
       body:not(.touch-device) #feedback { font-size: 36px; }
       body:not(.touch-device) #feedback-detail { font-size: 16px; }
     }
+    /* Touch notices share the desktop hierarchy, scaled to leave room for feedback and controls. */
+    body.touch-device #flight-overview:has(:is(#shower-warning, #end-countdown):not([hidden])) { top: auto; bottom: calc(50dvh + 112px); grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    body.touch-device #flight-overview:has(#end-countdown:not([hidden])) #flight-notices:not(:has(#shower-warning:not([hidden]))) { display: none; }
+    body.touch-device #shower-warning { padding: 10px 14px; font-size: clamp(18px, 3vw, 22px); font-weight: 750; border-color: #ffd58c99; text-shadow: 0 0 18px #ffd58c44; }
+    body.touch-device #end-countdown { flex-direction: column; gap: 8px; font-size: clamp(56px, 9dvh, 72px); }
+    body.touch-device .countdown-track { gap: 5px; }
+    body.touch-device .countdown-track i { width: 6px; height: 6px; }
+    body.touch-device .countdown-track .icon { width: 18px; height: 18px; }
+    @media (orientation: portrait) {
+      /* Clear the top panels even on short phones; routine status keeps its original position. */
+      body.touch-device #flight-overview:has(:is(#shower-warning, #end-countdown):not([hidden])) { top: max(calc(var(--hud-panels-bottom) + 20px), calc(50dvh - 210px)); bottom: auto; }
+    }
+    @media (orientation: portrait) and (max-height: 650px) {
+      body.touch-device #end-countdown { flex-direction: row; font-size: 48px; }
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      body.touch-device #flight-overview:has(:is(#shower-warning, #end-countdown):not([hidden])) { bottom: calc(50dvh + 96px); gap: 6px; }
+      body.touch-device #shower-warning { padding: 8px 12px; font-size: clamp(16px, 2.4vw, 20px); }
+      body.touch-device #end-countdown { flex-direction: row; gap: 10px; font-size: clamp(44px, 12dvh, 60px); }
+    }
     @keyframes action-reward { 0% { opacity: 0; scale: .94; } 15%, 65% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 1; } }
     @media (prefers-reduced-motion: reduce) { #action-feedback #feedback.pop { animation: none; opacity: 1; } }
   </style>
