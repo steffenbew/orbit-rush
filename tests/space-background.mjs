@@ -1,6 +1,7 @@
 // Run from the project root: node tests/space-background.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
@@ -203,20 +204,23 @@ for (const axis of [0, 1, 2]) {
 }
 console.log('PASS soft near/far fades and invisible recycling on every axis');
 
-const longFlight = makeSky(), geometry = longFlight.stars.geometry, positions = longFlight.starPositions;
-longFlight.setStarted(true); longFlight.setPaused(false);
-// Five minutes at high speed: straight, sustained diagonal, then opposite steering.
-// Checking only a fresh level missed the shell/ring artifact seen after several levels.
-for (let tick = 0; tick < 18000; tick++) {
-  const phase = Math.floor(tick / 6000);
-  longFlight.worldStep.set(phase === 0 ? 0 : phase === 1 ? -18 : 18,
-    phase === 0 ? 0 : phase === 1 ? 10 : -10, 20);
-  longFlight.updateSpaceBackground();
-  if ((tick + 1) % 3000 === 0) assertUniformSpace(longFlight, `Long flight, tick ${tick + 1}`);
-}
-assert.equal(longFlight.starPositions, positions); assert.equal(longFlight.stars.geometry, geometry);
-assert.equal(longFlight.starGeometry.attributes.position.count, 3500, 'Do not allocate a growing star field');
-console.log('PASS no disc/ring or directional density holes after five minutes of forward and diagonal travel');
+test('no disc/ring or directional density holes after five minutes of flight', {
+  skip: process.env.ORBIT_TEST_FULL !== '1' && 'Run ./run test:full for the starfield soak'
+}, () => {
+  const longFlight = makeSky(), geometry = longFlight.stars.geometry, positions = longFlight.starPositions;
+  longFlight.setStarted(true); longFlight.setPaused(false);
+  // Five minutes at high speed: straight, sustained diagonal, then opposite steering.
+  // Checking only a fresh level missed the shell/ring artifact seen after several levels.
+  for (let tick = 0; tick < 18000; tick++) {
+    const phase = Math.floor(tick / 6000);
+    longFlight.worldStep.set(phase === 0 ? 0 : phase === 1 ? -18 : 18,
+      phase === 0 ? 0 : phase === 1 ? 10 : -10, 20);
+    longFlight.updateSpaceBackground();
+    if ((tick + 1) % 3000 === 0) assertUniformSpace(longFlight, `Long flight, tick ${tick + 1}`);
+  }
+  assert.equal(longFlight.starPositions, positions); assert.equal(longFlight.stars.geometry, geometry);
+  assert.equal(longFlight.starGeometry.attributes.position.count, 3500, 'Do not allocate a growing star field');
+});
 
 const reduced = makeSky(true);
 reduced.setStarted(true); reduced.setPaused(false); reduced.worldStep.set(10, 5, 100);

@@ -144,7 +144,17 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
 console.log('PASS occasional larger gap boulders, stable retries, stationary motion and clear boss/checkpoint sections');
 
 // Follow the authored channel using real steering. No firing, teleporting or damage immunity.
+// Fast: every level/motion mode at 60 FPS, then vary FPS and seeds independently
+// on settled (2), vertical (9) and late/boss (20) layouts. Full retains the entire matrix.
+const full = process.env.ORBIT_TEST_FULL === '1';
+let traversals = 0;
 for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 7, 8, 9, 11, 17, 20]) for (const seed of [12, 34, 56]) for (const fps of [5, 60, 144]) {
+  const baseline = seed === 12 && fps === 60;
+  const representative = [2, 9, 20].includes(level);
+  const frameRateEdge = representative && seed === 12;
+  const seedVariation = representative && fps === 60;
+  if (!full && !baseline && !frameRateEdge && !seedVariation) continue;
+  traversals++;
   randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   game.setTime(0); game.updateAsteroidShower(0);
@@ -195,7 +205,8 @@ for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 7, 8, 9, 1
   assert.equal(game.hits.length, 0, `Navigate instanced debris without shooting: level=${level}, reduced=${reduced}, seed=${seed}, fps=${fps}`);
   assert.ok(!game.sounds.includes('checkpointMiss'));
 }
-console.log('PASS non-shooting traversal through the complete cloud, real inertia and safe phase handoffs at 5–144 FPS');
+assert.equal(traversals, full ? 180 : 44);
+console.log(`PASS ${traversals} non-shooting traversals through the complete cloud, real inertia and safe phase handoffs at 5–144 FPS`);
 
 for (const reduced of [false, true]) {
   const game = makeGame(reduced); game.setupLevelFleet(); game.updateAsteroidShower(0);

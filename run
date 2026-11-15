@@ -12,7 +12,7 @@ stop() {
 }
 
 test() {
-  node --test --test-concurrency=6 tests/*.mjs
+  ORBIT_TEST_FULL="${1:-0}" node --test --test-concurrency=6 tests/*.mjs
 }
 
 deploy() {
@@ -21,11 +21,12 @@ deploy() {
 
 usage() {
   printf '%s\n' \
-    'Usage: ./run {start|dev|stop|test|deploy|help}' \
+    'Usage: ./run {start|dev|stop|test|test:full|deploy|help}' \
     '' \
     '  start, dev  Serve locally in the foreground (Python 3)' \
     '  stop        Stop only this checkout’s tracked server' \
-    '  test        Run all test suites in parallel (Python 3 and Node.js 20+)' \
+    '  test        Run fast regression suites (Python 3 and Node.js 20+)' \
+    '  test:full   Also run exhaustive traversals and the five-minute starfield soak' \
     '  deploy      Deploy to https://orbitrush.steffenbew.com (SSH/rsync)' \
     '  help        Show this help' \
     '' \
@@ -43,6 +44,7 @@ case "${1:-help}" in
   start|dev) start ;;
   stop) stop ;;
   test) test ;;
+  test:full) test 1 ;;
   deploy) deploy ;;
   help|--help|-h) usage ;;
   *) usage >&2; exit 1 ;;
