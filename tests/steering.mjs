@@ -232,7 +232,7 @@ pointerEvent(canvas, 'pointerup', canvas, {pointerType: 'touch'});
 assert.equal(input.state().pointer, null);
 console.log('PASS continuous HUD steering, page exit, inactive/modal guards, no accidental shots, touch/capture and blur safety');
 
-const makeStart = () => new Function('THREE', `
+const makeStart = (fullscreenPreferred = true) => new Function('THREE', 'fullscreenPreferred', `
   let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true, lastPointerPosition = null;
   const mouseAim = new THREE.Vector2(.7, -.6), target = new THREE.Vector2(.7, -.6), reticle = {style: {}};
   const camera = new THREE.PerspectiveCamera(), scene = {fog: {}}, reducedMotion = false;
@@ -266,7 +266,14 @@ const makeStart = () => new Function('THREE', `
       languageDisabled: languagePicker.disabled, label: document.querySelector('#start-label').textContent,
       silentDisabled: document.querySelector('#silent-start').disabled, noticeHidden: audioNotice.hidden})
   };
-`)(THREE);
+`)(THREE, fullscreenPreferred);
+for (const withSound of [false, true]) {
+  const start = makeStart(false);
+  const loading = start.start(withSound);
+  start.loadAudio(); await loading;
+  assert.deepEqual(start.state().calls, withSound ? ['audio'] : [], 'Disabled fullscreen preference must keep startup windowed');
+  assert.equal(start.state().started, true);
+}
 for (const withSound of [false, true]) for (const pointer of [null, {clientX: 500, clientY: 400}, {clientX: 950, clientY: 700}]) {
   const start = makeStart(); start.remember(pointer);
   const loading = start.start(withSound);

@@ -3789,7 +3789,7 @@
           // Unlock audio first: fullscreen can consume Safari's user activation.
           // Both calls must happen in the click handler, before the first await.
           const audioReady = withSound ? sound.initAudio() : Promise.resolve();
-          if (document.fullscreenEnabled && !document.fullscreenElement) {
+          if (fullscreenPreferred && document.fullscreenEnabled && !document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(error => {
               console.warn('Automatic fullscreen request failed:', error);
             });
@@ -4714,23 +4714,25 @@
       }
       const fullscreenButton = document.querySelector('#fullscreen');
       fullscreenButton.hidden = !document.fullscreenEnabled;
+      let fullscreenPreferred = true;
+      try { fullscreenPreferred = localStorage.getItem('orbit-rush-fullscreen') !== 'false'; } catch {}
       function syncFullscreen() {
-        const active = Boolean(document.fullscreenElement);
-        const label = t(active ? 'exitFullscreen' : 'enterFullscreen');
-        fullscreenButton.setAttribute('aria-pressed', String(active));
+        const label = t(fullscreenPreferred ? 'exitFullscreen' : 'enterFullscreen');
+        fullscreenButton.setAttribute('aria-pressed', String(fullscreenPreferred));
         fullscreenButton.setAttribute('aria-label', label);
         fullscreenButton.title = label;
       }
       fullscreenButton.addEventListener('click', async () => {
+        fullscreenPreferred = !fullscreenPreferred;
+        try { localStorage.setItem('orbit-rush-fullscreen', String(fullscreenPreferred)); } catch {}
+        syncFullscreen();
         try {
-          if (document.fullscreenElement) await document.exitFullscreen();
-          else await document.documentElement.requestFullscreen();
+          if (!fullscreenPreferred && document.fullscreenElement) await document.exitFullscreen();
+          else if (fullscreenPreferred && started && !document.fullscreenElement) await document.documentElement.requestFullscreen();
         } catch (error) {
           console.warn('Fullscreen request failed:', error);
         }
-        syncFullscreen();
       });
-      document.addEventListener('fullscreenchange', syncFullscreen);
       syncFullscreen();
       document.addEventListener('visibilitychange', () => {
         resetSimulationClock();
