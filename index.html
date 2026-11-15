@@ -19,6 +19,8 @@
     html, body { margin: 0; height: 100%; overflow: hidden; background: #030511; font-family: system-ui, sans-serif; }
     canvas { display: block; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     html, body { overscroll-behavior: none; }
+    /* overflow:hidden alone still allows iOS to scroll the document during rotation/focus. */
+    body.touch-device { position: fixed; inset: 0; width: 100%; }
     body > :not(#audio-credits, #render-diagnostics), body > :not(#audio-credits, #render-diagnostics) * { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; }
     #space, #effects { position: fixed; inset: 0; width: 100%; height: 100%; }
     #effects { position: fixed; inset: 0; cursor: none; }
@@ -637,6 +639,24 @@
     import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=14';
     import { createTouchControls } from './touch-controls.js?v=8';
     import { createRenderDiagnostics } from './render-diagnostics.js?v=1';
+    function anchorTouchViewport(onSync) {
+      let pending = false;
+      function schedule() {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+          pending = false;
+          const viewport = window.visualViewport;
+          // Do not fight accessibility zoom or its intentional viewport panning.
+          if (viewport && viewport.scale !== 1) return;
+          if (window.scrollX || window.scrollY || viewport?.offsetLeft || viewport?.offsetTop) window.scrollTo(0, 0);
+          onSync();
+        });
+      }
+      for (const name of ['resize', 'orientationchange', 'pageshow']) window.addEventListener(name, schedule);
+      for (const name of ['resize', 'scroll']) window.visualViewport?.addEventListener(name, schedule);
+      schedule();
+    }
     // Keep this helper with the entry point: the original PWA worker may still
     // return a previous touch-controls module during its first interrupted update.
     // Touch buttons must also work while another finger is holding a flight control.
@@ -706,6 +726,7 @@
     let getRenderState = () => ({ phase: 'loading' });
     let stopRendering = () => {};
     let renderPhase = 'initializing';
+    if (touchMode) anchorTouchViewport(updateHudClearance);
     const renderDiagnostics = createRenderDiagnostics({
       root: document.querySelector('#render-diagnostics'), canvas: document.querySelector('#space'), t,
       getState: () => getRenderState(), onFailure: () => stopRendering()

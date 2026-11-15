@@ -36,6 +36,10 @@ Lokal lässt die ungefüllte `sw.js` alle Anfragen direkt zum Entwicklungsserver
 
 Bei einem Fehler im Simulations-/Render-Frame oder einem verlorenen WebGL-Kontext erscheint automatisch ein Diagnosefenster. Es enthält Fehlermeldung und Stacktrace, Browser/Viewport, Level, Spielzustand, aktive Effektzahlen und Renderstatistik. Der erste Fehler bleibt erhalten; Renderloop, Eingaben und Audio werden angehalten. **Diagnose kopieren** kopiert den Bericht zum Weitergeben. Falls die Zwischenablage gesperrt ist, lässt sich der Text manuell auswählen und kopieren. **Spiel neu laden** startet die Seite neu; vorher bitte den Bericht sichern. Es gibt keine automatische Übertragung oder dauerhafte Speicherung. Die Anzeige fängt keine vollständigen Browser-/GPU-Abstürze ab, bei denen JavaScript nicht mehr läuft.
 
+### Touch-Viewport bei Rotation
+
+Auf Touch-Geräten ist der Dokumentkörper fest am Viewport verankert, damit iOS ihn bei Rotation oder Fokuswechseln nicht verschiebt. Größen-/Orientierungswechsel, App-Wiederherstellung und nachlaufende Visual-Viewport-Ereignisse setzen unbeabsichtigten Dokument-Scroll auf den Ursprung zurück und aktualisieren die HUD-Abstände im nächsten Animationframe. Dialoge behalten ihren eigenen Scrollbereich; gezoomte Visual Viewports werden nicht zurückgesetzt. Es gibt keine geräteabhängigen Koordinatenkorrekturen oder festen Safe-Area-Offsets.
+
 ## Deployment
 
 ```sh
