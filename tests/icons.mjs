@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const license = readFileSync(new URL('../assets/vendor/PHOSPHOR-LICENSE.txt', import.meta.url), 'utf8');
 const expected = {
-  shield: 'shield', volume: 'speaker-high', muted: 'speaker-slash', pause: 'pause', play: 'play',
+  planet: 'planet', shield: 'shield', volume: 'speaker-high', muted: 'speaker-slash', pause: 'pause', play: 'play',
   fullscreen: 'corners-out', 'exit-fullscreen': 'corners-in', trophy: 'trophy', 'heart-broken': 'heart-break',
   stop: 'warning-octagon', next: 'caret-double-right', finish: 'flag-checkered', restart: 'arrow-counter-clockwise',
   rocket: 'rocket-launch', 'mouse-left': 'mouse-left-click', 'cursor-click': 'cursor-click', prohibit: 'prohibit', close: 'x'

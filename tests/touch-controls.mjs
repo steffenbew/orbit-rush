@@ -208,7 +208,7 @@ for (const [width, height] of [[390, 844], [844, 390], [568, 320], [932, 430], [
   }
 }
 assert.ok(!source.includes('touchControls.advance('), 'No velocity-based cursor integration remains');
-const restart = source.slice(source.indexOf('      function restartRound('), source.indexOf("      document.querySelector('#restart').addEventListener"));
+const restart = source.slice(source.indexOf('      function restartRound('), source.indexOf("      document.querySelector('#play-again').addEventListener"));
 assert.match(restart, /if \(touchMode\) \{\s*lastPointerPosition = null;\s*steer\(\{ clientX: innerWidth \/ 2, clientY: innerHeight \/ 2 \}\);/, 'New levels and retries center the touch cursor');
 assert.match(source, /#touch-weapons \{[^}]*bottom: calc\(130px \+ env\(safe-area-inset-bottom\)\)/);
 assert.match(source, /#touch-joystick \{[^}]*bottom: calc\(120px \+ env\(safe-area-inset-bottom\)\)/);

@@ -8,14 +8,14 @@ const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const start = source.indexOf('      function togglePause()');
 const end = source.indexOf('      const fullscreenButton', start);
 assert.ok(start >= 0 && end > start);
-const document = { activeElement: null, querySelector: selector => elements.get(selector) };
+const document = Object.assign(new EventTarget(), { activeElement: null, querySelector: selector => elements.get(selector) });
 class Element extends EventTarget {
   attributes = {};
   open = false;
   setAttribute(name, value) { this.attributes[name] = value; }
   focus() { document.activeElement = this; }
   blur() { document.activeElement = body; }
-  showModal() { this.open = true; }
+  show() { this.open = true; }
   close() { this.open = false; }
 }
 const body = new Element();
@@ -85,7 +85,16 @@ menu.dispatchEvent(cancel);
 assert.equal(cancel.defaultPrevented, true, 'Escape must synchronize gameplay, not just dismiss the dialog');
 assert.equal(menu.open, false);
 assert.equal(game.state().paused, false);
-console.log('PASS Escape resumes gameplay and closes the menu; Space/repeat cannot activate it');
+game.togglePause();
+const escape = new Event('keydown', {cancelable: true});
+Object.assign(escape, {code: 'Escape', repeat: false});
+document.dispatchEvent(escape);
+assert.equal(escape.defaultPrevented, true);
+assert.equal(menu.open, false, 'Escape outside the pause dialog resumes gameplay');
+assert.equal(game.state().paused, false);
+assert.ok(source.includes('pauseMenu.show();'), 'Non-modal pause keeps HUD controls interactive');
+assert.match(source, /body:has\(#pause-menu\[open\]\) :is\(\.hud, #shield-hud, \.credits\) \{ z-index: 12;/);
+console.log('PASS non-modal pause, foreground HUD and Escape from inside/outside the menu; Space/repeat safety');
 
 for (const mode of ['intro', 'crash', 'defeat']) {
   game.mode(mode);
@@ -102,8 +111,9 @@ console.log('PASS intro/crash/defeat guards and celebration-flight pause');
 const hud = source.slice(source.indexOf('<div class="hud-actions"'), source.indexOf('</header>'));
 assert.ok(!hud.includes('id="restart"'));
 const menuMarkup = source.slice(source.indexOf('<dialog id="pause-menu"'), source.indexOf('<dialog id="round-end"'));
-assert.ok(menuMarkup.includes('id="restart"') && menuMarkup.includes('id="continue-flight"'));
+assert.ok(!menuMarkup.includes('id="restart"'));
+assert.ok(menuMarkup.includes('id="end-run"') && menuMarkup.includes('id="continue-flight"'));
 assert.ok(source.includes('<div class="brand"><span>ORBIT RUSH</span></div>'));
 assert.ok(!source.includes('FREE FLIGHT'));
 assert.ok(!source.includes('PAUSE · KLICK ZUM WEITERFLIEGEN'));
-console.log('PASS restart moved out of the HUD, Orbit Rush-only branding and no obsolete click-to-resume hint');
+console.log('PASS pause offers only continue/end, Orbit Rush-only branding and no obsolete click-to-resume hint');

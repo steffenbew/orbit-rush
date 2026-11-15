@@ -154,7 +154,7 @@ const input = new Function('THREE', 'window', 'document', 'canvas', `
   let lastPointerPosition = null, pointer = null, spaceHeld = false, shots = 0, drawings = 0;
   const fireRocket = () => shots++, sprayEmojis = () => drawings++;
   const togglePause = () => { paused = !paused; };
-  ${section('      function steer(event)', '      function togglePause()')}
+  ${section('      function steer(event)', '      async function endRun()')}
   return { target, mouseAim, reticle,
     state: () => ({lastPointerPosition, pointer, shots, drawings, paused}),
     mode: name => {
