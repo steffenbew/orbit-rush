@@ -8,16 +8,14 @@ const from = source.indexOf('      function planAsteroidShower() {') + '      fu
 const to = source.indexOf('\n      }\n      function advanceAsteroidShower', from);
 assert.ok(from > 0 && to > from);
 const initialize = source.slice(from, to);
-const selection = initialize.match(/const roll = random\(0, 1\);\s*const course = [^;]+;/);
-assert.ok(selection, 'Exercise the production weighted direction choice');
-const choose = new Function('random', selection[0] + '\nreturn course;');
+const selection = source.match(/const direction = \[[^;]+;/);
+assert.ok(selection, 'Exercise the production level-based direction plan');
+const choose = new Function('level', selection[0] + '\nreturn direction;');
 const counts = [0, 0, 0, 0];
-for (let sample = 0; sample < 1000; sample++) counts[choose(() => (sample + .5) / 1000)]++;
-assert.deepEqual(counts, [400, 400, 100, 100], 'Keep 40/40/10/10: front-left/right plus shallow front-below/above');
-for (const [roll, expected] of [[0, 0], [.4, 1], [.8, 2], [.9, 3], [1 - Number.EPSILON, 3]]) {
-  assert.equal(choose(() => roll), expected);
-}
-console.log('PASS unchanged shower distribution: 40% front-right, 40% front-left, 10% front-below, 10% front-above');
+for (let level = 1; level <= 1000; level++) counts[choose(level)]++;
+assert.deepEqual(counts, [400, 400, 100, 100], 'Keep 40/40/10/10 across the repeating direction cycle');
+assert.equal(choose(1), choose(11), 'Directions are repeatable rather than rerolled on retry');
+console.log('PASS deterministic shower directions with predominantly lateral approaches');
 function field(course, speed, reducedMotion, width = 1280, height = 720, yaw = 0, pitch = 0, corridor = false) {
   return new Function('THREE', 'selectedCourse', 'speed', 'reducedMotion', 'width', 'height', 'yaw', 'pitch', 'showerCorridor', `
     const random = (a, b) => a === 0 && b === 1 ? [.2, .6, .85, .95][selectedCourse] : (a + b) / 2;
@@ -29,7 +27,8 @@ function field(course, speed, reducedMotion, width = 1280, height = 720, yaw = 0
     const showerRotation = new THREE.Quaternion(), showerCourseOrigin = new THREE.Vector3(), courseOrigin = camera.position.clone();
     const courseStartTime = 0;
     const levelFlightSpeed = () => speed, flightDistanceAt = time => time * speed * .85;
-    const level = 1, roundDuration = 45, maxShowerRocks = 144, showerStart = 0, showerEnd = 18, showerStrength = 2;
+    const level = 1, roundDuration = 45, maxShowerRocks = 144, showerStart = 0, showerEntry = 12, showerEnd = 30, showerStrength = 2;
+    const showerCourse = selectedCourse, showerShape = 0, showerKind = 'shower'; let corridorPlan = null;
     let showerPending = true, showerLength, showerSpacing, showerObstacleSpacing, nextShowerObstacle, showerHalfGap, showerHalfWidth, showerBend = 1.15;
     ${initialize}
     showerOrigin.copy(showerCourseOrigin);

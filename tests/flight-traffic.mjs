@@ -163,9 +163,9 @@ for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (con
   assert.ok(Math.abs(gaps[0] - 1.8) > 1e-4, 'Arrival spacing is randomized, not a fixed formation');
   assert.ok(pool.every(ship => ship.visible && ship.userData.arrivalOpacity === 0));
   assert.ok(pool.every(ship => ship.position.distanceTo(arrivals.camera.position) > (reducedMotion ? 150 : 800)),
-    'Delayed traffic must leave a safe approach, not teleport into the current flight path');
+    `Delayed traffic must leave a safe approach: level=${level}, reduced=${reducedMotion}, fps=${fps}, distances=${pool.map(ship => ship.position.distanceTo(arrivals.camera.position))}`);
   const firstArrival = pool[0].position.distanceTo(arrivals.camera.position);
-  assert.ok(firstArrival < Math.max(reducedMotion ? 220 : 1200, arrivals.levelFlightSpeed(6 / 45) * .85 * 3.1),
+  assert.ok(firstArrival < Math.max(reducedMotion ? 260 : 1200, arrivals.levelFlightSpeed(6 / 45) * .85 * 3.1),
     'The first route ship stays nearby instead of starting beyond the distance fade');
   const routes = pool.map(ship => ship.userData.ringRoute);
   for (let frame = 1; frame <= fps * 12; frame++) {
@@ -628,8 +628,8 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     lesson.recordVisibleObjects(); assert.equal(ship.userData.lastVisibleTime, 55.6 + slot * 3);
     lesson.updateShipCourse(ship, .6); assert.equal(ship.userData.arrivalOpacity, 1);
   }
-  assert.equal(lesson.ships.filter(ship => !ship.userData.scheduledHazard).length, allocated,
-    'The two arrivals reuse planned fleet members; independent scheduled hazards keep their own pool');
+  assert.equal(lesson.ships.filter(ship => !ship.userData.scheduledHazard && !ship.userData.shower).length, allocated,
+    'The two arrivals reuse planned fleet members; distant scheduled hazards and fields keep their own pools');
   lesson.setTime(59.09); lesson.updateRingShipArrivals();
   assert.ok(lesson.ringShips.every(ship => !ship.visible), 'Route traffic waits six active course seconds');
   lesson.setTime(59.1); lesson.updateRingShipArrivals();

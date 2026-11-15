@@ -40,7 +40,8 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
   const flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
   const flightDirection = new THREE.Vector3(0, 0, -1), flightMotion = new THREE.Vector3();
   const playerHullRotation = new THREE.Quaternion(), worldStep = new THREE.Vector3();
-  let showerCorridor = false, showerStart = 9, showerEnd = 25, showerShape = 0, showerBend = 1;
+  let showerCorridor = false, showerStart = 0, showerEntry = 12, showerEnd = 27, showerShape = 0, showerBend = 1;
+  let corridorPlan = null; const showerCourse = 0, showerKind = 'shower';
   let showerLength = 0, showerSpacing = 0, showerObstacleSpacing = 0, nextShowerObstacle = 0, showerHalfGap = 0, showerHalfWidth = 0;
   const showerStrength = 1, maxShowerRocks = 144;
   const showerRotation = new THREE.Quaternion(), showerDirection = new THREE.Vector3(), showerVelocity = new THREE.Vector3();
@@ -69,7 +70,8 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
       if ('started' in options) started = options.started;
       if ('ended' in options) roundEnded = options.ended;
       if ('crashing' in options) crashing = options.crashing;
-      if ('corridor' in options) { showerCorridor = options.corridor; showerBend = 1; }
+      if ('corridor' in options) { showerCorridor = options.corridor; showerBend = 1; corridorPlan = null; }
+      if ('level' in options) level = options.level;
       if ('shape' in options) showerShape = options.shape;
       if ('pressure' in options) levelPressure = options.pressure;
     },
@@ -87,9 +89,9 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
 `)(THREE, t, reducedMotion);
 
 
-for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) {
+for (const reducedMotion of [false, true]) for (const level of [1, 4, 10]) {
   const game = makeGame(reducedMotion);
-  game.configure({pressure}); game.resetFlightRing();
+  game.configure({level}); game.resetFlightRing();
   game.renderFlightRingFeedback();
   assert.equal(game.messages.length, 0, 'No checkpoint rules banner at level start');
   assert.ok(!source.includes('flight-ring-notice'), 'Checkpoint messages have no duplicate bottom notice');
@@ -299,7 +301,7 @@ for (const reducedMotion of [false, true]) for (const shape of [0, 1, 2]) {
   corridor.rings.slice(1).forEach((gate, index) => {
     assert.ok(corridor.rings[index].position.z - gate.position.z >= gate.userData.radius * 3, 'Keep gates ordered and their glows separated');
   });
-  assert.equal(corridor.field().gap, .4 * (130 - 22), 'Corridor height remains exactly the original strength-1 value');
+  assert.equal(corridor.field().gap, reducedMotion ? 30 : 45, 'Strength-1 passage stays navigable without unbounded level-based narrowing');
 }
 const guide = makeGame(); guide.configure({time: 1});
 guide.camera.rotation.y = Math.PI; guide.camera.updateMatrixWorld(); guide.renderFlightRingFeedback();
@@ -318,8 +320,8 @@ assert.ok(source.includes('        resetFlightRing();'));
 console.log('PASS lifecycle guards, no gates in any corridor shape, original passage height and off-screen course guide');
 
 // Leave five seconds of finish margin, including an already-moving tutorial handoff.
-for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) for (const cruising of [false, true]) {
-  const game = makeGame(reducedMotion); game.configure({pressure}); game.resetFlightRing();
+for (const reducedMotion of [false, true]) for (const level of [1, 4, 10, 40]) for (const cruising of [false, true]) {
+  const game = makeGame(reducedMotion); game.configure({level}); game.resetFlightRing();
   const finish = game.rings.at(-1);
   game.rings.slice(0, -1).forEach(gate => { gate.visible = false; gate.userData.resolved = true; });
   if (cruising) game.flightMotion.set(0, 0, -game.levelFlightSpeed(0));
@@ -328,14 +330,14 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) fo
   assert.equal(game.state().score, 0);
   const remaining = 45 - game.state().time;
   assert.ok(remaining >= 4.5 && remaining <= 5.5,
-    `Finish timing: reduced=${reducedMotion}, pressure=${pressure}, cruising=${cruising}, remaining=${remaining}`);
+    `Finish timing: reduced=${reducedMotion}, level=${level}, cruising=${cruising}, remaining=${remaining}`);
 }
 console.log('PASS final checkpoint with five seconds to spare at all cruise speeds, from rest and after training');
 
 // A simple heading controller must be able to follow the actual fixed course within the round.
-for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) for (const shape of [0, 1, 2]) {
+for (const reducedMotion of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 12, 40, 100]) for (const shape of [0, 1, 2]) {
   const game = makeGame(reducedMotion);
-  game.configure({pressure, corridor: true, shape}); game.planAsteroidShower(); game.resetFlightRing();
+  game.configure({level, corridor: true, shape}); game.planAsteroidShower(); game.resetFlightRing();
   const availableGates = game.rings.filter(gate => gate.visible).length;
   while (game.state().time < 45 && game.rings.some(gate => !gate.userData.resolved)) {
     const next = game.rings.find(gate => !gate.userData.resolved), delta = next.position.clone().sub(game.camera.position);
@@ -348,7 +350,7 @@ for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) fo
     );
     game.fly(1 / 60);
   }
-  assert.deepEqual(game.sounds, Array(availableGates).fill('checkpoint'), `Entire course must be flyable: pressure=${pressure}, shape=${shape}, reduced=${reducedMotion}`);
+  assert.deepEqual(game.sounds, Array(availableGates).fill('checkpoint'), `Entire course must be flyable: level=${level}, shape=${shape}, reduced=${reducedMotion}`);
   assert.equal(game.state().score, 0, 'Even an entire checkpoint course awards no score');
   assert.equal(game.state().shield, 100);
   assert.ok(45 - game.state().time >= 4 && 45 - game.state().time <= 5.5, 'Corridor routes also leave comfortable finish margin');

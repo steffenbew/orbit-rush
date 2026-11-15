@@ -7,13 +7,14 @@ for (const reducedMotion of [false, true]) {
   const initialFleet = new Function('THREE', 'reducedMotion', `
     const scene = new THREE.Scene(), glow = new THREE.Texture(), camera = new THREE.PerspectiveCamera();
     const random = (a, b) => a + Math.random() * (b - a);
+    ${section('      function levelFlightSpeed(', '      function getAsteroidEncounters(')}
     ${section('      const dark =', '      // Reuse one ship of each type')}
     const flightMotion = new THREE.Vector3();
     return ships;
   `)(THREE, reducedMotion);
   assert.equal(initialFleet.length, 8, 'Boot-time asteroid creation must not read uninitialized flight state');
   for (const ship of initialFleet.filter(ship => !ship.userData.type.asteroid)) {
-    const openingSpeed = reducedMotion ? 35 : 180 * 1.86 * 1.15;
+    const openingSpeed = reducedMotion ? 35 : 180 * 1.86 * 1.15 * 1.15;
     assert.ok(Math.abs(ship.userData.courseVelocity.length() - openingSpeed * .85 * ship.userData.cruiseRatio) < 1e-8,
       'Opening traffic must match the increased flight speed, without changing reduced motion');
   }
@@ -21,32 +22,40 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS initial fleet creation before flight state initialization');
 
 const flightSpeed = new Function('reducedMotion', 'levelPressure', 'progress', 'level', `
-  ${section('      function levelFlightSpeed(', '      function flightDistanceAt(')}
+  ${section('      function levelFlightSpeed(', '      function getAsteroidEncounters(')}
   return levelFlightSpeed(progress);
 `);
-for (const reducedMotion of [false, true]) for (const level of [1, 2, 6, 20, 1000]) {
-  const pressure = 1 - Math.exp(-(level - 1) / 4);
+for (const reducedMotion of [false, true]) for (const level of [1, 2, 4, 8, 20, 1000]) {
+  const pace = (reducedMotion ? 1 : 1.15) * (1 + .22 * Math.log(level));
   for (const progress of [0, .25, .5, .75, 1]) {
-    const previousSpeed = reducedMotion ? 35 + pressure * 10 + (8 + pressure * 15) * progress
-      : 1.55 * (180 + pressure * 380 + (140 + pressure * 560) * Math.pow(progress, 1.6));
-    assert.ok(Math.abs(flightSpeed(reducedMotion, pressure, progress, level) / previousSpeed - (reducedMotion ? 1 : 1.2 * (level === 1 ? 1.15 : 1))) < 1e-8,
-      'Level one adds 15% to the current speed; later levels and reduced motion stay unchanged');
+    const baseline = reducedMotion ? 35 + 8 * progress : 1.86 * 1.15 * (180 + 140 * Math.pow(progress, 1.3));
+    assert.ok(Math.abs(flightSpeed(reducedMotion, 0, progress, level) / baseline - pace) < 1e-8);
+    assert.equal(flightSpeed(reducedMotion, 0, progress, level), flightSpeed(reducedMotion, 1, progress, level),
+      'Enemy pressure no longer accelerates the player');
+    assert.ok(pace >= 1);
   }
 }
-console.log('PASS 15% faster level one throughout the round, unchanged later-level and reduced-motion speed');
-const pressureForLevel = new Function('level', 'return ' + source.match(/        levelPressure = ([^;]+);/)[1]);
-assert.equal(pressureForLevel(1), 0, 'Level one starts at zero progression pressure');
-assert.ok(Math.abs(pressureForLevel(2) - (1 - Math.exp(-1 / 6))) < 1e-12);
-for (const progress of [0, .5, 1]) {
-  const before = flightSpeed(false, 1 - Math.exp(-1 / 4), progress, 2);
-  const after = flightSpeed(false, pressureForLevel(2), progress, 2);
-  assert.ok(after > flightSpeed(false, 0, progress, 1), 'Level two still flies faster than the boosted level one');
-  assert.ok(after < before * .92 && after > before * .85, 'Level two is about 10% slower than before');
+for (const reduced of [false, true]) {
+  const opening = flightSpeed(reduced, 0, 0, 1), peak = flightSpeed(reduced, 0, 1, 1);
+  assert.ok(Math.abs(opening - (reduced ? 35 : 442.773)) < 1e-8);
+  assert.ok(Math.abs(peak - (reduced ? 43 : 787.152)) < 1e-8);
+  const ratio = level => flightSpeed(reduced, 0, 1, level) / peak;
+  assert.ok(ratio(4) > 1.3 && ratio(4) < 1.32, 'Level four is about 30% faster than the new level one');
+  assert.ok(ratio(8) > 1.45 && ratio(8) < 1.47, 'Level eight continues the early speed ramp');
+  assert.ok(ratio(12) > 1.5, 'Speed keeps climbing beyond +50%');
+  for (let level = 2; level <= 1000; level++) {
+    assert.ok(ratio(level) > ratio(level - 1), 'No late-level speed plateau');
+    if (level > 2) assert.ok(ratio(level) - ratio(level - 1) < ratio(level - 1) - ratio(level - 2),
+      'Increments taper without imposing a hard cap');
+  }
 }
+console.log('PASS 15% faster normal opening/peak, preserved reduced-motion base, faster early ramp and uncapped logarithmic growth');
+const pressureForLevel = new Function('level', 'return ' + source.match(/        levelPressure = ([^;]+);/)[1]);
+assert.equal(pressureForLevel(1), 0);
 for (let level = 2; level <= 100; level++) {
   assert.ok(pressureForLevel(level) > pressureForLevel(level - 1) && pressureForLevel(level) < 1);
 }
-console.log('PASS gentler six-level speed ramp, faster first level without reversing progression and bounded later speeds');
+console.log('PASS enemy progression remains independent of the flight-speed curve');
 
 const game = makeGame();
 const moveLaser = new Function('rocket', 'dt', 'playerLaserSpeed',
@@ -214,7 +223,7 @@ for (const corridor of [false, true]) {
   assert.ok(active.every(item => item.userData.hull.onBeforeCompile === game.asteroidShader),
     'Pooled/cloned materials must keep the distance-fade shader');
   assert.ok(field.width <= 1800, 'Field width must not scale with distant view width');
-  assert.ok(field.end - field.start <= 20, 'Field length should stay within its shorter travel budget');
+  assert.ok(field.end - field.entry <= 20, 'Encounter duration excludes its distant approach');
   assert.equal(field.grit.material.transparent, false, 'Instances must not use unsorted transparent blending');
   assert.equal(field.grit.material.alphaHash, true, 'Discard faded samples instead of leaving invisible occluders');
   assert.equal(field.grit.material.depthWrite, true, 'Debris must depth-test against other instances and real rocks');
@@ -254,8 +263,8 @@ for (const reducedMotion of [false, true]) {
     for (const strength of [0, 1, 2]) {
       corridor.setLevel(level); corridor.setupLevelFleet();
       const field = corridor.shower(true, strength);
-      const originalGap = Math.max(27, .4 * (130 - strength * 22 - (level - 1) * 3));
-      assert.equal(field.gap, originalGap, 'Restore the original narrow corridor height exactly at every level/strength');
+      const expectedGap = reducedMotion ? 34 - strength * 4 : 52 - strength * 7;
+      assert.equal(field.gap, expectedGap, 'Passage difficulty is capped by strength, not narrowed indefinitely by level');
       assert.equal(field.width, 1800, 'Keep the core width fixed rather than scaling with the viewport');
       const walls = field.pool.filter(rock => rock.visible);
       assert.equal(walls.length, [8, 12, 16][strength]);
@@ -308,7 +317,7 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS uneven ring layers, progressively scattered side fringes, original narrow flight passage and bounded instance budget');
 
 // Compare the same seeded layout: only the ceiling/floor separation should change.
-const widerCode = code.replace('showerHalfGap = Math.max(27, .4 *', 'showerHalfGap = Math.max(27, .6 *');
+const widerCode = code.replace('52 - showerStrength * 7', '72 - showerStrength * 7');
 assert.notEqual(widerCode, code);
 const savedSeed = randomState.seed;
 for (const corridor of [false, true]) {
@@ -439,7 +448,9 @@ for (const corridor of [false, true]) {
     bounded.flightMotion.set(0, 0, -speed); bounded.camera.aspect = 32 / 9;
     bounded.setupLevelFleet();
     const field = bounded.shower(corridor, 2);
-    const start = field.start, seenSpawns = new Map(), fadeBoundary = speed === 40 ? 700 : 3600;
+    const start = field.start, seenSpawns = new Map();
+    // Authored slow-mode corridors are visible earlier, but still leave four seconds to react.
+    const spawnClearance = speed === 40 ? speed * .85 * 4 : 3600;
     let peak = 0;
     for (let frame = 0; frame < 90 * 60; frame++) {
       bounded.setTime(start + frame / 60);
@@ -450,13 +461,13 @@ for (const corridor of [false, true]) {
       for (const rock of active) {
         if (seenSpawns.get(rock) !== rock.userData.spawn) {
           seenSpawns.set(rock, rock.userData.spawn);
-          assert.ok(rock.position.distanceTo(bounded.camera.position) - rock.userData.type.radius * rock.scale.x > fadeBoundary,
-            'Every shower slice and reused rock must spawn wholly outside the visible range');
+          assert.ok(rock.position.distanceTo(bounded.camera.position) - rock.userData.type.radius * rock.scale.x > spawnClearance,
+            `Every shower slice must have safe lead: corridor=${corridor}, speed=${speed}, frame=${frame}, distance=${rock.position.distanceTo(bounded.camera.position) - rock.userData.type.radius * rock.scale.x}`);
         }
         bounded.updateShipCourse(rock, 1 / 60);
         rock.position.addScaledVector(bounded.worldStep, .85).addScaledVector(rock.userData.courseVelocity, 1 / 60);
         if (rock.userData.courseAge <= .3) assert.ok(rock.position.distanceTo(bounded.camera.position)
-          - rock.userData.type.radius * rock.scale.x > fadeBoundary, 'Finish the timed blend while the whole rock is still distant and invisible');
+          - rock.userData.type.radius * rock.scale.x > spawnClearance - speed * .85 * .3, 'Finish the timed blend with the full reaction margin remaining');
         if (bounded.hasPassedCamera(rock)) bounded.queueShip(rock);
       }
     }

@@ -1069,6 +1069,8 @@
         if (ship.userData.arrivalOpacity < 1) setShipOpacity(ship, 1);
         const asteroidTier = ship.userData.type.asteroid ? Math.floor(random(1, Math.min(maxAsteroidTier, level) + 1)) : 0;
         ship.userData.asteroidTier = asteroidTier;
+        ship.userData.asteroidSizeScale = 1;
+        ship.userData.impactFragment = false; ship.userData.fractureAfter = 0;
         ship.scale.setScalar(ship.userData.type.asteroid ? [.35, 1.3, 2.8][asteroidTier - 1] : ship.userData.type.scale);
         ship.userData.maxHealth = ship.userData.type.asteroid ? asteroidTier : ship.userData.type.health;
         const angle = initial ? formationSlot * 2.4 : random(0, Math.PI * 2);
@@ -1115,7 +1117,7 @@
         ship.userData.throttleTime = random(3.5, 6.5);
         ship.userData.dodgeSkill = random(.65, 1.15);
         if (!ship.userData.type.asteroid) {
-          const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (level === 1 ? 1.15 : 1) * (180 + levelPressure * 380);
+          const openingSpeed = levelFlightSpeed(0);
           ship.userData.courseVelocity.copy(ship.userData.cruiseDirection)
             .multiplyScalar(initial ? openingSpeed * .85 * ship.userData.cruiseRatio : 0);
         }
@@ -1127,6 +1129,8 @@
           ship.userData.fireCooldown = 2.8;
           ship.userData.rockHitCooldown = 0;
           ship.userData.gunsCharging = false;
+          ship.userData.retreating = false;
+          ship.userData.retreatStart = Infinity;
           for (const muzzle of ship.userData.muzzles) muzzle.scale.setScalar(3);
         }
         if (ship.userData.type.asteroid && !initial && !ship.userData.shower && !ship.userData.scheduledHazard && !ship.userData.stationary) {
@@ -1447,6 +1451,7 @@
             const source = part.material;
             if (!materials.has(source)) materials.set(source, source.clone());
             part.material = materials.get(source);
+            if (part.isMesh && !part.userData.engineExhaust) part.material.alphaHash = true;
           });
           ship.userData.hull = materials.get(hull);
           ship.userData.flashMaterials = [...materials.values()].map(material => ({ material,
@@ -1764,8 +1769,28 @@
       const hazardInterval = 5 / .75, hazardApproach = 3, hazardStartDelay = 2;
       let nextHazardTime = hazardStartDelay;
       function levelFlightSpeed(progress) {
-        return reducedMotion ? 35 + levelPressure * 10 + (8 + levelPressure * 15) * progress
-          : 1.86 * (level === 1 ? 1.15 : 1) * (180 + levelPressure * 380 + (140 + levelPressure * 560) * Math.pow(progress, 1.6));
+        // Faster opening; +30% at level 4 and +46% at level 8, then ongoing growth without a cap.
+        const pace = (reducedMotion ? 1 : 1.15) * (1 + .22 * Math.log(level));
+        return pace * (reducedMotion ? 35 + 8 * progress : 1.86 * 1.15 * (180 + 140 * Math.pow(progress, 1.3)));
+      }
+      function getAsteroidEncounters() {
+        const boss = level % 4 === 0;
+        const strength = Math.max(0, Math.min(2, Math.floor((level - 1) / 2)) - (boss ? 1 : 0));
+        const shape = level < 5 ? 0 : 1 + Math.floor((level - 5) / 2) % 2;
+        const direction = [0, 1, 0, 1, 0, 1, 0, 1, 2, 3][(level - 1) % 10];
+        const bend = shape === 0 ? 0 : (level % 2 ? 1 : -1) * (reducedMotion ? 1.8 : 3.5);
+        const encounter = (kind, prepare, entry, exit, intensity = strength) => ({ kind, prepare, entry, exit,
+          strength: intensity, shape: kind === 'corridor' ? shape : 0, direction, bend });
+        // A gentle field first, then a short shower after a breather; keep the opening clear.
+        if (level === 1) return [encounter('field', 6, 12, 17, 0), encounter('shower', 18, 24, 32, 0)];
+        // A brief, wide, straight corridor introduces passage flying with roughly fifteen seconds remaining.
+        if (level === 2) return [encounter('field', 0, 8, 12, 0), encounter('shower', 14, 20, 22, 0),
+          encounter('corridor', 25, 31, 36, 0)];
+        if (level === 3) return [encounter('corridor', 0, 8, 20, 1)];
+        // The first boss arrives during the warm-up's exit and retreats at 28, clear by the finale at 32.
+        if (level === 4) return [encounter('field', 0, 5, 8, 0), encounter('field', 26, 32, 37, 1)];
+        return [encounter('field', 0, 5, 8, Math.max(0, strength - 1)),
+          encounter('shower', 11, 16, 20), encounter('corridor', 23, 28, 36)];
       }
       function flightDistanceAt(time) {
         let forward = 0, distance = 0;
@@ -1785,24 +1810,30 @@
       const showerPool = [];
       const maxShowerRocks = 144;
       const showerWarning = document.querySelector('#shower-warning');
-      let showerStart = Infinity, showerEnd = Infinity, showerPending = false;
+      let showerStart = Infinity, showerEntry = Infinity, showerEnd = Infinity, showerPending = false;
+      let asteroidEncounters = [], asteroidEncounterIndex = 0, corridorPlan = null;
+      let showerCourse = 0, showerKind = 'shower';
+      let fieldGroups = [], fieldRoute = [], fieldDebris = [], fieldImpacts = [], fieldShower = [], fieldBoulder = null;
+      let lateAsteroids = [], lateAsteroidsSeeded = false;
       let showerStrength = 0, showerSpacing = 200, showerHalfGap = 100, showerCorridor = false;
-      let showerTravel = 0, nextShowerSlice = 0, showerHalfWidth = 800, showerLength = 0;
+      let showerTravel = 0, nextShowerSlice = 0, showerHalfWidth = 800, showerLength = 0, showerFadeStart = 0;
       let showerObstacleSpacing = 800, nextShowerObstacle = Infinity;
       const showerOrigin = new THREE.Vector3();
       const showerDirection = new THREE.Vector3();
       const showerVelocity = new THREE.Vector3();
       const showerRotation = new THREE.Quaternion();
       let showerShape = 0, showerBend = 0;
-      function corridorCenter(distance) {
-        if (!showerCorridor || showerShape === 0) return 0;
-        const progress = THREE.MathUtils.clamp(distance / showerLength, 0, 1);
-        const curve = showerShape === 1 ? Math.pow(Math.sin(Math.PI * progress), 2)
-          : THREE.MathUtils.smoothstep(progress, .15, .85);
-        return showerBend * curve;
+      function corridorCenter(distance, plan = null) {
+        const shape = plan ? plan.shape : showerShape;
+        if ((!plan && !showerCorridor) || shape === 0) return 0;
+        const progress = THREE.MathUtils.clamp(distance / (plan ? plan.length : showerLength), 0, 1);
+        // Straight entry/exit, then a legible turn rather than a shallow full-length drift.
+        const turn = THREE.MathUtils.clamp((progress - (reducedMotion ? .1 : .2)) / (reducedMotion ? .8 : .6), 0, 1);
+        const curve = shape === 1 ? Math.pow(Math.sin(Math.PI * turn), 2) : THREE.MathUtils.smoothstep(turn, 0, 1);
+        return (plan ? plan.bend : showerBend) * curve;
       }
       function corridorSlope() {
-        return showerShape === 0 ? 0 : Math.abs(showerBend) * Math.PI / showerLength;
+        return showerShape === 0 ? 0 : Math.abs(showerBend) * Math.PI / ((reducedMotion ? .8 : .6) * showerLength);
       }
       function corridorRockX() {
         // Overlapping distributions taper to scattered outliers, not a rectangular edge.
@@ -1824,23 +1855,29 @@
       function seedShowerGrit() {
         const transform = new THREE.Object3D();
         showerRocks.length = 0; showerRockCells.clear();
-        showerGrit.count = showerCorridor ? [7200, 9600, 12000][showerStrength] : [300, 900, 1800][showerStrength];
+        fieldGroups = []; fieldRoute = []; fieldDebris = []; fieldImpacts = []; fieldShower = [];
+        if (showerKind === 'field') seedAsteroidField();
+        showerGrit.count = showerKind === 'field' ? fieldDebris.length : showerCorridor ? [7200, 9600, 12000][showerStrength]
+          : [300, 900, 1800][showerStrength] * (reducedMotion ? .1 : 1);
         for (let i = 0; i < showerGrit.count; i++) {
           const side = i % 2 ? 1 : -1;
           // Mostly small rubble, with a continuous range up to much larger boulders.
-          const size = showerCorridor ? 4 + Math.pow(Math.random(), 3) * (maxShowerGritSize - 4) : random(.6, 2);
+          const size = showerKind === 'field' ? fieldDebris[i].size
+            : showerCorridor ? 4 + Math.pow(Math.random(), 3) * (maxShowerGritSize - 4) : random(.6, 2);
           const depth = random(-showerLength, 0);
           const x = showerCorridor ? corridorRockX() : random(-showerHalfWidth, showerHalfWidth);
           // Wall rocks stay outside the flight gap; individual hazards also enter the passage.
           const clearance = size * 1.7 * (1 + corridorSlope());
           transform.position.set(x, showerCorridor
             ? corridorCenter(-depth) + side * (showerHalfGap + clearance + random(6, 65 + corridorFringe(x) * 100))
-            : random(-700, 700), depth);
+            : random(reducedMotion ? -120 : -700, reducedMotion ? 120 : 700), depth);
+          if (showerKind === 'field') transform.position.copy(fieldDebris[i].position);
           transform.rotation.set(random(-3, 3), random(-3, 3), random(-3, 3));
-          transform.scale.set(size, size * random(.4, .9), size * random(1, 1.7));
+          const shard = showerKind === 'field' && Math.random() < .3;
+          transform.scale.set(size, size * random(shard ? .12 : .4, shard ? .35 : .9), size * random(shard ? 1.4 : 1, 1.7));
           transform.updateMatrix();
           showerGrit.setMatrixAt(i, transform.matrix);
-          const rock = { index: i, position: transform.position.clone(), seen: false, hit: false,
+          const rock = { index: i, size, position: transform.position.clone(), seen: false, hit: false,
             health: size < 10 ? 1 : size < 18 ? 2 : 3, destroyed: false };
           showerRocks.push(rock);
           const key = `${Math.floor(rock.position.x / 128)},${Math.floor(rock.position.y / 128)},${Math.floor(rock.position.z / 128)}`;
@@ -1849,7 +1886,16 @@
         }
         showerGrit.instanceMatrix.needsUpdate = true;
         showerGrit.computeBoundingBox();
+        // Include the detailed chunks as well as the instanced debris in phase cleanup.
+        const fieldBounds = new THREE.Box3();
+        for (const group of fieldGroups) for (const rock of group.rocks) {
+          rock.updateMatrix();
+          fieldBounds.copy(rock.userData.collisionBox).applyMatrix4(rock.matrix);
+          fieldBounds.min.sub(showerOrigin); fieldBounds.max.sub(showerOrigin);
+          showerGrit.boundingBox.union(fieldBounds);
+        }
         showerGrit.computeBoundingSphere();
+        if (showerKind === 'field') showerGrit.boundingBox.getBoundingSphere(showerGrit.boundingSphere);
         showerGrit.quaternion.copy(showerRotation);
         showerGrit.visible = true;
       }
@@ -1908,7 +1954,7 @@
       const showerLaserImpact = new THREE.Vector3(), showerLaserInverseMatrix = new THREE.Matrix4();
       const showerHiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
       function findShowerLaserHit(from, to, maxDistance = Infinity) {
-        if (!started || paused || roundEnded || crashing || !showerCorridor || !showerGrit.visible
+        if (!started || paused || roundEnded || crashing || (!showerCorridor && showerKind !== 'field') || !showerGrit.visible
           || showerGritMaterial.opacity < .25) return null;
         showerInverse.copy(showerRotation).invert();
         showerLaserFrom.copy(from).sub(showerOrigin).applyQuaternion(showerInverse);
@@ -1941,7 +1987,7 @@
         hitMarker = .16;
         if (rock.health <= 0) {
           const collider = prepareShowerRock(rock);
-          collider.userData.asteroidTier = 1; // Wall rubble gives the small-asteroid reward.
+          collider.userData.asteroidTier = 1; // Instanced field/wall rubble gives the small-asteroid reward.
           rock.destroyed = true;
           showerGrit.setMatrixAt(rock.index, showerHiddenMatrix);
           showerGrit.instanceMatrix.needsUpdate = true;
@@ -2059,10 +2105,11 @@
         nextShipTime = gameTime;
         tutorialReinforcements = 2;
         nextHazardTime = gameTime + hazardStartDelay;
-        showerStart += gameTime; showerEnd += gameTime;
-        // Only the still-hidden encounter and remaining checkpoints are laid out ahead of the ongoing flight.
+        showerStart += gameTime; showerEntry += gameTime; showerEnd += gameTime;
+        // Only the still-hidden encounters and remaining checkpoints move ahead of the ongoing flight.
         const depthShift = camera.position.z - courseWorldOffset.z - courseOrigin.z;
         courseOrigin.z += depthShift; showerCourseOrigin.z += depthShift;
+        if (corridorPlan) corridorPlan.origin.z += depthShift;
         resetFlightRing(true);
         tutorialGoUntil = gameTime + 1.2;
         showControlStep();
@@ -2117,7 +2164,7 @@
         });
         const fleet = order.map(index => ships[index]);
         ships.forEach(ship => { ship.visible = false; });
-        const openingSpeed = reducedMotion ? 35 + levelPressure * 10 : 1.86 * (level === 1 ? 1.15 : 1) * (180 + levelPressure * 380);
+        const openingSpeed = levelFlightSpeed(0);
         fleet.slice(0, 2).forEach((ship, slot) => {
           resetShip(ship, true, slot);
           ship.position.z = -550 - slot * Math.max(280, openingSpeed * .85 * 1.5);
@@ -2128,27 +2175,25 @@
         countdownShipsSpawned = 0; nextCountdownShipTime = 0;
         nextShipTime = 2 * progressionTimeScale;
         nextHazardTime = hazardStartDelay;
-        showerStrength = Math.floor(random(0, 3));
-        showerCorridor = Math.random() < .5;
-        showerShape = showerCorridor ? Math.floor(random(0, 3)) : 0;
-        showerBend = (Math.random() < .5 ? -1 : 1) * (reducedMotion ? .45 : 1.15);
         resetRepairPickup();
-        showerStart = random(8, 11);
-        showerEnd = showerStart + Math.min(20, 14 + showerStrength * 2 + (level - 1) * .3);
         courseWorldOffset.set(0, 0, 0); courseOrigin.copy(camera.position); courseStartTime = 0;
-        planAsteroidShower();
+        asteroidEncounters = getAsteroidEncounters(); asteroidEncounterIndex = 0; corridorPlan = null;
+        fieldGroups = []; fieldRoute = []; fieldDebris = []; fieldImpacts = []; fieldShower = []; fieldBoulder = null;
+        lateAsteroids = []; lateAsteroidsSeeded = false;
+        showerStart = showerEntry = showerEnd = Infinity; showerCorridor = false; showerPending = false;
+        nextShowerObstacle = Infinity; nextShowerSlice = 0; showerTravel = 0;
+        // Checkpoints and route traffic need the future corridor even while the opening shower is active.
+        const corridor = asteroidEncounters.find(event => event.kind === 'corridor');
+        if (corridor) selectAsteroidEncounter(corridor);
+        if (asteroidEncounters.length) selectAsteroidEncounter(asteroidEncounters[0]);
         resetFlightRing();
         resetRingShips();
         // Only the two ordinary ships open a level; course traffic joins later from a distance.
         ringShips.forEach(ship => { ship.visible = false; });
         ringShipsPending = true;
         resetFlightBoundary();
-        showerPending = true;
-        showerTravel = 0; nextShowerSlice = 0;
         showerGrit.visible = false;
         showerRocks.length = 0; showerRockCells.clear();
-        showerWarning.innerHTML = '<span aria-hidden="true">' + '☄️ '.repeat(showerStrength + 1)
-          + '</span>' + t(showerCorridor ? 'asteroidCorridor' : 'asteroidShower');
         showerWarning.hidden = true;
       }
       function advanceFlightHeading(orientation, turn, dt) {
@@ -2227,69 +2272,329 @@
         }
         resetShip(rock, false);
         rock.userData.corridorObstacle = false;
-        // Free showers share a stream; the fixed corridor has zero intrinsic velocity.
+        // Only showers drift; fields and corridors have zero intrinsic velocity.
         // Copy on every reuse so former rain rocks cannot keep drifting through its gap.
         rock.userData.courseVelocity.copy(showerVelocity);
         if (!showerCorridor) rock.userData.courseVelocity.multiplyScalar(random(.9, 1.1));
         return rock;
       }
+      function seedAsteroidField() {
+        const scale = reducedMotion ? .35 : 1, coreRadius = reducedMotion ? 65 : 180;
+        const phase = Math.floor((showerEntry - courseStartTime) / 16 + 1e-6);
+        const shape = (level - 1 + phase) % 3, angle = level * .73 + phase * .91;
+        const diffuse = level > 1 && (level + phase) % 3 === 2; // Occasional older remnants; stable on retry.
+        let fieldSeed = (Math.imul(level, 73856093) ^ Math.imul(phase + 1, 19349663)) >>> 0;
+        const fieldRandom = () => ((fieldSeed = (Math.imul(fieldSeed, 1664525) + 1013904223) >>> 0) / 4294967296);
+        // Use the authored opening rather than the passed tutorial gate.
+        const gates = flightRings.map((gate, index) => ({ radius: gate.userData.radius,
+          position: (index === 0 ? courseOrigin.clone().add(new THREE.Vector3(0, 0, -flightDistanceAt(firstCheckpointTime)))
+            : gate.position.clone().sub(courseWorldOffset)).sub(showerCourseOrigin) }));
+        const courseAt = depth => {
+          const next = gates.findIndex(gate => gate.position.z <= -depth);
+          if (next <= 0) return gates[Math.max(0, next)].position.clone().setZ(-depth);
+          const before = gates[next - 1].position, after = gates[next].position;
+          return before.clone().lerp(after, (before.z + depth) / (before.z - after.z));
+        };
+        const edges = [0, ...gates.map(gate => -gate.position.z).filter(depth => depth > 0 && depth < showerLength), showerLength];
+        const gaps = edges.slice(1).map((depth, index) => [edges[index], depth]);
+        const groupCount = 1; // A compact breakup, not a chain of sources stretched along the camera axis.
+        const depths = [];
+        while (depths.length < groupCount) {
+          gaps.sort((a, b) => {
+            const difference = (b[1] - b[0]) - (a[1] - a[0]);
+            return Math.abs(difference) < 1e-6 ? a[0] - b[0] : difference;
+          });
+          const [from, to] = gaps.shift(), depth = from + (to - from) * (.38 + fieldRandom() * .24);
+          depths.push(depth); gaps.push([from, depth], [depth, to]);
+        }
+        depths.sort((a, b) => a - b);
+        fieldRoute = gates.map(gate => gate.position.clone());
+        fieldGroups = depths.map((depth, index) => {
+          const baseline = courseAt(depth), side = (level + index + phase) % 2 ? 1 : -1;
+          const axis = level >= 9 && (level + index) % 3 === 0 ? 'y' : 'x';
+          const room = Math.min(...[...edges, ...depths.filter(value => value !== depth)].map(value => Math.abs(value - depth)));
+          const detour = coreRadius + playerHullRadius + (reducedMotion ? 8 : 14);
+          const blocking = room * (axis === 'y' ? .26 : .35) >= detour;
+          const position = baseline.clone(), passage = baseline.clone();
+          if (blocking) {
+            // Offset the formation independently of gate centers, while retaining a reachable way around it.
+            position.x = baseline.x * .35 + (fieldRandom() - .5) * 140;
+            position.y = baseline.y + (fieldRandom() - .5) * 100;
+            passage[axis] = position[axis] + side * detour;
+            fieldRoute.push(passage);
+          }
+          else {
+            position[axis] -= side * (coreRadius + playerHullRadius + (reducedMotion ? 30 : 90));
+            position.x += (fieldRandom() - .5) * (reducedMotion ? 20 : 100);
+            position.y += (fieldRandom() - .5) * (reducedMotion ? 16 : 80);
+          }
+          return { position, coreRadius, passage, blocking, axis, shape, angle, diffuse, rocks: [] };
+        });
+        fieldRoute.sort((a, b) => b.z - a.z);
+        // DART/Scheila-inspired ejecta, independent of the camera and direction of flight.
+        const makeImpact = (source, reach, width, height, age) => {
+          const a = fieldRandom(), b = fieldRandom() * Math.PI * 2, c = fieldRandom() * Math.PI * 2;
+          const rotation = new THREE.Quaternion(Math.sqrt(1 - a) * Math.sin(b), Math.sqrt(1 - a) * Math.cos(b),
+            Math.sqrt(a) * Math.sin(c), Math.sqrt(a) * Math.cos(c));
+          const drift = new THREE.Vector3(0, 0, -reach).applyQuaternion(rotation);
+          const u = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation), v = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+          const rays = [-.8, .2, 1.4, 3].map(bearing => drift.clone()
+            .addScaledVector(u, Math.cos(angle + bearing) * width)
+            .addScaledVector(v, Math.sin(angle + bearing) * height));
+          return { source: source.clone(), drift, u, v, width, height, age, rays };
+        };
+        const primary = fieldGroups[0];
+        // The first field is a tighter breakup; reduced-motion formations are already compact.
+        const reach = Math.min(reducedMotion ? 105 : 900, showerLength * .3) * (level === 1 && !reducedMotion ? .65 : 1);
+        const firstImpact = makeImpact(primary.position, reach, reach * .8, reach * .55, 1);
+        fieldImpacts.push(firstImpact);
+        // Some settled fields retain an old crossing scar, unrelated to the player's course.
+        primary.tunnel = null;
+        if (diffuse && (level + phase) % 2 === 1) {
+          const radius = reducedMotion ? 42 : 120, direction = firstImpact.drift.clone().normalize();
+          const across = new THREE.Vector3(-direction.y, direction.x, 0);
+          if (across.lengthSq() < .01) across.copy(firstImpact.u);
+          // Offset beside the surviving core, without pushing the bore outside the encounter's depth.
+          const center = primary.position.clone().addScaledVector(across.normalize(), radius + (reducedMotion ? 35 : 110));
+          primary.tunnel = { center, direction, radius };
+        }
+        if (!diffuse && shape !== 0) {
+          const source = primary.position.clone();
+          source[primary.axis] += Math.sign(primary.position[primary.axis] - primary.passage[primary.axis]) * (reducedMotion ? 50 : 170);
+          source.z += Math.sin(angle * 1.7) * Math.min(showerLength * .12, reducedMotion ? 24 : 180);
+          source.z = THREE.MathUtils.clamp(source.z, -showerLength * .94 + (reducedMotion ? 25 : 80), -(reducedMotion ? 25 : 80));
+          firstImpact.rays.unshift(source.clone().sub(primary.position).divideScalar(.7));
+          fieldImpacts.push(makeImpact(source, reducedMotion ? 70 : reach * .55,
+            reducedMotion ? 50 : reach * .4, reducedMotion ? 36 : reach * .25, .7));
+        }
+        const cloudRadius = reducedMotion ? Math.max(150, reach * 1.8) : reach;
+        primary.pockets = [];
+        const pickPocket = () => {
+          if (!diffuse || Math.random() < .12) return null; // A few isolated pieces between the pockets.
+          let weight = Math.random() * primary.pockets.reduce((sum, pocket) => sum + pocket.weight, 0);
+          return primary.pockets.find(pocket => (weight -= pocket.weight) < 0);
+        };
+        const debrisPoint = (radius, pocket = null) => {
+          if (diffuse) {
+            const z = random(-1, 1), bearing = random(-Math.PI, Math.PI), ring = Math.sqrt(1 - z * z);
+            const travel = (Math.random() + Math.random() + Math.random()) / 3;
+            const spread = pocket ? pocket.spread : new THREE.Vector3(cloudRadius, cloudRadius * .9, cloudRadius);
+            const position = (pocket ? pocket.center : firstImpact.source).clone()
+              .addScaledVector(firstImpact.u, Math.cos(bearing) * ring * travel * spread.x)
+              .addScaledVector(firstImpact.v, Math.sin(bearing) * ring * travel * spread.y)
+              .addScaledVector(firstImpact.drift, z * travel * spread.z / reach);
+            return { position, impact: 0, travel: position.distanceTo(firstImpact.source) / cloudRadius,
+              pocket: pocket ? primary.pockets.indexOf(pocket) : -1 };
+          }
+          const impact = fieldImpacts.length > 1 && Math.random() < .3 ? 1 : 0, event = fieldImpacts[impact];
+          // Fine debris has a longer reach on average; sizes still overlap rather than forming sorted bands.
+          const fraction = Math.min(1, radius / (reducedMotion ? 12 : 45));
+          const travel = random(.08, 1) * (.4 + .6 * Math.sqrt(1 - fraction)) * event.age;
+          const filament = Math.floor(Math.pow(Math.random(), 1.6) * event.rays.length);
+          const ray = event.rays[filament];
+          const spread = Math.random() < .8 ? .1 : .35;
+          const position = event.source.clone().addScaledVector(ray, travel)
+            .addScaledVector(event.u, random(-1, 1) * event.width * spread * travel)
+            .addScaledVector(event.v, random(-1, 1) * event.height * spread * travel);
+          return { position, impact, travel };
+        };
+        // Reserve only a narrow, bending escape route; the direct course is not kept empty.
+        const segment = new THREE.Line3(), closest = new THREE.Vector3(), sphere = new THREE.Sphere();
+        const occupied = [], routeClearance = playerHullRadius + (reducedMotion ? 14 : 40);
+        const tunnelOffset = new THREE.Vector3();
+        const canPlace = (point, radius) => {
+          if (point.z + radius > 0 || point.z - radius < -showerLength * .94) return false;
+          if (primary.tunnel) {
+            const tunnel = primary.tunnel;
+            tunnelOffset.copy(point).sub(tunnel.center);
+            const along = tunnelOffset.dot(tunnel.direction);
+            const width = tunnel.radius * (1 + .1 * Math.sin(along / (tunnel.radius * 2) + angle));
+            // Reject entire hulls, not only centers. Uneven edges avoid a machined-looking bore.
+            if (tunnelOffset.lengthSq() - along * along < (width + radius * 1.05) ** 2) return false;
+          }
+          if (gates.some(gate => point.distanceTo(gate.position) < radius + gate.radius * 1.5 + playerHullRadius)) return false;
+          for (let i = 1; i < fieldRoute.length; i++) {
+            segment.set(fieldRoute[i - 1], fieldRoute[i]).closestPointToPoint(point, true, closest);
+            if (point.distanceToSquared(closest) < (radius + routeClearance) ** 2) return false;
+          }
+          // Prevent intersecting hulls, not close neighbours: density comes from the pockets, not uniform padding.
+          return !occupied.some(other => point.distanceToSquared(other.point) < (radius + other.radius + (diffuse ? 1 : 4) * scale) ** 2);
+        };
+        if (diffuse) {
+          const count = 3 + Math.floor(fieldRandom() * 3);
+          for (let i = 0; i < count; i++) {
+            const coarse = fieldRandom() < .35;
+            const radius = cloudRadius * (coarse ? .14 + fieldRandom() * .12 : .09 + fieldRandom() * .12);
+            const spread = new THREE.Vector3(radius, radius * (.4 + fieldRandom() * .7), radius * (.5 + fieldRandom() * .8));
+            const weight = .15 + Math.pow(fieldRandom(), 2) * 1.85;
+            const sizePower = coarse ? 1 + fieldRandom() * .8 : 2.4 + fieldRandom() * 3;
+            const sizeScale = coarse ? .7 + fieldRandom() * .3 : .28 + fieldRandom() * .42;
+            for (let attempt = 0; attempt < 24; attempt++) {
+              const z = fieldRandom() * 2 - 1, bearing = fieldRandom() * Math.PI * 2, ring = Math.sqrt(1 - z * z);
+              const distance = cloudRadius * (.22 + fieldRandom() * .4);
+              const center = firstImpact.source.clone()
+                .addScaledVector(firstImpact.u, Math.cos(bearing) * ring * distance)
+                .addScaledVector(firstImpact.v, Math.sin(bearing) * ring * distance * .9)
+                .addScaledVector(firstImpact.drift, z * distance / reach);
+              if (!canPlace(center, reducedMotion ? 6 : 12)) continue;
+              primary.pockets.push({ center, spread, weight, sizePower, sizeScale }); break;
+            }
+          }
+        }
+        const addBoulder = (group, core, slot, source = null) => {
+          const rock = eventAsteroid();
+          if (!rock) return;
+          let tier, size;
+          const pocket = diffuse && !(core && slot === 0) ? pickPocket() : null;
+          if (diffuse) {
+            // Local size families, not a full size catalogue repeated in every batch.
+            size = core && slot === 0 ? 3.5 : core && slot === 2 && Math.random() < .6 ? random(3.2, 4.6)
+              : .45 + 2.35 * Math.pow(Math.random(), pocket ? pocket.sizePower : 1.7);
+            tier = Math.min(3, Math.ceil(size));
+          } else {
+            // Keep directional fields, including the approved introduction, unchanged.
+            tier = source ? 3 : core ? (slot === 1 ? 2 : 3) : Math.random() < .55 ? 3 : 2;
+            size = source ? 2.8 : core && slot === 0 ? (group === primary ? 3.5 : 2.8)
+              : [1.3, 2.8][tier - 2] * random(.85, 1.35);
+          }
+          rock.userData.asteroidTier = tier; rock.userData.asteroidSizeScale = scale;
+          rock.scale.setScalar(size * scale);
+          rock.userData.health = rock.userData.maxHealth = Math.max(tier, Math.ceil(rock.scale.x / scale));
+          const bounds = rock.userData.collisionBox.getBoundingSphere(sphere);
+          const radius = (bounds.radius + bounds.center.length()) * rock.scale.x;
+          for (let attempt = 0; attempt < 32; attempt++) {
+            const point = source ? source.clone() : core && (!diffuse || slot === 0) ? group.position.clone() : debrisPoint(radius, pocket).position;
+            if (core && slot > 0 && !diffuse) point.add(new THREE.Vector3(random(-88, 88), random(-88, 88), random(-120, 120)).multiplyScalar(scale));
+            if (!canPlace(point, radius)) continue;
+            rock.position.copy(point).add(showerOrigin);
+            rock.rotation.set(random(-Math.PI, Math.PI), random(-Math.PI, Math.PI), random(-Math.PI, Math.PI));
+            rock.userData.previousPosition.copy(rock.position);
+            group.rocks.push(rock); occupied.push({ point, radius }); return;
+          }
+          rock.visible = false;
+        };
+        for (const group of fieldGroups) addBoulder(group, true, 0);
+        const secondaryCore = fieldImpacts.length > 1 && fieldGroups.length === 1;
+        if (secondaryCore) addBoulder(primary, false, 0, fieldImpacts[1].source);
+        for (const group of fieldGroups) for (let slot = 1; slot < 3; slot++) addBoulder(group, true, slot);
+        const scattered = reducedMotion ? 4 : level === 1 ? 6 : 10 + showerStrength * 4;
+        for (let i = secondaryCore ? 1 : 0; i < scattered; i++) addBoulder(fieldGroups[i % fieldGroups.length], false, i);
+        // Keep the reduced fragment budget; structure and empty wedges supply the impact's silhouette.
+        const fragments = reducedMotion ? 65 : level === 1 ? 140 : 220 + showerStrength * 40;
+        const minimumSize = diffuse ? (reducedMotion ? .22 : .35) : (reducedMotion ? .45 : .7);
+        for (let i = 0; i < fragments; i++) {
+          const pocket = diffuse ? pickPocket() : null;
+          // Fine chips collect together; chunkier pockets and isolated outliers use their own size mix.
+          const maximumSize = (reducedMotion ? 7 : 26) * (pocket ? pocket.sizeScale : 1);
+          const size = minimumSize + (maximumSize - minimumSize) * Math.pow(Math.random(), pocket ? pocket.sizePower : 2.1);
+          const radius = size * 1.7;
+          for (let attempt = 0; attempt < 32; attempt++) {
+            const debris = debrisPoint(radius, pocket);
+            if (!canPlace(debris.position, radius)) continue;
+            fieldDebris.push({ ...debris, size });
+            occupied.push({ point: debris.position, radius }); break;
+          }
+        }
+        // One larger, isolated remnant in a quiet gap, separate from the cloud's cleanup bounds.
+        // Keep boss fights and the final checkpoint stretch free of these extra landmarks.
+        const [opening, next] = asteroidEncounters;
+        if (!fieldBoulder && showerStart === courseStartTime && level % 4 !== 0 && next
+          && opening.kind === 'field' && next.entry - opening.exit >= 6) {
+          const rock = eventAsteroid();
+          if (rock) {
+            const time = (opening.exit + next.entry) / 2;
+            rock.scale.setScalar(5 * scale);
+            rock.userData.asteroidTier = 3; rock.userData.asteroidSizeScale = scale;
+            rock.userData.health = rock.userData.maxHealth = Math.ceil(rock.scale.x / scale);
+            rock.userData.courseVelocity.set(0, 0, 0);
+            const point = courseAt(flightDistanceAt(time) - flightDistanceAt(showerEntry - courseStartTime));
+            point.x += (level % 2 ? 1 : -1) * (reducedMotion ? 100 : 210);
+            point.y += (level % 3 - 1) * (reducedMotion ? 6 : 30);
+            rock.position.copy(point).add(showerOrigin);
+            rock.rotation.set(random(-Math.PI, Math.PI), random(-Math.PI, Math.PI), random(-Math.PI, Math.PI));
+            rock.userData.previousPosition.copy(rock.position);
+            fieldBoulder = { rock, time }; // A destroyed or passed landmark is not spawned again.
+          }
+        }
+        if (level >= 6) {
+          // A small, simultaneous crossing shower: real moving bodies, not another uniform backdrop.
+          const count = reducedMotion ? 2 : 4 + showerStrength * 2;
+          const velocity = new THREE.Vector3(showerCourse < 2 ? (showerCourse === 0 ? -1 : 1) : .2,
+            showerCourse < 2 ? .15 : (showerCourse === 2 ? -1 : 1), .2).normalize()
+            .multiplyScalar(reducedMotion ? 28 : 260 + showerStrength * 50);
+          for (let i = 0; i < count; i++) {
+            const rock = eventAsteroid();
+            if (!rock) break;
+            const size = [1.3, .65, 2.2][i % 3];
+            rock.scale.setScalar(size * scale); rock.userData.asteroidSizeScale = scale;
+            rock.userData.asteroidTier = Math.min(3, Math.ceil(size));
+            rock.userData.health = rock.userData.maxHealth = Math.ceil(size);
+            const impact = fieldImpacts[i % fieldImpacts.length].source.clone();
+            if (i > 1) impact.add(new THREE.Vector3(random(-110, 110), random(-90, 90), random(-80, 80)).multiplyScalar(scale));
+            const arrival = showerEntry + (-impact.z / showerLength) * (showerEnd - showerEntry);
+            rock.userData.courseVelocity.copy(velocity).multiplyScalar(1 + i * .06);
+            rock.position.copy(impact).add(showerOrigin).addScaledVector(rock.userData.courseVelocity, -(arrival - gameTime));
+            rock.userData.previousPosition.copy(rock.position);
+            fieldShower.push(rock);
+          }
+        }
+      }
+      function selectAsteroidEncounter(event) {
+        showerStart = courseStartTime + event.prepare; showerEntry = courseStartTime + event.entry;
+        showerEnd = courseStartTime + event.exit; showerKind = event.kind; showerCorridor = showerKind === 'corridor';
+        showerStrength = event.strength; showerShape = event.shape; showerBend = event.bend; showerCourse = event.direction;
+        planAsteroidShower();
+        showerPending = true; showerTravel = 0; nextShowerSlice = 0;
+        showerWarning.innerHTML = '<span aria-hidden="true">' + (showerKind === 'field' ? '🪨 ' : '☄️ ').repeat(showerStrength + 1)
+          + '</span>' + t(showerCorridor ? 'asteroidCorridor' : showerKind === 'field' ? 'asteroidField' : 'asteroidShower');
+      }
       function planAsteroidShower() {
         const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
-        showerRotation.identity();
-        showerDirection.set(0, 0, -1).applyQuaternion(showerRotation);
-        showerVelocity.set(0, 0, 0);
-        const crossingOffset = new THREE.Vector3();
-        const showerTime = showerStart - courseStartTime;
-        const courseSpeed = levelFlightSpeed(showerTime / roundDuration) * .85;
-        let approachSpeed = courseSpeed;
-        // The corridor stays a fixed passage; only free showers become directional rain.
-        if (!showerCorridor) {
-          // Front-left/right dominate (80%); the rest approach ahead, slightly above/below.
-          const roll = random(0, 1);
-          const course = roll < .4 ? 0 : roll < .8 ? 1 : roll < .9 ? 2 : 3;
-          if (course < 2) showerVelocity.set(course === 0 ? -1 : 1, random(-.15, .15), random(.4, .7));
-          else showerVelocity.set(0, course === 2 ? .2 : -.2, 1); // About 11° off a frontal approach.
-          // Keep shallow variants near the forward view instead of using the full sideways offset.
-          crossingOffset.set(showerVelocity.x, showerVelocity.y, 0);
-          if (course < 2) crossingOffset.normalize();
-          crossingOffset.multiplyScalar(reducedMotion ? 200 : 600).applyQuaternion(showerRotation);
-          showerVelocity.normalize().multiplyScalar(Math.max(reducedMotion ? 50 : 220, courseSpeed * .9))
-            .applyQuaternion(showerRotation);
-          // Lay the stream upstream so it reaches the view instead of drifting off-screen.
-          showerDirection.set(0, 0, -courseSpeed).sub(showerVelocity);
-          approachSpeed = showerDirection.length();
-          showerDirection.normalize();
-          showerRotation.setFromUnitVectors(new THREE.Vector3(0, 0, -1), showerDirection);
+        const entry = showerEntry - courseStartTime, exit = showerEnd - courseStartTime;
+        const duration = exit - entry, courseSpeed = levelFlightSpeed(entry / roundDuration) * .85;
+        showerRotation.identity(); showerVelocity.set(0, 0, 0);
+        // Direction belongs to the level plan; stationary fields never inherit the last shower's drift.
+        if (showerKind === 'shower' && !showerCorridor) {
+          if (showerCourse < 2) showerVelocity.set(showerCourse === 0 ? -1 : 1, 0, .55);
+          else showerVelocity.set(0, showerCourse === 2 ? .2 : -.2, 1);
+          showerVelocity.normalize().multiplyScalar(Math.max(reducedMotion ? 50 : 220, courseSpeed * .9));
         }
-        // Start beyond the distance fade; the field gradually emerges from the sky.
-        let lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5) + crossingOffset.length();
-        showerLength = Math.max(900, approachSpeed * (showerEnd - showerStart));
+        // Align the leading/trailing planes with the intended player-facing times, not spawn times.
+        showerDirection.copy(showerVelocity).multiplyScalar(-duration);
+        showerDirection.z -= flightDistanceAt(exit) - flightDistanceAt(entry);
+        showerLength = showerDirection.length();
+        const approachSpeed = showerLength / duration;
+        showerDirection.normalize();
+        showerRotation.setFromUnitVectors(new THREE.Vector3(0, 0, -1), showerDirection);
+        const crossingOffset = new THREE.Vector3();
+        if (showerKind === 'shower' && !showerCorridor) {
+          crossingOffset.set(showerCourse < 2 ? Math.sign(showerVelocity.x) : 0, showerCourse >= 2 ? Math.sign(showerVelocity.y) * .2 : 0, 0)
+            .multiplyScalar(reducedMotion ? 200 : 600);
+          // Offset within the entry plane: visible sideways rain without shifting its arrival time.
+          crossingOffset.addScaledVector(showerDirection, -crossingOffset.dot(showerDirection));
+        }
+        showerCourseOrigin.copy(courseOrigin).add(crossingOffset).add(new THREE.Vector3(0, 0, -flightDistanceAt(entry)))
+          .addScaledVector(showerVelocity, -(showerEntry - showerStart));
+        const lead = showerCourseOrigin.clone().sub(courseOrigin)
+          .add(new THREE.Vector3(0, 0, flightDistanceAt(showerStart - courseStartTime))).length();
         showerSpacing = showerCorridor ? Math.max(160, approachSpeed * [1.15, .9, .7][showerStrength])
           : Math.max(120, approachSpeed * [2.5, 1.4, .85][showerStrength]);
-        // Leave room for all approach slices, including spacing jitter and gap obstacles.
         showerSpacing = Math.max(showerSpacing, (Math.min(lead, showerLength) + 200) * (count + 1) / (maxShowerRocks * .75));
         showerObstacleSpacing = Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][showerStrength]));
-        nextShowerObstacle = showerSpacing; // Keep the entry clear before the first obstacle.
-        // Preserve the original narrow corridor; energy gates stay outside it.
-        showerHalfGap = Math.max(27, .4 * (130 - showerStrength * 22 - (level - 1) * 3));
+        nextShowerObstacle = showerSpacing;
+        // Density and bends get harder, but the passage always retains a navigable opening.
+        showerHalfGap = reducedMotion ? 34 - showerStrength * 4 : 52 - showerStrength * 7;
         showerBend *= showerHalfGap;
-        // Fixed-width core plus a sparse fringe, never scaled to the viewport.
-        showerHalfWidth = showerCorridor ? 900 : 650;
-        if (showerCorridor) {
-          // Reserve a real passage and a clear finish even on slow reduced-motion flights.
-          const finishClearance = (reducedMotion ? 14 : 80) * 3 + levelFlightSpeed(1) * .85 * .75;
-          const available = flightDistanceAt(roundDuration - 5) - flightDistanceAt(showerTime) - finishClearance;
-          lead = Math.min(lead, Math.max(0, available - Math.min(showerLength, approachSpeed * 4)));
-          showerLength = Math.min(showerLength, available - lead);
-        }
-        showerCourseOrigin.copy(courseOrigin).add(crossingOffset).addScaledVector(showerDirection, lead);
-        showerCourseOrigin.z -= flightDistanceAt(showerTime);
+        // Slow-mode rain must also clear before the next encounter, without increasing its density.
+        showerHalfWidth = showerCorridor ? 900 : reducedMotion ? 120 : 650;
+        if (showerCorridor) corridorPlan = { origin: showerCourseOrigin.clone(), rotation: showerRotation.clone(),
+          length: showerLength, gap: showerHalfGap, shape: showerShape, bend: showerBend, entry };
       }
       function advanceAsteroidShower(dt) {
         const count = showerCorridor ? [8, 12, 16][showerStrength] : [3, 6, 9][showerStrength];
         if (showerPending) {
-          showerPending = false;
-          showerOrigin.copy(showerCourseOrigin).add(courseWorldOffset);
+          showerPending = false; showerFadeStart = gameTime;
+          showerOrigin.copy(showerCourseOrigin).add(courseWorldOffset).addScaledVector(showerVelocity, gameTime - showerStart);
           showerPreviousOrigin.copy(showerOrigin);
           seedShowerGrit();
         } else {
@@ -2299,9 +2604,10 @@
           showerTravel -= worldStep.dot(showerDirection) * .85 + showerVelocity.dot(showerDirection) * dt;
         }
         showerGrit.position.copy(showerOrigin);
-        showerGritMaterial.opacity = THREE.MathUtils.smoothstep(gameTime - showerStart, 0, .3);
+        showerGritMaterial.opacity = THREE.MathUtils.smoothstep(gameTime - showerFadeStart, 0, .3);
         // Keep the full field until even its trailing edges have passed the camera.
         showerGrit.visible = !hasPassedCamera(showerGrit, showerGrit.boundingBox);
+        if (showerKind === 'field') return; // Groups are placed once; no uniformly scattered refill slices.
         while (nextShowerSlice <= Math.min(showerTravel, showerLength)) {
           for (let i = 0; i < count; i++) {
             const rock = eventAsteroid();
@@ -2310,15 +2616,15 @@
             const tier = showerCorridor ? (roll < .15 ? 1 : roll < .45 ? 2 : 3)
               : showerStrength === 0 ? 3 : roll < .6 ? 1 : roll < .9 ? 2 : 3;
             rock.userData.asteroidTier = tier;
-            rock.userData.maxHealth = tier; rock.userData.health = tier;
             rock.scale.setScalar([.35, 1.3, 2.8][tier - 1] * (showerCorridor ? random(.75, 1.35) : 1));
+            rock.userData.health = rock.userData.maxHealth = Math.max(tier, Math.ceil(rock.scale.x));
             const nearCourse = i < Math.ceil(count * .8);
-            const x = showerCorridor ? corridorRockX() : nearCourse ? random(-350, 350)
+            const x = showerCorridor ? corridorRockX() : nearCourse ? random(reducedMotion ? -150 : -350, reducedMotion ? 150 : 350)
               : random(-showerHalfWidth, showerHalfWidth);
             const side = i % 2 ? 1 : -1;
             const clearance = rock.userData.type.radius * rock.scale.x * (1 + corridorSlope());
             const depth = -nextShowerSlice + random(-25, 25);
-            const y = showerCorridor ? corridorCenter(-depth) + side * (showerHalfGap + clearance + random(0, 70 + corridorFringe(x) * 80)) : random(-380, 380);
+            const y = showerCorridor ? corridorCenter(-depth) + side * (showerHalfGap + clearance + random(0, 70 + corridorFringe(x) * 80)) : random(reducedMotion ? -140 : -380, reducedMotion ? 140 : 380);
             rock.position.set(x, y, depth)
               .applyQuaternion(showerRotation).add(showerOrigin);
             rock.rotation.set(random(-Math.PI, Math.PI), random(-Math.PI, Math.PI), random(-Math.PI, Math.PI));
@@ -2334,8 +2640,8 @@
               const tier = roll < .2 ? 1 : roll < .7 ? 2 : 3;
               rock.userData.corridorObstacle = true;
               rock.userData.asteroidTier = tier;
-              rock.userData.maxHealth = tier; rock.userData.health = tier;
               rock.scale.setScalar([.35, 1.3, 2.8][tier - 1] * (reducedMotion ? 1 : random(.8, 1.2)));
+              rock.userData.health = rock.userData.maxHealth = Math.max(tier, Math.ceil(rock.scale.x));
               // Large rocks can span the gap vertically, but always leave wide lateral escape routes.
               const verticalRoom = Math.max(0, Math.min(showerHalfGap * .35, showerHalfGap - rock.userData.type.radius * rock.scale.x - 4));
               const x = reducedMotion ? random(-30, 30) : Math.random() < .5 ? random(-20, 20) : random(-100, 100);
@@ -2349,10 +2655,46 @@
           nextShowerSlice += showerSpacing * random(.8, 1.2);
         }
       }
+      function seedLateAsteroids() {
+        lateAsteroidsSeeded = true;
+        const scale = reducedMotion ? .35 : 1;
+        const from = flightRings.at(-2).position, to = flightRings.at(-1).position;
+        const startDepth = flightDistanceAt(32), finishDepth = flightDistanceAt(40);
+        // Two isolated remnants after level one's shower, not another cloud or moving stream.
+        for (const [time, size, side] of [[35, 2.8, 1], [37.5, 1.3, -1]]) {
+          const rock = eventAsteroid();
+          if (!rock) break;
+          rock.scale.setScalar(size * scale);
+          rock.userData.asteroidSizeScale = scale;
+          rock.userData.asteroidTier = Math.min(3, Math.ceil(size));
+          rock.userData.health = rock.userData.maxHealth = Math.ceil(size);
+          rock.userData.courseVelocity.set(0, 0, 0); // Never inherit the preceding shower's drift.
+          rock.position.lerpVectors(from, to, (flightDistanceAt(time) - startDepth) / (finishDepth - startDepth));
+          rock.position.x += side * (reducedMotion ? 25 : 130);
+          rock.position.y += side * (reducedMotion ? 60 : 40);
+          rock.rotation.set(time * .31, time * .47, time * .19);
+          rock.userData.previousPosition.copy(rock.position);
+          lateAsteroids.push({ rock, time });
+        }
+      }
       function updateAsteroidShower(dt = 0) {
-        showerWarning.hidden = paused || roundEnded || !started || gameTime < showerStart - 2 || gameTime > showerStart + 4;
-        if (!started || paused || roundEnded) return;
-        if (gameTime >= showerStart) advanceAsteroidShower(dt);
+        if (started && !paused && !roundEnded && !crashing) {
+          const next = asteroidEncounters[asteroidEncounterIndex + 1];
+          // An early first-boss kill extends the finale, without spawning rocks in the player's face.
+          if (level === 4 && next && !capitalPending && !capitalShip?.visible && capitalShip?.userData.health <= 0
+            && next.prepare > gameTime - courseStartTime) {
+            next.prepare = Math.max(12, gameTime - courseStartTime);
+            next.entry = next.prepare + 6;
+          }
+          // Reuse the field only after its trailing rocks have passed; never remove visible obstacles.
+          if (next && gameTime - courseStartTime >= next.prepare && !showerGrit.visible) {
+            asteroidEncounterIndex++;
+            selectAsteroidEncounter(next);
+          }
+          if (gameTime >= showerStart) advanceAsteroidShower(dt);
+          if (level === 1 && !lateAsteroidsSeeded && gameTime - courseStartTime >= 29) seedLateAsteroids();
+        }
+        showerWarning.hidden = paused || roundEnded || crashing || !started || gameTime < showerEntry - 2 || gameTime > showerEntry + 4;
       }
       function queueShip(ship) {
         if (ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital && !ship.userData.tutorialTarget) {
@@ -2360,6 +2702,121 @@
         }
         ship.visible = false;
         if (!ship.userData.shower && !ship.userData.scheduledHazard && !ship.userData.type.capital && !ship.userData.ringRoute && !ship.userData.tutorialTarget) spawnQueue.push(ship);
+      }
+      const rockContactPath = new THREE.Line3(), rockContactClosest = new THREE.Vector3();
+      const rockContactStart = new THREE.Vector3(), rockContactStep = new THREE.Vector3(), rockContactNormal = new THREE.Vector3();
+      function asteroidContact(from, to, center, radius) {
+        rockContactPath.set(from, to).closestPointToPoint(center, true, rockContactClosest);
+        if (rockContactClosest.distanceToSquared(center) > radius * radius) return null;
+        rockContactStart.copy(from).sub(center); rockContactStep.copy(to).sub(from);
+        const a = rockContactStep.lengthSq(), b = rockContactStart.dot(rockContactStep);
+        const c = rockContactStart.lengthSq() - radius * radius;
+        const time = c > 0 && a > 1e-10 ? THREE.MathUtils.clamp((-b - Math.sqrt(Math.max(0, b * b - a * c))) / a, 0, 1) : 0;
+        rockContactNormal.copy(rockContactStart).addScaledVector(rockContactStep, time);
+        if (rockContactNormal.lengthSq() < 1e-10) rockContactNormal.copy(rockContactStep).negate();
+        if (rockContactNormal.lengthSq() < 1e-10) rockContactNormal.set(1, 0, 0);
+        return rockContactNormal.normalize();
+      }
+      function fractureImpactAsteroid(rock, normal) {
+        const sizeScale = rock.userData.asteroidSizeScale, size = rock.scale.x;
+        if (size / sizeScale < 1.2 || gameTime < rock.userData.fractureAfter) return false;
+        const fragments = ships.filter(ship => ship.visible && ship.userData.impactFragment).length;
+        if (fragments + (rock.userData.impactFragment ? 1 : 2) > 12) return false;
+        const child = eventAsteroid();
+        if (!child) return false;
+        const position = rock.position.clone(), velocity = rock.userData.courseVelocity.clone();
+        const tangent = new THREE.Vector3(Math.abs(normal.y) > .9 ? 1 : 0, Math.abs(normal.y) > .9 ? 0 : 1, 0).cross(normal).normalize();
+        // Two solid pieces, conserving volume and center of mass. No blast, flash, sound or reward.
+        const sizes = [Math.cbrt(.55) * size, Math.cbrt(.45) * size];
+        const separation = rock.userData.type.radius * (sizes[0] + sizes[1]) * 1.15;
+        [rock, child].forEach((piece, index) => {
+          const weight = index === 0 ? .45 : -.55;
+          piece.scale.setScalar(sizes[index]);
+          piece.position.copy(position).addScaledVector(tangent, separation * weight);
+          piece.userData.previousPosition.copy(piece.position);
+          piece.userData.courseVelocity.copy(velocity).addScaledVector(tangent, (reducedMotion ? 8 : 35) * weight);
+          piece.userData.asteroidSizeScale = sizeScale;
+          piece.userData.asteroidTier = Math.min(3, Math.ceil(sizes[index] / sizeScale));
+          piece.userData.health = piece.userData.maxHealth = Math.ceil(sizes[index] / sizeScale);
+          piece.userData.impactFragment = true; piece.userData.fractureAfter = gameTime + 1;
+          piece.userData.courseAge = 1; piece.userData.hull.opacity = 1;
+          piece.userData.lastVisibleTime = rock.userData.lastVisibleTime;
+        });
+        return true;
+      }
+      function collideAsteroids() {
+        if (!started || paused || roundEnded || crashing) return 0;
+        let contacts = 0;
+        for (let i = 0; i < activeAsteroids.length; i++) {
+          const a = activeAsteroids[i];
+          if (!a.visible || a.userData.tutorialTarget) continue;
+          for (let j = i + 1; j < activeAsteroids.length; j++) {
+            const b = activeAsteroids[j];
+            if (!b.visible || b.userData.tutorialTarget) continue;
+            const velocity = a.userData.courseVelocity, otherVelocity = b.userData.courseVelocity;
+            if (velocity.lengthSq() + otherVelocity.lengthSq() < 1) continue;
+            // Shared player travel cancels out; only relative asteroid movement produces an impact.
+            asteroidCollisionPrevious.copy(a.userData.previousPosition).add(b.position).sub(b.userData.previousPosition);
+            const radius = (a.scale.x + b.scale.x) * a.userData.type.radius;
+            const normal = asteroidContact(asteroidCollisionPrevious, a.position, b.position, radius);
+            if (!normal) continue;
+            const closing = -asteroidCollisionClosest.copy(velocity).sub(otherVelocity).dot(normal);
+            if (closing <= .01) continue; // Separating contacts must not bounce or fracture again.
+            const massA = a.scale.x ** 3, massB = b.scale.x ** 3;
+            const impulse = 1.25 * closing / (1 / massA + 1 / massB);
+            velocity.addScaledVector(normal, impulse / massA);
+            otherVelocity.addScaledVector(normal, -impulse / massB);
+            const overlap = Math.max(0, radius - asteroidCollisionClosest.copy(a.position).sub(b.position).dot(normal)) + .01;
+            a.position.addScaledVector(normal, overlap * massB / (massA + massB));
+            b.position.addScaledVector(normal, -overlap * massA / (massA + massB));
+            contacts++;
+            if (closing > (reducedMotion ? 24 : 180) && Math.random() < .22) {
+              fractureImpactAsteroid(massA < massB ? a : b, normal);
+            }
+          }
+        }
+        return contacts;
+      }
+      function collideAsteroidsWithField() {
+        if (!started || paused || roundEnded || crashing || showerKind !== 'field' || !showerGrit.visible) return 0;
+        let contacts = 0;
+        for (const body of activeAsteroids) {
+          if (!body.visible || body.userData.tutorialTarget || body.userData.courseVelocity.lengthSq() < 1) continue;
+          if (particles.filter(p => p.kind === 'rock').length >= 96) break;
+          const radius = body.userData.type.radius * body.scale.x;
+          const from = body.userData.previousPosition.clone().add(showerOrigin).sub(showerPreviousOrigin);
+          showerQueryStart.copy(from).sub(showerOrigin);
+          showerQueryEnd.copy(body.position).sub(showerOrigin);
+          for (const piece of nearbyShowerRocks(showerQueryStart, showerQueryEnd, radius + maxShowerGritSize * 1.7)) {
+            if (piece.destroyed) continue;
+            const center = piece.position.clone().add(showerOrigin);
+            const normal = asteroidContact(from, body.position, center, radius + piece.size);
+            if (!normal) continue;
+            const closing = -body.userData.courseVelocity.dot(normal);
+            if (closing <= .01) continue;
+            const massBody = radius ** 3, massPiece = piece.size ** 3;
+            const impulse = 1.25 * closing / (1 / massBody + 1 / massPiece);
+            body.userData.courseVelocity.addScaledVector(normal, impulse / massBody);
+            const velocity = normal.clone().multiplyScalar(-impulse / massPiece);
+            // Detach the exact rendered fragment into the existing solid-fragment lifecycle.
+            // The static instance is removed once; no duplicate collider or disappearing moving hull.
+            const object = new THREE.Mesh(showerGrit.geometry, new THREE.MeshStandardMaterial({ color: 0x918777, roughness: 1, flatShading: true }));
+            showerGrit.getMatrixAt(piece.index, showerInstanceMatrix);
+            showerInstanceMatrix.decompose(object.position, object.quaternion, object.scale);
+            object.position.add(showerOrigin);
+            object.userData = { collisionBox: showerGrit.geometry.boundingBox,
+              collisionParts: [{ bounds: showerGrit.geometry.boundingBox, triangles: showerBaseTriangles }],
+              lastVisibleTime: piece.seen ? gameTime : -Infinity };
+            particles.push({ object, kind: 'rock', vx: velocity.x, vy: velocity.y, vz: velocity.z,
+              age: 0, life: 5, worldFactor: .85, spin: reducedMotion ? 0 : random(-1, 1) });
+            scene.add(object);
+            piece.destroyed = true;
+            showerGrit.setMatrixAt(piece.index, showerHiddenMatrix); showerGrit.instanceMatrix.needsUpdate = true;
+            contacts++;
+            break; // Bound work and visual density during a dense crossing.
+          }
+        }
+        return contacts;
       }
       const asteroidCollisionPrevious = new THREE.Vector3(), asteroidCollisionClosest = new THREE.Vector3();
       const asteroidCollisionPath = new THREE.Line3();
@@ -2678,15 +3135,21 @@
         const radius = reducedMotion ? 14 : 80;
         let depths = [firstCheckpointTime, 12, 22, 32, roundDuration - 5].map(flightDistanceAt);
         let approachDepth, exitDepth;
-        if (showerCorridor) {
-          const entranceDepth = courseOrigin.z - showerCourseOrigin.z;
-          const approachGap = Math.max(radius * 3, reducedMotion ? 120 : levelFlightSpeed((showerStart - courseStartTime) / roundDuration) * .85 * 1.5);
+        if (corridorPlan) {
+          const entranceDepth = courseOrigin.z - corridorPlan.origin.z;
+          const approachGap = Math.max(radius * 3, levelFlightSpeed(corridorPlan.entry / roundDuration) * .85 * 1.5);
           approachDepth = entranceDepth - approachGap;
-          exitDepth = entranceDepth + showerLength;
-          depths = [depths[0], approachDepth, depths[4]];
-          const gaps = [[depths[0], approachDepth], [exitDepth + radius * 2, depths[2]]];
+          exitDepth = entranceDepth + corridorPlan.length;
+          // Keep level two's familiar opening slalom; only its former 32-second gate moves to the entrance.
+          depths = level === 2 ? [depths[0], depths[1], depths[2], approachDepth, depths[4]]
+            : [depths[0], approachDepth, depths[4]];
+          const gaps = [[depths[0], approachDepth], [exitDepth + radius * 2, depths.at(-1)]];
           while (depths.length < flightRings.length) {
-            gaps.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
+            gaps.sort((a, b) => {
+              const difference = (b[1] - b[0]) - (a[1] - a[0]);
+              // Prefer the earlier gap on a tie, independent of floating-point drift at different speeds.
+              return Math.abs(difference) < 1e-6 ? a[0] - b[0] : difference;
+            });
             const [from, to] = gaps.shift(), middle = (from + to) / 2;
             depths.push(middle);
             gaps.push([from, middle], [middle, to]);
@@ -2695,8 +3158,19 @@
         }
         flightRings.forEach((gate, index) => {
           if (openingComplete && index === 0) return; // Leave the passed opening checkpoint behind.
-          const depth = depths[index], y = showerCorridor && depth > exitDepth ? corridorCenter(showerLength) : 0;
-          gate.position.set(0, y, -depth).add(courseOrigin).add(courseWorldOffset);
+          const depth = depths[index];
+          const exitHeight = corridorPlan && depth > exitDepth ? corridorCenter(corridorPlan.length, corridorPlan) : 0;
+          // Steering matters from level 1; add vertical navigation from level 3.
+          // Limit each offset by the neighboring flight distance, never shrink the checkpoint opening.
+          const clearance = Math.min(depth - (depths[index - 1] || 0), (depths[index + 1] || depth * 2) - depth) * .12;
+          const lateral = Math.min(clearance, radius * Math.min(3, 1.25 + (level - 1) * .45));
+          const vertical = Math.min(clearance * .65, radius * Math.min(1.8, Math.max(0, level - 2) * .4));
+          const x = [0, 1, -1, 1, 0][index] * lateral * (level % 2 ? 1 : -1);
+          // Keep alternating climbs and descents when the corridor approach occupies a checkpoint.
+          const verticalIndex = index - (depth > approachDepth ? 1 : 0);
+          const y = exitHeight + (index === 0 || index === flightRings.length - 1 || depth === approachDepth
+            ? 0 : (verticalIndex % 2 ? 1 : -1) * vertical);
+          gate.position.set(x, y, -depth).add(courseOrigin).add(courseWorldOffset);
           gate.userData.kind = index === 0 ? 'start' : index === flightRings.length - 1 ? 'finish'
             : depth === approachDepth ? 'approach' : 'course';
           gate.userData.radius = radius;
@@ -2824,7 +3298,7 @@
         }
         const clearance = Math.min(...gates.map(gate => gate.userData.radius));
         const firstDistance = Math.min(gates[0].position.distanceTo(camera.position), flightDistanceAt(firstCheckpointTime));
-        const arrivalDistance = Math.max(reducedMotion ? 180 : 900, levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 2.5);
+        const arrivalDistance = Math.max(reducedMotion ? 240 : 900, levelFlightSpeed((gameTime - courseStartTime) / roundDuration) * .85 * 2.5);
         activeShips.forEach((ship, index) => {
           resetShip(ship, true);
           // Loose lanes beside and above/below the gates, rather than a single-file procession.
@@ -2841,19 +3315,20 @@
           points.push(start);
           points.sort((a, b) => b.z - a.z);
           // Follow only the remaining passage; a delayed wave may arrive inside or beyond it.
-          if (showerCorridor && start.z > showerCourseOrigin.z - showerLength) {
-            const startDepth = showerCourseOrigin.z - start.z;
-            const entry = points.filter(point => point.z > showerCourseOrigin.z).pop() || start;
-            const exit = points.find(point => point.z < showerCourseOrigin.z - showerLength);
-            const entryPadding = Math.min(200, Math.max(0, (entry.z - showerCourseOrigin.z) / 2));
-            const exitPadding = exit ? Math.min(200, (showerCourseOrigin.z - showerLength - exit.z) / 2) : 200;
-            if (startDepth >= 0) start.y = showerCourseOrigin.y + corridorCenter(startDepth);
+          if (corridorPlan && start.z > corridorPlan.origin.z - corridorPlan.length) {
+            const { origin, length, rotation } = corridorPlan;
+            const startDepth = origin.z - start.z;
+            const entry = points.filter(point => point.z > origin.z).pop() || start;
+            const exit = points.find(point => point.z < origin.z - length);
+            const entryPadding = Math.min(200, Math.max(0, (entry.z - origin.z) / 2));
+            const exitPadding = exit ? Math.min(200, (origin.z - length - exit.z) / 2) : 200;
+            if (startDepth >= 0) start.y = origin.y + corridorCenter(startDepth, corridorPlan);
             for (let step = -1; step <= 9; step++) {
-              const depth = step < 0 ? -entryPadding : step > 8 ? showerLength + exitPadding : showerLength * step / 8;
-              if (showerCourseOrigin.z - depth >= start.z) continue;
-              const x = THREE.MathUtils.lerp(entry.x, exit ? exit.x : entry.x, THREE.MathUtils.clamp(depth / showerLength, 0, 1));
-              points.push(new THREE.Vector3(x - showerCourseOrigin.x, corridorCenter(THREE.MathUtils.clamp(depth, 0, showerLength)), -depth)
-                .applyQuaternion(showerRotation).add(showerCourseOrigin));
+              const depth = step < 0 ? -entryPadding : step > 8 ? length + exitPadding : length * step / 8;
+              if (origin.z - depth >= start.z) continue;
+              const x = THREE.MathUtils.lerp(entry.x, exit ? exit.x : entry.x, THREE.MathUtils.clamp(depth / length, 0, 1));
+              points.push(new THREE.Vector3(x - origin.x, corridorCenter(THREE.MathUtils.clamp(depth, 0, length), corridorPlan), -depth)
+                .applyQuaternion(rotation).add(origin));
             }
           }
           points.sort((a, b) => b.z - a.z);
@@ -3529,7 +4004,7 @@
           levelCheckpoint = { score: 0, kills: 0 };
         }
         bestAtLevelStart = best;
-        // Higher levels stay progressively harder without unbounded flight speeds.
+        // Enemy pressure stays separate from the uncapped logarithmic flight-speed curve.
         levelPressure = 1 - Math.exp(-(level - 1) / 6);
         combo = 0; lastKill = -Infinity; gameTime = 0;
         roundEnded = false; celebrating = false; emission = 0;
@@ -3606,7 +4081,24 @@
         enemyBolts.length = 0;
       }
       function updateCapitalShip(ship, dt) {
+        if (!started || paused || roundEnded || crashing || !ship.visible || dt <= 0) return;
         const data = ship.userData;
+        if (level === 4 && gameTime - courseStartTime >= 28 && !data.retreating) {
+          data.retreating = true; data.retreatStart = gameTime;
+        }
+        if (data.retreating) {
+          const previousSpeed = data.courseVelocity.dot(data.cruiseDirection);
+          const forwardSpeed = Math.max(0, flightMotion.dot(data.cruiseDirection) * .85);
+          const desired = data.cruiseDirection.clone().multiplyScalar(forwardSpeed + 2200);
+          data.courseVelocity.lerp(desired, 1 - Math.exp(-1.5 * dt));
+          updateEngineThrust(ship, previousSpeed, dt);
+          data.gunsCharging = false;
+          for (const muzzle of data.muzzles) muzzle.scale.setScalar(3);
+          const elapsed = gameTime - data.retreatStart;
+          setShipOpacity(ship, 1 - THREE.MathUtils.smoothstep(elapsed, 1, 4));
+          if (elapsed >= 4) ship.visible = false; // Escape is neither a kill nor a reward.
+          return;
+        }
         data.courseAge += dt;
         data.rockHitCooldown = Math.max(0, data.rockHitCooldown - dt);
         const direction = data.cruiseDirection;
@@ -4387,6 +4879,8 @@
           if (!ship.userData.tutorialTarget && hasPassedCamera(ship)) queueShip(ship);
         }
         danger = updateShowerRockCollisions() || danger;
+        collideAsteroids();
+        collideAsteroidsWithField();
         collideShipsWithAsteroids();
         if (!danger && !paused && !roundEnded) {
           danger = particles.some(p => {
@@ -4517,7 +5011,7 @@
           }
           const previous = isRock ? p.object.position.clone() : null;
           // Drawings and fragments stay in the world as the player flies in any direction.
-          p.object.position.add(worldStep);
+          p.object.position.addScaledVector(worldStep, p.worldFactor ?? 1);
           if (!paused || crashing) {
             p.object.position.x += p.vx * dt;
             p.object.position.y += p.vy * dt;
@@ -4627,7 +5121,7 @@
           capitalHealth.value = Math.max(0, capitalShip.userData.health);
           const charging = capitalShip.userData.gunsCharging;
           capitalHud.classList.toggle('charging', charging);
-          capitalState.textContent = t('capitalStatus', { health: capitalShip.userData.health, max: capitalShip.userData.maxHealth, state: t(charging ? 'capitalCharging' : 'capitalEnemy') });
+          capitalState.textContent = t('capitalStatus', { health: capitalShip.userData.health, max: capitalShip.userData.maxHealth, state: t(capitalShip.userData.retreating ? 'capitalRetreating' : charging ? 'capitalCharging' : 'capitalEnemy') });
         }
         updateTargetLock(0);
         const selected = focusedShip;

@@ -53,7 +53,15 @@ const code = `
   }
   return {
     scene, sounds, messages, ships, activeAsteroids, camera, flightMotion, flightOrientation, worldStep, explosions, hits, enemyBolts, target,
-    flightTurn, flightVelocity, advanceFlightHeading, forecastFlightPosition, flightDistanceAt,
+    flightTurn, flightVelocity, advanceFlightHeading, forecastFlightPosition, flightDistanceAt, getAsteroidEncounters,
+    get encounterIndex() { return asteroidEncounterIndex; }, get corridorPlan() { return corridorPlan; },
+    get showerVisible() { return showerGrit.visible; }, get warningHidden() { return showerWarning.hidden; },
+    get warningText() { return showerWarning.innerHTML; }, get grit() { return showerGrit; },
+    get fieldGroups() { return fieldGroups; }, get fieldRoute() { return fieldRoute; },
+    get fieldDebris() { return fieldDebris; }, get fieldImpacts() { return fieldImpacts; }, get fieldBoulder() { return fieldBoulder; },
+    recordVisibleShowerRocks, updateShowerRockCollisions, collideAsteroids, collideAsteroidsWithField, fractureImpactAsteroid,
+    particles, get fieldShower() { return fieldShower; }, get showerRocks() { return showerRocks; },
+    get lateAsteroids() { return lateAsteroids; },
     ringShips, flightRings, resetRingShips, updateRingShipCourse, updateRingShipArrivals, courseWorldOffset,
     beginFlightTutorial, completeTutorialStep, spawnTutorialTarget, updateFlightTutorial, updateFlightRing, flightBoundary,
     flightBoundaryOrigin, flightBoundaryRadii, constrainShipToBoundary,
@@ -61,9 +69,13 @@ const code = `
       ${section('          ship.position.addScaledVector(worldStep, .85);', '          updateShipHitFlash(ship);')}
     },
     tutorialState: () => ({stage: tutorialStage, completed: tutorialCompleted, completedAt: tutorialStepCompletedAt, time: gameTime, courseStartTime}),
-    coursePlan: () => ({origin: showerCourseOrigin.clone(), start: showerStart, end: showerEnd, length: showerLength, bend: showerBend, shape: showerShape}),
+    coursePlan: () => ({origin: showerCourseOrigin.clone(), start: showerStart, entry: showerEntry, end: showerEnd,
+      length: showerLength, bend: showerBend, shape: showerShape, corridor: showerCorridor, kind: showerKind,
+      direction: showerDirection.clone(), velocity: showerVelocity.clone()}),
     ringCourse(corridor, shape = 0) {
-      showerCorridor = corridor; showerShape = shape; showerBend = reducedMotion ? .45 : 1.15;
+      asteroidEncounters = []; corridorPlan = null;
+      showerStart = 0; showerEntry = 12; showerEnd = 27; showerPending = true;
+      showerCorridor = corridor; showerKind = corridor ? 'corridor' : 'shower'; showerShape = shape; showerBend = reducedMotion ? .45 : 1.15;
       gameTime = 0; courseWorldOffset.set(0, 0, 0);
       planAsteroidShower(); resetFlightRing(); resetRingShips();
       return { origin: showerCourseOrigin.clone(), length: showerLength, gap: showerHalfGap };
@@ -72,7 +84,7 @@ const code = `
     resetShip, fadeShipShader, targetInfo, updateShipCourse, avoidAsteroids, updateCapitalShip, updateEnemyBolts, recordVisibleObjects,
     updateShipHitFlash, updateEngineThrust, updateEngineVisuals, collideShipsWithAsteroids,
     clearEnemyBolts, playerLaserSpeed, setupLevelFleet, updateAsteroidShower, updateShipArrivals, queueShip,
-    showerPool, maxShowerRocks, eventAsteroid, fadeAsteroidShader, asteroidShader, encounterRest, corridorCenter, corridorSlope,
+    showerPool, maxShowerRocks, eventAsteroid, selectAsteroidEncounter, fadeAsteroidShader, asteroidShader, encounterRest, corridorCenter, corridorSlope, playerHull,
     repairPickup, repairRing, repairMarker, updateRepairPickup, resetRepairPickup,
     get shield() { return shield; }, setShield: value => { shield = value; },
     get repairPending() { return repairPending; }, setRepairPending: value => { repairPending = value; },
@@ -86,13 +98,15 @@ const code = `
     setPaused: value => { paused = value; },
     setRoundEnded: value => { roundEnded = value; }, setCrashing: value => { crashing = value; },
     shower: (corridor, strength, shape = 0, direction = 1) => {
-      showerCorridor = corridor; showerStrength = strength; showerShape = shape;
+      asteroidEncounters = []; corridorPlan = null;
+      showerStart = 0; showerEntry = 12; showerEnd = 27; showerPending = true; showerTravel = 0; nextShowerSlice = 0;
+      showerCorridor = corridor; showerKind = corridor ? 'corridor' : 'shower'; showerStrength = strength; showerShape = shape;
       showerBend = direction * (reducedMotion ? .45 : 1.15); gameTime = showerStart;
       planAsteroidShower();
       courseWorldOffset.set(0, 0, flightDistanceAt(showerStart));
       worldStep.set(0, 0, 0); updateAsteroidShower();
       return { pool: showerPool, grit: showerGrit, gap: showerHalfGap, length: showerLength,
-        origin: showerOrigin, rotation: showerRotation, direction: showerDirection, velocity: showerVelocity, start: showerStart, end: showerEnd,
+        origin: showerOrigin, rotation: showerRotation, direction: showerDirection, velocity: showerVelocity, start: showerStart, entry: showerEntry, end: showerEnd,
         width: showerHalfWidth * 2, spacing: showerSpacing, obstacleSpacing: showerObstacleSpacing, bend: showerBend };
     },
     get capital() { return capitalShip; }, get capitalPending() { return capitalPending; },

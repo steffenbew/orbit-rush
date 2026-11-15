@@ -17,6 +17,7 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
       const scene = new THREE.Scene(), glow = new THREE.Texture();
       const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .03, 14000);
       const random = (a, b) => (a + b) / 2;
+      ${section('      function levelFlightSpeed(', '      function getAsteroidEncounters(')}
       ${section('      const dark =', "      const canvas = document.querySelector('#effects');")}
       // Boot must not read flight state before it is initialized.
       const flightMotion = new THREE.Vector3();

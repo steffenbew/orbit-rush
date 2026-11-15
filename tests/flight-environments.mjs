@@ -248,8 +248,8 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
   hazards.flightMotion.set(0, 0, -speed);
   hazards.setLevel(level); hazards.setupLevelFleet();
   const field = hazards.shower(true, strength, shape);
-  const approachSpeed = hazards.levelFlightSpeed(field.start / 45) * .85;
-  const lead = Math.max((reducedMotion ? 900 : 3800) + approachSpeed * .3, approachSpeed * 5.5);
+  const approachSpeed = field.length / (field.end - field.entry);
+  const lead = hazards.flightDistanceAt(field.entry);
   assert.ok(field.pool.every(rock => !rock.userData.corridorObstacle), 'Leave the first entry slice clear');
   assert.equal(field.obstacleSpacing, Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][strength])));
   for (const rock of field.pool.filter(rock => rock.visible)) {
@@ -287,7 +287,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
       assert.ok(rock.position.distanceTo(hazards.camera.position) >= lead - 100, 'No nearby pop-in: interior rocks get the same distant lead as the walls');
       assert.ok(rock.userData.previousPosition.equals(rock.position), 'Placement must not create a swept teleport');
       assert.ok(rock.userData.courseVelocity.equals(field.velocity), 'Interior rocks travel with the walls, never homing toward the pilot');
-      assert.equal(rock.userData.health, rock.userData.asteroidTier);
+      assert.equal(rock.userData.health, Math.max(rock.userData.asteroidTier, Math.ceil(rock.scale.x)));
       assert.ok(rock.userData.asteroidTier <= (reducedMotion ? 1 : 3));
       assert.ok(radius <= (reducedMotion ? .35 : 2.8 * 1.2) * rock.userData.type.radius + 1e-8, 'Keep even the largest passage boulders dodgeable');
       assert.ok(hazards.ships.includes(rock) && rock.userData.collisionParts.length > 0, 'Gap rocks must use the real shooting/collision pipeline');
@@ -312,7 +312,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
   assert.equal(hazards.nextShowerObstacle, nextObstacle);
   assert.ok(field.origin.equals(origin), 'Pause freezes obstacle placement and the field');
   hazards.setPaused(false); hazards.setupLevelFleet();
-  assert.equal(hazards.nextShowerObstacle, hazards.showerSpacing, 'Retry preplans a fresh first obstacle slice');
+  assert.equal(hazards.nextShowerObstacle, hazards.showerSpacing, 'Retry preplans the next encounter with fresh obstacle state');
   const free = hazards.shower(false, strength);
   assert.ok(free.pool.filter(rock => rock.visible).every(rock => !rock.userData.corridorObstacle), 'Pooled rocks must clear corridor roles when reused in free showers');
 }
@@ -328,7 +328,7 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   const inverse = new THREE.Quaternion(); // Field axes belong to the fixed course, not the player's turn.
   const field = motion.shower(corridor, 2);
   const stream = field.velocity.clone().applyQuaternion(inverse);
-  const streamSpeed = corridor ? 0 : Math.max(reducedMotion ? 50 : 220, motion.levelFlightSpeed(field.start / 45) * .85 * .9);
+  const streamSpeed = corridor ? 0 : Math.max(reducedMotion ? 50 : 220, motion.levelFlightSpeed(field.entry / 45) * .85 * .9);
   assert.ok(Math.abs(stream.length() - streamSpeed) < 1e-8);
   if (!corridor) {
     if (Math.abs(stream.x) > 1e-8) assert.ok(Math.hypot(stream.x, stream.y) > streamSpeed * .8, 'Side streams keep their strong transverse motion');

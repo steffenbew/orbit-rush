@@ -36,8 +36,9 @@ function makeGame(seed = 12345, reducedMotion = false) {
       hits, effects, awards, sounds, findShowerLaserHit, damageShowerRock,
       prepareShowerRock, nearbyShowerRocks, update: updateShowerRockCollisions, corridorCenter,
       get shield() { return shield; }, setPaused: value => { paused = value; },
-      seed: (strength = 2, shape = 0, corridor = true) => {
-        showerCorridor = corridor; showerStrength = strength; showerShape = shape;
+      setKind: value => { showerKind = value; showerCorridor = value === 'corridor'; },
+      seed: (strength = 2, shape = 0, corridor = true, kind = corridor ? 'corridor' : 'shower') => {
+        showerCorridor = corridor; showerKind = kind; showerStrength = strength; showerShape = shape;
         showerLength = 3000; showerHalfGap = 27; showerHalfWidth = corridor ? 900 : 650; showerBend = 27 * 1.15;
         showerOrigin.set(0, 0, 0); showerPreviousOrigin.copy(showerOrigin);
         showerRotation.identity(); showerGrit.position.copy(showerOrigin); showerVelocity.set(0, 0, 0);
@@ -208,8 +209,9 @@ for (const reducedMotion of [false, true]) for (const turn of [false, true]) for
   assert.equal(flight.hits.length, 1, 'The same instance must not damage repeatedly');
   flight.seed(); assert.ok(flight.rocks.every(rock => !rock.seen && !rock.hit));
   flight.seed(0, 0, false);
-  assert.equal(flight.rocks.length, 300);
-  assert.equal([...flight.cells.values()].reduce((count, cell) => count + cell.length, 0), 300);
+  const count = reducedMotion ? 30 : 300;
+  assert.equal(flight.rocks.length, count);
+  assert.equal([...flight.cells.values()].reduce((count, cell) => count + cell.length, 0), count);
   assert.ok(flight.rocks.every(rock => !rock.hit && !rock.seen), 'Switching to a free shower rebuilds only its own collision records');
   assert.equal(flight.update(), false, 'New, never-rendered shower instances must not hit yet');
 }
@@ -241,8 +243,8 @@ assert.ok(source.includes('danger = updateShowerRockCollisions() || danger;'), '
 assert.ok(source.includes('recordVisibleObjects();\n        recordVisibleShowerRocks();'), 'Visibility must be recorded on rendered frames, not simulation ticks');
 
 // Controlled instances exercise the real spatial query, transformed triangles and destruction.
-for (const rotated of [false, true]) for (const damage of [1, 3]) {
-  const laser = makeGame(); laser.seed();
+for (const kind of ['corridor', 'field']) for (const rotated of [false, true]) for (const damage of [1, 3]) {
+  const laser = makeGame(); laser.seed(); laser.setKind(kind);
   laser.cells.clear();
   for (const rock of laser.rocks) rock.destroyed = true;
   if (rotated) laser.rotation.setFromEuler(new THREE.Euler(.3, -.6, .2));
@@ -297,4 +299,4 @@ for (const rotated of [false, true]) for (const damage of [1, 3]) {
 assert.ok(source.includes('const wallHit = findShowerLaserHit(previous, rocket.object.position, shipDistance);'));
 assert.ok(source.includes('damageShowerRock(wallHit, rocket.damage);'));
 assert.ok(source.includes('if (wallHit || hit || rocket.age > 8'), 'A wall hit consumes the projectile');
-console.log('PASS wall lasers: nearest transformed mesh, ship occlusion, normal/heavy damage, holes, no collisions, bounded effects and reset');
+console.log('PASS wall and stationary-field lasers: nearest transformed mesh, ship occlusion, normal/heavy damage, holes, no collisions, bounded effects and reset');

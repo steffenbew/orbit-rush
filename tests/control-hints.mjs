@@ -25,7 +25,8 @@ const makeGame = (touchMode = false) => new Function('THREE', 't', 'touchMode', 
   let lastKill = -Infinity, combo = 0, lastShot = -Infinity, lastEmptyAttempt = -Infinity, lastHeatShot = 0;
   let shotFlashUntil = 0, emptyFlashUntil = 0, heavyEnergy = 1, weaponHeat = 0, overheated = false, hitMarker = 0;
   let spawnQueue = [], normalStarts = 0, courseStartTime = 0, tutorialReinforcements = 0;
-  let nextShipTime = 2, nextHazardTime = 0, showerStart = 9, showerEnd = 25;
+  let nextShipTime = 2, nextHazardTime = 0, showerStart = 0, showerEntry = 12, showerEnd = 27;
+  const corridorPlan = null;
   const progressionTimeScale = 1.5, hazardStartDelay = 4, firstCheckpointTime = 5;
   const courseOrigin = new THREE.Vector3(), showerCourseOrigin = new THREE.Vector3(0, 0, -3000);
   const heatPerShot = 10, reducedMotion = false, innerWidth = 1000, innerHeight = 800;
