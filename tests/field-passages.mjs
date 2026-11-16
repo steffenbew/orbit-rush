@@ -1,9 +1,11 @@
 // Old asteroid tracks through settled debris are real, freely oriented gaps, not painted tunnels.
 import assert from 'node:assert/strict';
-import { THREE, makeGame } from './helpers/flight-game.mjs';
+import { THREE, makeGame, randomState } from './helpers/flight-game.mjs';
 
 const directions = [], variants = new Set();
 for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 59]) {
+  // Keep each layout independent of random draws consumed by earlier speed/mode cases.
+  randomState.seed = 12345;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet();
   game.setTime(game.getAsteroidEncounters()[0].prepare); game.updateAsteroidShower(0);
   const group = game.fieldGroups[0], tunnel = group.tunnel;

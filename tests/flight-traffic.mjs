@@ -622,7 +622,7 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     assert.ok(offset.dot(nextGate.userData.normal) > 0, 'Both ships start before the checkpoint plane, not behind it');
     if (slot === 0) {
       const distance = ship.position.distanceTo(lesson.camera.position);
-      assert.ok(distance > (reducedMotion ? 60 : 400) && distance < (reducedMotion ? 190 : 600),
+      assert.ok(distance > (reducedMotion ? 60 : 620) && distance < (reducedMotion ? 190 : 700),
         'The delayed first arrival stays at a readable shooting distance with safe hull clearance');
       assert.ok(distance < nextGate.position.distanceTo(lesson.camera.position),
         'The delayed first ship still arrives before the checkpoint');
@@ -644,6 +644,8 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     lesson.updateShipCourse(ship, .6); assert.equal(ship.userData.arrivalOpacity, 1);
     if (slot === 0) {
       assert.equal(nextGate.userData.fadeStart, 55.6 + 1.4, 'Reveal the checkpoint 0.2 seconds after the first enemy finishes fading in');
+      // Include forward travel during the reveal delay: faster levels place gates farther away.
+      advanceToCheckpoint(arrivalFraction + .001 + leadDistance * 2.8 / checkpointDistance);
       const position = nextGate.position.clone();
       lesson.worldStep.set(0, 0, 0);
       for (const elapsed of [1.19, 1.2, 1.39]) {

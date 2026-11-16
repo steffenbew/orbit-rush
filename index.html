@@ -1827,9 +1827,11 @@
       const hazardInterval = 5 / .75, hazardApproach = 3, hazardStartDelay = 2;
       let nextHazardTime = hazardStartDelay;
       function levelFlightSpeed(progress) {
-        // Faster opening; +30% at level 4 and +46% at level 8, then ongoing growth without a cap.
-        const pace = (reducedMotion ? 1 : 1.15) * (1 + .22 * Math.log(level));
-        return pace * (reducedMotion ? 35 + 8 * progress : 1.86 * 1.15 * (180 + 140 * Math.pow(progress, 1.3)));
+        // Normal flight: +36% at level 4 and +54% at level 8, with uncapped logarithmic growth.
+        // Preserve reduced-motion speeds, including their gentler level scaling.
+        const pace = (reducedMotion ? 1 : 1.15) * (1 + (reducedMotion ? .22 : .26) * Math.log(level));
+        const opening = level === 1 ? 205 : 300;
+        return pace * (reducedMotion ? 35 + 8 * progress : 1.86 * 1.15 * (opening + (380 - opening) * Math.pow(progress, 1.15)));
       }
       function getAsteroidEncounters() {
         const boss = level % 4 === 0;
@@ -3001,7 +3003,7 @@
             // Reveal the checkpoint shortly after the enemy's 1.2-second fade-in.
             gate.userData.fadeStart = gameTime + 1.4;
             // Preserve shooting distance on the shorter remaining approach, without spawning beyond the gate.
-            const fraction = Math.min(.8, (reducedMotion ? 160 : 550) / camera.position.distanceTo(gate.position));
+            const fraction = Math.min(.8, (reducedMotion ? 160 : 650) / camera.position.distanceTo(gate.position));
             ship.position.copy(camera.position).lerp(gate.position, fraction)
               .addScaledVector(data.courseRight, reducedMotion ? -18 : -60)
               .addScaledVector(data.courseUp, reducedMotion ? 4 : 10);

@@ -14,7 +14,7 @@ for (const reducedMotion of [false, true]) {
   `)(THREE, reducedMotion);
   assert.equal(initialFleet.length, 8, 'Boot-time asteroid creation must not read uninitialized flight state');
   for (const ship of initialFleet.filter(ship => !ship.userData.type.asteroid)) {
-    const openingSpeed = reducedMotion ? 35 : 180 * 1.86 * 1.15 * 1.15;
+    const openingSpeed = reducedMotion ? 35 : 205 * 1.86 * 1.15 * 1.15;
     assert.ok(Math.abs(ship.userData.courseVelocity.length() - openingSpeed * .85 * ship.userData.cruiseRatio) < 1e-8,
       'Opening traffic must match the increased flight speed, without changing reduced motion');
   }
@@ -26,9 +26,10 @@ const flightSpeed = new Function('reducedMotion', 'levelPressure', 'progress', '
   return levelFlightSpeed(progress);
 `);
 for (const reducedMotion of [false, true]) for (const level of [1, 2, 4, 8, 20, 1000]) {
-  const pace = (reducedMotion ? 1 : 1.15) * (1 + .22 * Math.log(level));
+  const pace = (reducedMotion ? 1 : 1.15) * (1 + (reducedMotion ? .22 : .26) * Math.log(level));
   for (const progress of [0, .25, .5, .75, 1]) {
-    const baseline = reducedMotion ? 35 + 8 * progress : 1.86 * 1.15 * (180 + 140 * Math.pow(progress, 1.3));
+    const opening = level === 1 ? 205 : 300;
+    const baseline = reducedMotion ? 35 + 8 * progress : 1.86 * 1.15 * (opening + (380 - opening) * Math.pow(progress, 1.15));
     assert.ok(Math.abs(flightSpeed(reducedMotion, 0, progress, level) / baseline - pace) < 1e-8);
     assert.equal(flightSpeed(reducedMotion, 0, progress, level), flightSpeed(reducedMotion, 1, progress, level),
       'Enemy pressure no longer accelerates the player');
@@ -37,11 +38,11 @@ for (const reducedMotion of [false, true]) for (const level of [1, 2, 4, 8, 20, 
 }
 for (const reduced of [false, true]) {
   const opening = flightSpeed(reduced, 0, 0, 1), peak = flightSpeed(reduced, 0, 1, 1);
-  assert.ok(Math.abs(opening - (reduced ? 35 : 442.773)) < 1e-8);
-  assert.ok(Math.abs(peak - (reduced ? 43 : 787.152)) < 1e-8);
+  assert.ok(Math.abs(opening - (reduced ? 35 : 504.26925)) < 1e-8);
+  assert.ok(Math.abs(peak - (reduced ? 43 : 934.743)) < 1e-8);
   const ratio = level => flightSpeed(reduced, 0, 1, level) / peak;
-  assert.ok(ratio(4) > 1.3 && ratio(4) < 1.32, 'Level four is about 30% faster than the new level one');
-  assert.ok(ratio(8) > 1.45 && ratio(8) < 1.47, 'Level eight continues the early speed ramp');
+  assert.ok(ratio(4) > (reduced ? 1.3 : 1.36) && ratio(4) < (reduced ? 1.32 : 1.37), 'Level four scales by 36%, or the unchanged 30% in reduced motion');
+  assert.ok(ratio(8) > (reduced ? 1.45 : 1.54) && ratio(8) < (reduced ? 1.47 : 1.55), 'Level eight scales by 54%, or the unchanged 46% in reduced motion');
   assert.ok(ratio(12) > 1.5, 'Speed keeps climbing beyond +50%');
   for (let level = 2; level <= 1000; level++) {
     assert.ok(ratio(level) > ratio(level - 1), 'No late-level speed plateau');
@@ -49,7 +50,15 @@ for (const reduced of [false, true]) {
       'Increments taper without imposing a hard cap');
   }
 }
-console.log('PASS 15% faster normal opening/peak, preserved reduced-motion base, faster early ramp and uncapped logarithmic growth');
+for (let level = 2; level <= 1000; level++) {
+  const previousPeak = flightSpeed(false, 0, 1, level - 1);
+  const opening = flightSpeed(false, 0, 0, level);
+  assert.ok(opening > previousPeak * .78 && opening < previousPeak,
+    'New levels offer a modest breather without dropping more than 22% of the previous peak speed');
+}
+const midpoint = flightSpeed(false, 0, .5, 1);
+assert.ok(midpoint > 697 && midpoint < 699, 'The gentler level-one opening reaches about 698 halfway through');
+console.log('PASS faster normal opening/peak, earlier acceleration, stronger logarithmic scaling and unchanged reduced motion');
 const pressureForLevel = new Function('level', 'return ' + source.match(/        levelPressure = ([^;]+);/)[1]);
 assert.equal(pressureForLevel(1), 0);
 for (let level = 2; level <= 100; level++) {
@@ -81,7 +90,7 @@ game.flightMotion.set(0, 0, -400);
 console.log('PASS 25% faster heavy laser, synchronized aim/movement and unchanged normal-laser speed');
 
 const ship = game.ships[0];
-game.flightMotion.set(0, 0, -480); // Keep this cruising scenario at the same relative speed after the 20% increase.
+game.flightMotion.set(0, 0, -480 * 205 / 180); // Preserve the cruise scenario's relative speed as opening traffic speeds up.
 let minSpeed = Infinity, maxSpeed = 0, minSide = Infinity, maxSide = -Infinity;
 let minThrust = Infinity, maxThrust = 0;
 game.resetShip(ship, true); // Exercise cruising after the distant approach has finished.
@@ -679,6 +688,7 @@ assert.equal(cadence.ships.filter(ship => ship.userData.type.capital).length, 1)
 console.log('PASS boss only on levels 4/8/12/16, pause, single encounter, retry and model reuse');
 
 const threats = makeGame(false, false); threats.setupLevelFleet();
+threats.flightMotion.set(0, 0, -flightSpeed(false, 0, 0, 1));
 threats.setTime(1.99); threats.updateCollisionHazard();
 assert.equal(threats.hazardPool.length, 0);
 threats.setTime(2); threats.updateCollisionHazard();

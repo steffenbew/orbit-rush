@@ -71,7 +71,12 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
       if ('ended' in options) roundEnded = options.ended;
       if ('crashing' in options) crashing = options.crashing;
       if ('corridor' in options) { showerCorridor = options.corridor; showerBend = 1; corridorPlan = null; }
-      if ('level' in options) level = options.level;
+      if ('level' in options) {
+        level = options.level;
+        // Use the real corridor timing; the level-two slalom assumes its late corridor.
+        const corridor = getAsteroidEncounters().find(event => event.kind === 'corridor');
+        showerEntry = corridor?.entry ?? 12; showerEnd = corridor?.exit ?? 27;
+      }
       if ('shape' in options) showerShape = options.shape;
       if ('pressure' in options) levelPressure = options.pressure;
     },
