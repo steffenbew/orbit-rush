@@ -1000,6 +1000,15 @@
       sweptShape.lineTo(4, 6); sweptShape.lineTo(2, 3); sweptShape.closePath();
       const sweptGeometry = new THREE.ExtrudeGeometry(sweptShape, { depth: .6, bevelEnabled: true, bevelSize: .2, bevelThickness: .15, bevelSegments: 1, steps: 1 });
       sweptGeometry.rotateX(Math.PI / 2);
+      function localTestLevel() {
+        if (!['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return null;
+        const params = new URLSearchParams(location.search);
+        if (!params.has('test')) return null;
+        const value = params.get('level');
+        if (!value || !/^\d+$/.test(value)) return null;
+        const requested = Number(value);
+        return Number.isInteger(requested) && requested >= 1 && requested <= 1000 ? requested : null;
+      }
       let level = 1, levelPressure = 0, retries = 3;
       const shipTypes = [
         { name: 'INTERCEPTOR', scale: 1.6, radius: 13, health: 3, points: 400, color: 0x8ea9c7, glow: 0x49dfff },
@@ -1888,7 +1897,7 @@
       let lateAsteroids = [], lateAsteroidsSeeded = false;
       let showerStrength = 0, showerSpacing = 200, showerHalfGap = 100, showerCorridor = false;
       let showerTravel = 0, nextShowerSlice = 0, showerHalfWidth = 800, showerLength = 0, showerFadeStart = 0;
-      let showerObstacleSpacing = 800, nextShowerObstacle = Infinity;
+      let showerObstacleSpacing = 800, nextShowerObstacle = Infinity, corridorSlalomGroup = 0;
       const showerOrigin = new THREE.Vector3();
       const showerDirection = new THREE.Vector3();
       const showerVelocity = new THREE.Vector3();
@@ -2113,7 +2122,7 @@
       let shipWaveReadyAt = 0, shipWaveRemaining = 0;
       let countdownShipsSpawned = 0, nextCountdownShipTime = 0;
       function regularShipLimit() {
-        return Math.min(6, 2 + Math.floor((level - 1) / 3));
+        return Math.min(6, Math.max(level >= 5 && corridorPlan ? 4 : 2, 2 + Math.floor((level - 1) / 3)));
       }
       function canStartShipWave(activeShips, arrivals) {
         return activeShips <= 1 && activeShips + arrivals <= regularShipLimit()
@@ -2658,8 +2667,10 @@
         showerSpacing = showerCorridor ? Math.max(160, approachSpeed * [1.15, .9, .7][showerStrength])
           : Math.max(120, approachSpeed * [2.5, 1.4, .85][showerStrength]);
         showerSpacing = Math.max(showerSpacing, (Math.min(lead, showerLength) + 200) * (count + 1) / (maxShowerRocks * .75));
-        showerObstacleSpacing = Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][showerStrength]));
-        nextShowerObstacle = showerSpacing;
+        showerObstacleSpacing = Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][showerStrength])
+          * (level >= 5 && showerCorridor ? .5 : 1));
+        nextShowerObstacle = showerCorridor && level >= 5 && !reducedMotion ? showerLength * .22 : showerSpacing;
+        corridorSlalomGroup = 0;
         // Density and bends get harder, but the passage always retains a navigable opening.
         showerHalfGap = reducedMotion ? 34 - showerStrength * 4 : 52 - showerStrength * 7;
         showerBend *= showerHalfGap;
@@ -2708,22 +2719,34 @@
             rock.rotation.set(random(-Math.PI, Math.PI), random(-Math.PI, Math.PI), random(-Math.PI, Math.PI));
             rock.quaternion.premultiply(showerRotation);
           }
-          // Spaced, shootable hazards break up every corridor shape, never a full barrier.
+          // Later corridors get three loose clusters, without extra random hazards between them.
           if (showerCorridor && nextShowerSlice >= nextShowerObstacle) {
-            nextShowerObstacle = nextShowerSlice + showerObstacleSpacing * random(.9, 1.2);
-            // Like the ring walls, these belong to the field, not the reinforcement queue.
-            const rock = eventAsteroid();
-            if (rock) {
+            const slalom = level >= 5 && !reducedMotion;
+            const group = corridorSlalomGroup;
+            if (slalom) {
+              corridorSlalomGroup++;
+              nextShowerObstacle = corridorSlalomGroup < 3 ? showerLength * (.22 + corridorSlalomGroup * .26) : Infinity;
+            } else nextShowerObstacle = nextShowerSlice + showerObstacleSpacing * random(.9, 1.2);
+            const side = (level % 2 ? -1 : 1) * (group % 2 ? -1 : 1);
+            for (let index = 0; index < (slalom ? 6 : 1); index++) {
+              // Loose clouds inside the passage, not transverse walls or prescribed openings.
+              const depth = nextShowerSlice + (slalom ? random(0, 240) : 0);
+              // Like the ring walls, these belong to the field, not the reinforcement queue.
+              const rock = eventAsteroid();
+              if (!rock) break;
+              const boulder = slalom && index === 0 && group !== 1;
               const roll = reducedMotion ? 0 : Math.random();
-              const tier = roll < .2 ? 1 : roll < .7 ? 2 : 3;
+              const tier = slalom ? [3, 2, 3, 1, 2, 3][index] : roll < .2 ? 1 : roll < .7 ? 2 : 3;
               rock.userData.corridorObstacle = true;
               rock.userData.asteroidTier = tier;
-              rock.scale.setScalar([.35, 1.3, 2.8][tier - 1] * (reducedMotion ? 1 : random(.8, 1.2)));
+              rock.scale.setScalar(boulder ? 5 : [.35, 1.3, 2.8][tier - 1] * (reducedMotion ? 1 : random(.8, 1.2)));
               rock.userData.health = rock.userData.maxHealth = Math.max(tier, Math.ceil(rock.scale.x));
               // Large rocks can span the gap vertically, but always leave wide lateral escape routes.
               const verticalRoom = Math.max(0, Math.min(showerHalfGap * .35, showerHalfGap - rock.userData.type.radius * rock.scale.x - 4));
-              const x = reducedMotion ? random(-30, 30) : Math.random() < .5 ? random(-20, 20) : random(-100, 100);
-              rock.position.set(x, corridorCenter(nextShowerSlice) + random(-verticalRoom, verticalRoom), -nextShowerSlice)
+              const x = slalom ? side * 180 + random(-240, 240)
+                : reducedMotion ? random(level >= 5 ? -90 : -30, level >= 5 ? 90 : 30)
+                : Math.random() < .5 ? random(-20, 20) : random(-100, 100);
+              rock.position.set(x, corridorCenter(depth) + random(-verticalRoom, verticalRoom), -depth)
                 .applyQuaternion(showerRotation).add(showerOrigin);
               rock.rotation.set(random(-Math.PI, Math.PI), random(-Math.PI, Math.PI), random(-Math.PI, Math.PI));
               rock.quaternion.premultiply(showerRotation);
@@ -3365,7 +3388,8 @@
         if (!started || paused || roundEnded || crashing || tutorialStage < 3 || tutorialReinforcements > 0 || !ringShipsPending
           || gameTime - courseStartTime < 6 || gameTime - courseStartTime >= roundDuration - 6.5) return;
         const activeShips = ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).length;
-        if (!canStartShipWave(activeShips, 2)) return;
+        const count = level >= 5 && corridorPlan ? 4 : 2;
+        if (!canStartShipWave(activeShips, count)) return;
         resetRingShips(true);
         shipWaveReadyAt = gameTime + 3;
       }
@@ -3374,10 +3398,11 @@
         ringShips.forEach(ship => { ship.visible = false; });
         const gates = flightRings.filter(gate => !gate.userData.resolved);
         if (!gates.length) return;
-        // Just two route companions; the second showcases the newest unlocked class.
+        // Add extra corridor companions on deployment, not during hidden opening setup.
+        const count = distant && level >= 5 && corridorPlan ? 4 : 2;
         const activeShips = [];
-        for (let index = 0; index < 2; index++) {
-          const type = shipTypes[index === 0 ? 0 : Math.min(2, level - 1)];
+        for (let index = 0; index < count; index++) {
+          const type = shipTypes[index === 0 ? 0 : index === 1 ? Math.min(2, level - 1) : 1];
           let ship = ringShips.find(ship => ship.userData.type === type && !activeShips.includes(ship));
           if (!ship) {
             createShip(ships.length, shipTypes.indexOf(type));
@@ -3903,6 +3928,12 @@
           camera.updateProjectionMatrix();
           started = true; paused = false;
           scene.fog.density = .00065;
+          const testLevel = localTestLevel();
+          if (testLevel !== null) {
+            level = testLevel;
+            levelPressure = 1 - Math.exp(-(level - 1) / 6);
+            tutorialCompleted = true;
+          }
           setupLevelFleet();
           beginFlightTutorial();
           resetSimulationClock();

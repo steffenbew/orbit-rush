@@ -18,10 +18,14 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
     }
     const gates = game.flightRings.filter(gate => !gate.userData.resolved);
     assert.ok(gates.length > 0, 'Keep checkpoints ahead so delayed traffic has a route');
-    const pool = [...game.ringShips], allocated = game.ships.length;
+    let pool = [...game.ringShips];
+    const allocated = game.ships.length;
     const context = `reduced=${reducedMotion}, level=${level}, shape=${shape}, progress=${progress}`;
     assert.doesNotThrow(() => game.resetRingShips(true), context);
-    assert.deepEqual(game.ringShips, pool); assert.equal(game.ships.length, allocated, 'Reuse the companion models');
+    assert.deepEqual(game.ringShips.slice(0, pool.length), pool, 'Reuse the original companion models');
+    assert.equal(game.ships.length, allocated + (level >= 5 ? 2 : 0), 'Only the two extra corridor companions need new models');
+    pool = [...game.ringShips];
+    assert.equal(pool.length, level >= 5 ? 4 : 2);
 
     const startZ = game.camera.position.z - game.courseWorldOffset.z;
     for (const ship of pool) {

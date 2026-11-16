@@ -218,7 +218,7 @@ for (const reducedMotion of [false, true]) {
         const offset = Math.abs(local.y - bends.corridorCenter(-local.z));
         if (rock.userData.corridorObstacle) {
           assert.ok(offset <= field.gap * .35 + 1e-7, 'Interior hazards must stay in the curved flight passage');
-          assert.ok(Math.abs(local.x) + radius + 40 < field.width / 2, 'Even large boulders must leave lateral escape routes');
+          assert.ok(Math.abs(local.x) + radius + 40 < field.width / 2, 'Natural groups leave lateral escape routes');
           if (reducedMotion) assert.ok(offset + radius <= field.gap - 4 + 1e-7, 'Reduced-motion obstacles stay small');
         } else {
           assert.ok(offset - radius >= field.gap - 1e-7, 'Both curved walls must retain the full narrow passage');
@@ -242,8 +242,9 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS fixed arcing/offset corridors, coherent background geometry, full-length clearance and gentler reduced-motion bends');
 
 const passageTiers = new Set(), passageScales = new Set();
-let passageCount = 0, centerThreats = 0, scatteredObstacles = 0, oversizedWalls = 0;
-for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (const shape of [0, 1, 2]) for (const strength of [0, 1, 2]) {
+let passageCount = 0, centerThreats = 0, scatteredObstacles = 0, oversizedWalls = 0, slalomGroups = 0;
+const laterLanes = new Set();
+for (const reducedMotion of [false, true]) for (const level of [1, 4, 5, 20]) for (const shape of [0, 1, 2]) for (const strength of [0, 1, 2]) {
   const hazards = makeGame(reducedMotion), speed = reducedMotion ? 40 : 400;
   hazards.flightMotion.set(0, 0, -speed);
   hazards.setLevel(level); hazards.setupLevelFleet();
@@ -251,13 +252,14 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
   const approachSpeed = field.length / (field.end - field.entry);
   const lead = hazards.flightDistanceAt(field.entry);
   assert.ok(field.pool.every(rock => !rock.userData.corridorObstacle), 'Leave the first entry slice clear');
-  assert.equal(field.obstacleSpacing, Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][strength])));
+  assert.equal(field.obstacleSpacing, Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][strength]) * (level >= 5 ? .5 : 1)));
   for (const rock of field.pool.filter(rock => rock.visible)) {
     const baseScale = [.35, 1.3, 2.8][rock.userData.asteroidTier - 1];
     assert.ok(rock.scale.x >= baseScale * .75 && rock.scale.x <= baseScale * 1.35);
     if (rock.scale.x > 2.8) oversizedWalls++;
   }
-  let count = 0, lastDepth = -Infinity;
+  const slalom = level >= 5 && !reducedMotion;
+  let count = 0, boulders = 0, groups = 0, lastDepth = -Infinity;
   for (let travel = 100; travel <= lead + field.length + 300; travel += 100) {
     // These are fixed field rocks, not targeted reinforcements: the formation survives breathers.
     hazards.setTime(12);
@@ -268,15 +270,31 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
     }
     hazards.updateAsteroidShower();
     const spawned = field.pool.filter(rock => rock.visible && rock.userData.corridorObstacle && rock.userData.courseAge === 0);
-    assert.ok(spawned.length <= 1, 'Never introduce a group of gap obstacles together');
-    for (const rock of spawned) {
+    assert.ok(spawned.length <= (slalom ? 6 : 1), 'Loose clusters stay small, never full-width walls');
+    spawned.sort((a, b) => a.position.dot(field.direction) - b.position.dot(field.direction));
+    if (slalom && spawned.length) {
+      assert.equal(spawned.length, 6, 'Each cluster contains six mixed-size rocks');
+      groups++; slalomGroups++;
+      const points = spawned.map(rock => rock.position.clone().sub(field.origin).applyQuaternion(field.rotation.clone().invert()));
+      assert.ok(points.every(point => Math.abs(point.x) <= 420), 'Keep clusters inside the corridor, not edge-to-edge');
+      assert.ok(points.at(-1).z < points[0].z - 20, 'Clusters have depth rather than forming a flat row');
+      assert.equal(new Set(spawned.map(rock => rock.userData.asteroidTier)).size, 3, 'Every cluster mixes small, medium and large rocks');
+    }
+    for (const [index, rock] of spawned.entries()) {
       count++;
+      if (rock.scale.x === 5) {
+        boulders++;
+        assert.equal(rock.userData.asteroidTier, 3);
+        assert.equal(rock.userData.health, 5, 'Landmark-sized boulders stay shootable with five normal hits');
+      }
       const local = rock.position.clone().sub(field.origin).applyQuaternion(field.rotation.clone().invert());
       const radius = rock.userData.type.radius * rock.scale.x;
-      assert.ok(-local.z - lastDepth >= field.obstacleSpacing * .9 - 1e-7, 'Keep room between successive evasions');
+      assert.ok(-local.z - lastDepth >= (index > 0 ? 0 : field.obstacleSpacing * .9) - 1e-7, 'Keep shallow depth separation within groups and recovery room between them');
       lastDepth = -local.z;
       const offsetY = local.y - hazards.corridorCenter(-local.z);
-      assert.ok(Math.abs(local.x) <= (reducedMotion ? 30 : 100), 'Scatter obstacles across the flown passage, not at distant edges');
+      const laneWidth = level >= 5 ? (reducedMotion ? 90 : 420) : (reducedMotion ? 30 : 100);
+      assert.ok(Math.abs(local.x) <= laneWidth, 'Keep obstacles inside the lateral corridor lanes');
+      if (level >= 5 && !reducedMotion) laterLanes.add(Math.abs(local.x) < 100 ? 0 : Math.sign(local.x));
       assert.ok(Math.abs(offsetY) <= field.gap * .35 + 1e-7);
       if (reducedMotion) assert.ok(Math.abs(offsetY) + radius <= field.gap - 4 + 1e-7);
       else {
@@ -289,7 +307,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
       assert.ok(rock.userData.courseVelocity.equals(field.velocity), 'Interior rocks travel with the walls, never homing toward the pilot');
       assert.equal(rock.userData.health, Math.max(rock.userData.asteroidTier, Math.ceil(rock.scale.x)));
       assert.ok(rock.userData.asteroidTier <= (reducedMotion ? 1 : 3));
-      assert.ok(radius <= (reducedMotion ? .35 : 2.8 * 1.2) * rock.userData.type.radius + 1e-8, 'Keep even the largest passage boulders dodgeable');
+      assert.ok(radius <= (reducedMotion ? .35 : level >= 5 ? 5 : 2.8 * 1.2) * rock.userData.type.radius + 1e-8, 'Keep even the largest passage boulders dodgeable');
       assert.ok(hazards.ships.includes(rock) && rock.userData.collisionParts.length > 0, 'Gap rocks must use the real shooting/collision pipeline');
       const position = rock.position.clone();
       hazards.updateShipCourse(rock, .3);
@@ -304,9 +322,12 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
       rock.position.copy(position);
     }
   }
-  const fittingObstacles = field.length > field.spacing * 2 + field.obstacleSpacing * 1.2 ? 2 : field.length > field.spacing ? 1 : 0;
-  assert.ok(count >= fittingObstacles, 'Place every obstacle that fits before the guaranteed finish; short reduced-motion passages must not overrun it');
-  assert.ok(field.pool.length <= hazards.maxShowerRocks, 'Interior hazards share the existing bounded pool');
+  // Each scheduled hazard can wait up to one full randomized wall-slice step.
+  const fittingObstacles = field.length > field.spacing * 2.4 + field.obstacleSpacing * 1.2 ? 2 : field.length > field.spacing * 1.2 ? 1 : 0;
+  assert.ok(count >= fittingObstacles, `Place every obstacle that fits before the guaranteed finish: level=${level}, reduced=${reducedMotion}, shape=${shape}, strength=${strength}, count=${count}, expected=${fittingObstacles}, length=${field.length}, spacing=${field.spacing}, obstacles=${field.obstacleSpacing}`);
+  if (slalom) { assert.equal(groups, 3); assert.equal(count, 18, 'Three natural clusters replace random obstacles, without extras'); }
+  assert.equal(boulders, slalom ? 2 : 0, 'Retain two landmark-sized boulders among the mixed-size clusters');
+  assert.ok(field.pool.length <= hazards.maxShowerRocks, 'Clusters share the original bounded pool without an extra allowance');
   const nextObstacle = hazards.nextShowerObstacle, origin = field.origin.clone();
   hazards.setPaused(true); hazards.updateAsteroidShower();
   assert.equal(hazards.nextShowerObstacle, nextObstacle);
@@ -318,7 +339,9 @@ for (const reducedMotion of [false, true]) for (const level of [1, 20]) for (con
 }
 assert.deepEqual([...passageTiers].sort(), [1, 2, 3], 'Passage hazards must include small, medium and large rocks');
 assert.ok(passageScales.size > 30 && oversizedWalls > 20, 'Both the passage and walls need noticeable size variety');
-assert.ok(centerThreats > passageCount * .3, 'Enough real hull intersections must force evasions or shooting');
+assert.ok(centerThreats > 0, 'Some natural obstacles still intersect the center lane');
+assert.ok(slalomGroups > 0, 'Later corridors actually generate loose clusters');
+assert.deepEqual([...laterLanes].sort(), [-1, 0, 1], 'Later obstacles span the left, middle and right of the passage, not a centerline queue');
 assert.ok(scatteredObstacles > passageCount * .15, 'Not every obstacle should line up in the central lane');
 console.log('PASS varied small/medium/large passage hazards, larger walls, real central threats, lateral dodges, distant lead, pause and reuse');
 

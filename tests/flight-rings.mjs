@@ -42,7 +42,7 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
   const playerHullRotation = new THREE.Quaternion(), worldStep = new THREE.Vector3();
   let showerCorridor = false, showerStart = 0, showerEntry = 12, showerEnd = 27, showerShape = 0, showerBend = 1;
   let corridorPlan = null; const showerCourse = 0, showerKind = 'shower';
-  let showerLength = 0, showerSpacing = 0, showerObstacleSpacing = 0, nextShowerObstacle = 0, showerHalfGap = 0, showerHalfWidth = 0;
+  let showerLength = 0, showerSpacing = 0, showerObstacleSpacing = 0, nextShowerObstacle = 0, corridorSlalomGroup = 0, showerHalfGap = 0, showerHalfWidth = 0;
   const showerStrength = 1, maxShowerRocks = 144;
   const showerRotation = new THREE.Quaternion(), showerDirection = new THREE.Vector3(), showerVelocity = new THREE.Vector3();
   const random = (a, b) => (a + b) / 2;

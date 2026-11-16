@@ -5,7 +5,7 @@ import { THREE, t, source, section, code, math, makeGame, assertShipInsideBounda
 for (const reducedMotion of [false, true]) {
   const traffic = makeGame(reducedMotion);
   // Include retries and a return to level one after the larger fleet has been allocated.
-  for (const level of [8, 1, 2, 3, 4, 8, 12, 20, 20, 1]) {
+  for (const level of [8, 1, 2, 3, 4, 5, 8, 12, 20, 20, 1]) {
     traffic.setLevel(level);
     traffic.setupLevelFleet();
     const baseTypes = [0, 0, 3, 1, 2, 0, 2, 3];
@@ -28,8 +28,9 @@ for (const reducedMotion of [false, true]) {
     traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital).forEach(ship => traffic.queueShip(ship));
     traffic.setTime(6); traffic.updateRingShipArrivals();
     const routeShips = traffic.ringShips.filter(ship => ship.visible);
-    assert.equal(routeShips.length, 2, 'Only two extra ships accompany the checkpoint path');
-    assert.deepEqual(routeShips.map(ship => ship.userData.type.name).sort(), ['INTERCEPTOR', unlocked.at(-1)].sort(),
+    assert.equal(routeShips.length, level >= 5 ? 4 : 2, 'Later corridors get four route companions');
+    assert.deepEqual(routeShips.map(ship => ship.userData.type.name).sort(),
+      ['INTERCEPTOR', unlocked.at(-1), ...(level >= 5 ? ['NOVA SAUCER', 'NOVA SAUCER'] : [])].sort(),
       'The route pair includes the latest unlocked class, even after returning to level one');
     traffic.setTime(0);
     assert.equal(active.filter(ship => ship.userData.stationary).length, 3, 'Three guaranteed stationary rocks are mixed into arrivals');
@@ -42,9 +43,9 @@ for (const reducedMotion of [false, true]) {
 }
 console.log('PASS planned fleet counts, three stationary rocks, unchanged two-ship opening/bosses and fleet reuse');
 
-for (const reducedMotion of [false, true]) for (const level of [1, 2, 3, 4, 6, 7, 9, 10, 12, 13, 20]) {
+for (const reducedMotion of [false, true]) for (const level of [1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 13, 20]) {
   const traffic = makeGame(reducedMotion); traffic.setLevel(level); traffic.setupLevelFleet();
-  const limit = Math.min(6, 2 + Math.floor((level - 1) / 3));
+  const limit = Math.min(6, Math.max(level >= 5 ? 4 : 2, 2 + Math.floor((level - 1) / 3)));
   const activeShips = () => traffic.ships.filter(ship => ship.visible && !ship.userData.type.asteroid && !ship.userData.type.capital);
   traffic.setTime(3); traffic.updateShipArrivals();
   assert.equal(activeShips().length, 2, 'Every level opens with only two ships');
@@ -56,19 +57,21 @@ for (const reducedMotion of [false, true]) for (const level of [1, 2, 3, 4, 6, 7
   traffic.setTime(8.99); traffic.updateRingShipArrivals();
   assert.equal(activeShips().length, 1, 'Wait three seconds after a ship leaves');
   traffic.setTime(9); traffic.updateRingShipArrivals();
-  if (limit === 2) {
-    assert.equal(activeShips().length, 1, 'Early levels cannot add a pair beside one survivor');
+  const routeCount = level >= 5 ? 4 : 2;
+  const mustClear = limit < routeCount + 1;
+  if (mustClear) {
+    assert.equal(activeShips().length, 1, 'A route wave must fit beside any surviving ship');
     traffic.queueShip(activeShips()[0]);
     traffic.setTime(11.99); traffic.updateRingShipArrivals();
     assert.equal(activeShips().length, 0);
     traffic.setTime(12); traffic.updateRingShipArrivals();
   }
-  assert.equal(traffic.ringShips.filter(ship => ship.visible).length, 2);
-  assert.equal(activeShips().length, limit === 2 ? 2 : 3);
+  assert.equal(traffic.ringShips.filter(ship => ship.visible).length, routeCount);
+  assert.equal(activeShips().length, routeCount + (mustClear ? 0 : 1));
   const queuedRocks = traffic.queue.filter(ship => ship.userData.type.asteroid).length;
   traffic.setTime(16); traffic.updateShipArrivals();
   assert.equal(traffic.queue.filter(ship => ship.userData.type.asteroid).length, queuedRocks - 1, 'Waiting for a wave does not block queued rocks');
-  assert.equal(activeShips().length, limit === 2 ? 2 : 3, 'Do not top up a still-busy encounter');
+  assert.equal(activeShips().length, routeCount + (mustClear ? 0 : 1), 'Do not top up a still-busy encounter');
   // Isolate ship scheduling after separately verifying that rocks still arrive.
   traffic.queue.splice(0, traffic.queue.length, ...traffic.queue.filter(ship => !ship.userData.type.asteroid));
   traffic.setTime(17); activeShips().slice(1).forEach(ship => traffic.queueShip(ship));
@@ -132,10 +135,11 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS stationary collidable rock arrivals/reuse at 5–144 FPS and soft fading hit tints without transparent hulls');
 
 // The extra course ships must not join the opening formation, especially in level two.
-for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (const fps of [5, 60]) {
+for (const reducedMotion of [false, true]) for (const level of [2, 5, 10]) for (const fps of [5, 60]) {
   const arrivals = makeGame(reducedMotion);
   arrivals.setLevel(level); arrivals.setPressure(1 - Math.exp(-(level - 1) / 4)); arrivals.setupLevelFleet();
-  const pool = [...arrivals.ringShips], allocated = arrivals.ships.length;
+  let pool = [...arrivals.ringShips];
+  const allocated = arrivals.ships.length;
   assert.equal(arrivals.ships.filter(ship => ship.visible).length, 2);
   arrivals.setTime(2);
   arrivals.ships.filter(ship => ship.visible).forEach(ship => arrivals.queueShip(ship));
@@ -153,8 +157,10 @@ for (const reducedMotion of [false, true]) for (const level of [2, 10]) for (con
     if (gate.position.z >= 0) { gate.visible = false; gate.userData.resolved = true; }
   }
   arrivals.updateRingShipArrivals();
-  assert.deepEqual(arrivals.ringShips, pool); assert.equal(arrivals.ships.length, allocated);
-  assert.equal(pool.length, 2, 'Two reusable ships add traffic along the checkpoint route');
+  assert.deepEqual(arrivals.ringShips.slice(0, pool.length), pool, 'Reuse the opening route pair');
+  assert.equal(arrivals.ships.length, allocated + (level >= 5 ? 2 : 0), 'Allocate only the two extra corridor companions on first deployment');
+  pool = [...arrivals.ringShips];
+  assert.equal(pool.length, level >= 5 ? 4 : 2, 'Later corridors reuse four route ships; early levels retain two');
   assert.ok(pool.every(ship => ['INTERCEPTOR', 'NOVA SAUCER', 'TITAN CARRIER'].slice(0, Math.min(3, level)).includes(ship.userData.type.name)),
     'Only level-unlocked ship types join route traffic');
   const spacing = arrivals.levelFlightSpeed(6 / 45) * .85;
@@ -198,12 +204,15 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
   const traffic = makeGame(reducedMotion);
   traffic.setLevel(level); traffic.setPressure(1 - Math.exp(-(level - 1) / 4)); traffic.setupLevelFleet();
   const field = traffic.ringCourse(shape >= 0, Math.max(0, shape));
+  if (level >= 5 && shape >= 0) traffic.resetRingShips(true);
   const gates = traffic.flightRings.filter(gate => gate.visible).map(gate => ({
     position: gate.position.clone(), normal: gate.userData.normal.clone(), radius: gate.userData.radius
   }));
   const gateState = traffic.flightRings.map(gate => [gate.position.toArray(), gate.visible, gate.userData.resolved]);
-  const passes = traffic.ringShips.map(() => new Set());
-  const firstGateOffsets = traffic.ringShips.map(ship => ship.userData.ringRoute.curve.points[2].clone().sub(gates[0].position));
+  const companions = traffic.ringShips.filter(ship => ship.visible);
+  assert.equal(companions.length, level >= 5 && shape >= 0 ? 4 : 2, 'Exercise all four deployed corridor companions');
+  const passes = companions.map(() => new Set());
+  const firstGateOffsets = companions.map(ship => ship.userData.ringRoute.curve.points[2].clone().sub(gates[0].position));
   assert.ok(Math.max(...firstGateOffsets.map(point => point.x)) - Math.min(...firstGateOffsets.map(point => point.x)) > gates[0].radius * 1.6,
     'Traffic spans both sides of the checkpoint instead of sharing the same tight route');
   assert.ok(Math.max(...firstGateOffsets.map(point => point.y)) - Math.min(...firstGateOffsets.map(point => point.y)) > 1e-4,
@@ -218,7 +227,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
     traffic.worldStep.set(Math.sin(time) * 50 * dt, Math.cos(time) * 20 * dt, traffic.levelFlightSpeed(time / 45) * dt);
     traffic.flightMotion.copy(traffic.worldStep).multiplyScalar(-1 / dt);
     traffic.courseWorldOffset.addScaledVector(traffic.worldStep, .85);
-    traffic.ringShips.forEach((ship, index) => {
+    companions.forEach((ship, index) => {
       previous.copy(ship.position).sub(traffic.courseWorldOffset).addScaledVector(traffic.worldStep, .85);
       traffic.updateShipCourse(ship, dt);
       traffic.moveShip(ship, dt);

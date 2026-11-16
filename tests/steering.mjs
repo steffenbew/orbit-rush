@@ -252,7 +252,7 @@ const makeStart = (fullscreenPreferred = true) => new Function('THREE', 'fullscr
   const languagePicker = document.querySelector('#language'), audioNotice = document.querySelector('#audio-notice');
   let finishAudio = () => {}, lessons = 0;
   const sound = {initAudio: () => { calls.push('audio'); return new Promise(resolve => { finishAudio = resolve; }); }};
-  const t = key => key, setupLevelFleet = () => {}, beginFlightTutorial = () => { lessons++; };
+  const t = key => key, localTestLevel = () => null, setupLevelFleet = () => {}, beginFlightTutorial = () => { lessons++; };
   const resetSimulationClock = () => {}, syncMusic = () => {}, playSound = () => {};
   const audioError = error => { errors.push(error.message); audioNotice.hidden = false; };
   ${section('      function steer(event)', '      // Suppress accidental secondary clicks')}
