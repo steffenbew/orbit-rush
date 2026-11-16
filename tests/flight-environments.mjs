@@ -505,7 +505,9 @@ for (const reducedMotion of [false, true]) {
   repairs.updateRepairPickup(0); assert.equal(repairs.repairPickup.visible, false, 'Save the opportunity while shield is full');
   repairs.setShield(90); repairs.setTime(28); repairs.updateRepairPickup(0);
   repairs.repairPickup.position.set(0, 0, -60); repairs.worldStep.set(0, 0, 140); repairs.updateRepairPickup(1 / 60);
-  assert.equal(repairs.shield, 100); assert.deepEqual(repairs.messages.at(-1), {message: '+10 SCHILD', negative: false});
+  assert.equal(repairs.shield, 100, 'The pickup still caps shield at 100');
+  assert.deepEqual(repairs.messages.at(-1), {message: '+25 SCHILD', negative: false},
+    'Collection feedback matches the +25 pickup label even when part of the repair exceeds the cap');
   repairs.resetRepairPickup(); repairs.setRepairPending(true); repairs.setShield(50); repairs.worldStep.set(0, 0, 0);
   repairs.updateRepairPickup(0); repairs.repairPickup.position.set(100, 0, 200); repairs.updateRepairPickup(0);
   assert.equal(repairs.repairPickup.visible, false); assert.equal(repairs.shield, 50, 'Missed pickups do not repair automatically');
