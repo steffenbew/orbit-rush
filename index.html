@@ -167,7 +167,7 @@
     .intro-logo { --logo-size: clamp(72px, min(12vw, 18vh), 136px); position: relative; font-size: var(--logo-size); }
     .intro-logo h1 { margin: 0; font-size: inherit; line-height: .92; }
     .intro-logo h1 span { margin-top: 0; }
-    .intro-options { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 100%; }
+    .intro-options { position: relative; width: max-content; max-width: 100%; margin-inline: auto; }
     #intro .language-picker { margin-top: 20px; }
     #start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: clamp(52px, calc(var(--logo-size) * .52), 72px); height: auto; aspect-ratio: 1; padding: 0; margin: 0; border: 6px solid #071329; border-radius: 50%; background: #7effd5; color: #092438; box-shadow: 0 0 0 3px #071329; transition: transform .5s cubic-bezier(.2, 1.5, .35, 1), background .2s, box-shadow .3s; }
     @media (hover: hover) {
@@ -3937,8 +3937,9 @@
           setupLevelFleet();
           beginFlightTutorial();
           resetSimulationClock();
-          // Menu clicks and fullscreen/audio-loading pointer positions must not start a turn.
-          steer({ clientX: innerWidth / 2, clientY: innerHeight / 2 });
+          // Match the real pointer without letting menu clicks start a turn.
+          steer(lastPointerPosition || { clientX: innerWidth / 2, clientY: innerHeight / 2 });
+          target.set(0, 0);
           document.body.classList.add('playing');
           document.querySelector('#intro').hidden = true;
           audioNotice.hidden = true;

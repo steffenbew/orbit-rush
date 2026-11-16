@@ -285,8 +285,10 @@ for (const withSound of [false, true]) for (const pointer of [null, {clientX: 50
   assert.equal(state.started, true); assert.equal(state.paused, false); assert.equal(state.lessons, 1);
   assert.equal(state.introHidden, true); assert.equal(state.buttonDisabled, false);
   assert.deepEqual(state.timerDelays, [], 'Successful startup clears its timeout');
-  assert.deepEqual(state.aim, [0, 0]); assert.deepEqual(state.turn, [0, 0]);
-  assert.deepEqual(state.reticle, {left: '640px', top: '450px'}, 'Center against the new fullscreen viewport, not the old menu coordinates');
+  const position = withSound ? {clientX: 100, clientY: 100} : pointer || {clientX: 640, clientY: 450};
+  assert.deepEqual(state.aim, [position.clientX / 1280 * 2 - 1, 1 - position.clientY / 900 * 2]);
+  assert.deepEqual(state.turn, [0, 0], 'Pointer placement must not start a turn');
+  assert.deepEqual(state.reticle, {left: `${position.clientX}px`, top: `${position.clientY}px`}, 'Use the latest pointer position, or center for keyboard-only startup');
 }
 for (const retryWithSound of [false, true]) {
   const start = makeStart();
