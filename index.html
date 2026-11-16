@@ -96,6 +96,7 @@
     #feedback-detail { display: block; margin-top: 3px; font-size: 13px; line-height: 1.3; }
     #feedback-detail:empty { display: none; }
     #feedback.pop { animation: action-reward .9s ease-out; }
+    #feedback.pop.boss-reward { animation-duration: 3s; }
     #feedback.negative { color: #ff7b86; text-shadow: 0 0 25px #ff344f80; }
     #flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse, #ffb65e18, transparent 75%); opacity: 0; }
     #target .health { position: absolute; left: 8px; right: 8px; bottom: -24px; display: flex; gap: 4px; }
@@ -1185,7 +1186,6 @@
           ship.position.set(110, -100, -distance).applyQuaternion(courseRotation);
           ship.userData.courseVelocity.set(0, 0, 0);
           ship.userData.fireCooldown = 2.8;
-          ship.userData.rockHitCooldown = 0;
           ship.userData.gunsCharging = false;
           ship.userData.retreating = false;
           ship.userData.retreatStart = Infinity;
@@ -2912,14 +2912,9 @@
             rock.userData.health = 0;
             explode(rock.position, 18, false, true, rock.scale.x / 3.2, false);
             queueShip(rock);
-            if (ship.userData.type.capital) {
-              // Heavy armor absorbs a debris cluster as one hit, not dozens in one frame.
-              if (ship.userData.rockHitCooldown > 0) continue;
-              ship.userData.rockHitCooldown = 1.25;
-              ship.userData.health -= rock.userData.asteroidTier;
-            } else {
-              ship.userData.health = 0;
-            }
+            // Only player weapons can damage the boss; its hull still destroys rocks.
+            if (ship.userData.type.capital) continue;
+            ship.userData.health = 0;
             if (ship.userData.health <= 0) {
               // Environmental kills deliberately do not award score, combo or kill credit.
               explode(ship.position, 65, false, false, ship.scale.x / 2.4, false, ship.userData.type.capital);
@@ -3762,14 +3757,16 @@
       const feedback = document.querySelector('#feedback');
       const feedbackValue = document.querySelector('#feedback-value'), feedbackDetail = document.querySelector('#feedback-detail');
       let feedbackUntil = 0;
-      function showFeedback(message, negative = false) {
+      function showFeedback(message, negative = false, bossReward = false) {
+        if (!bossReward && gameTime < feedbackUntil && feedback.classList.contains('boss-reward') && feedback.classList.contains('pop')) return;
+        feedback.classList.toggle('boss-reward', bossReward);
         // Make the amount prominent, even when localized checkpoint penalties put it last.
         const parts = message.split(' · ');
         const amountIndex = parts.findIndex(part => /^[+−]\d/.test(part));
         if (amountIndex > 0) parts.unshift(...parts.splice(amountIndex, 1));
         feedbackValue.textContent = parts.shift();
         feedbackDetail.textContent = parts.join(' · ');
-        feedbackUntil = gameTime + 1.2;
+        feedbackUntil = gameTime + (bossReward ? 3 : 1.2);
         feedback.classList.toggle('negative', negative);
         feedback.classList.remove('pop');
         void feedback.offsetWidth;
@@ -3794,7 +3791,7 @@
           best = score;
           try { localStorage.setItem('sternflug-highscore', String(best)); } catch {}
         }
-        showFeedback('+' + points + (combo > 1 ? ' · COMBO ×' + combo : ' · ' + ship.userData.type.name));
+        showFeedback('+' + points + (combo > 1 ? ' · COMBO ×' + combo : ' · ' + ship.userData.type.name), false, !!ship.userData.type.capital);
         updateScore();
         if (combo > 1) playSound('reward');
       }
@@ -4198,7 +4195,6 @@
           return;
         }
         data.courseAge += dt;
-        data.rockHitCooldown = Math.max(0, data.rockHitCooldown - dt);
         const direction = data.cruiseDirection;
         const offset = ship.position.clone().sub(camera.position);
         const motion = reducedMotion ? .25 : 1;
@@ -5220,7 +5216,7 @@
         document.querySelector('#flash').style.opacity = flash;
         sound.updateEngine(speed);
         updateCollisionAlert();
-        feedback.style.visibility = danger && !paused && !roundEnded && !feedback.classList.contains('negative') ? 'hidden' : 'visible';
+        feedback.style.visibility = danger && !paused && !roundEnded && !feedback.classList.contains('boss-reward') && !feedback.classList.contains('negative') ? 'hidden' : 'visible';
         dangerVignette.classList.toggle('warning', danger && !paused && !roundEnded);
         dangerVignette.style.opacity = crashing ? (reducedMotion ? .35 : .7) : danger && !paused && !roundEnded ? .4 : 0;
         sound.setAlarm(danger && !paused && !roundEnded);

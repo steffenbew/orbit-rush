@@ -546,20 +546,20 @@ rock.position.copy(boss.position); rock.userData.previousPosition.copy(rock.posi
 rock.scale.setScalar(2.8); rock.userData.asteroidTier = 3;
 game.activeAsteroids.push(rock);
 game.collideShipsWithAsteroids();
-assert.equal(boss.userData.health, boss.userData.maxHealth - 3);
+assert.equal(boss.userData.health, boss.userData.maxHealth);
 rock.visible = true; game.collideShipsWithAsteroids();
-assert.equal(boss.userData.health, boss.userData.maxHealth - 3, 'A debris cluster must not strip capital armor in one frame');
+assert.equal(boss.userData.health, boss.userData.maxHealth, 'Asteroids cannot damage boss armor');
+assert.equal(rock.visible, false, 'The boss still destroys colliding rocks');
 assert.equal(boss.visible, true);
-boss.userData.health = 3; boss.userData.rockHitCooldown = 0; rock.visible = true;
+boss.userData.health = 3; rock.visible = true;
 const destructionStart = game.explosions.length;
 game.collideShipsWithAsteroids();
 const capitalExplosion = game.explosions.slice(destructionStart).find(args => args[1] === 65);
-assert.ok(capitalExplosion, 'A fatal asteroid collision must destroy the capital ship');
-assert.equal(capitalExplosion[5], false, 'Environmental kills must retain their no-screen-flash policy');
-assert.equal(capitalExplosion[6], true, 'Environmental capital kills must use the giant finale too');
-assert.equal(boss.visible, false);
+assert.equal(capitalExplosion, undefined, 'Asteroids cannot destroy a nearly defeated boss');
+assert.equal(boss.userData.health, 3);
+assert.equal(boss.visible, true);
 game.activeAsteroids.length = 0; game.resetShip(boss);
-console.log('PASS capital armor absorbs clustered asteroid hits');
+console.log('PASS capital immunity to environmental damage, including at low health');
 
 for (const engineShip of [game.ships[0], game.ships[1], game.ships[2], boss]) {
   game.resetShip(engineShip);

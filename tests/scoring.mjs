@@ -18,7 +18,7 @@ function makeGame(storageBlocked = false) {
     let score = 0, best = 0, kills = 0, combo = 0, gameTime = 0, lastKill = -Infinity, roundEnded = false;
     const comboWindows = [0, 2.5, 1.8, 1.2, .8, .8], sounds = [], saved = [];
     const classes = new Set(), feedbackValue = {textContent: ''}, feedbackDetail = {textContent: ''};
-    const feedback = {classList: {add: key => classes.add(key), remove: key => classes.delete(key),
+    const feedback = {classList: {contains: key => classes.has(key), add: key => classes.add(key), remove: key => classes.delete(key),
       toggle: (key, value) => value ? classes.add(key) : classes.delete(key)}, offsetWidth: 0};
     ${feedbackCode}
     const localStorage = {setItem: (...args) => { if (storageBlocked) throw new Error('Blocked'); saved.push(args); }};
@@ -75,6 +75,22 @@ assert.deepEqual(game.state(), before, 'No score after the round ends');
 const blocked = makeGame(true); blocked.award(target(rock, 3));
 assert.equal(blocked.state().score, 300, 'Blocked storage must not prevent rewards');
 console.log('PASS unchanged combo multiplier/cap/expiry, score feedback, highscore persistence and end-of-round guard');
+
+const bossReward = makeGame();
+bossReward.award(target(types[4]));
+assert.equal(bossReward.state().until, 3);
+bossReward.time(.5); bossReward.penalty(10);
+assert.equal(bossReward.state().value, '+10000', 'Shield notices cannot overwrite the boss reward');
+bossReward.award(target(types[0]));
+assert.equal(bossReward.state().value, '+10000', 'Other kills cannot overwrite the boss reward');
+assert.ok(bossReward.state().score > 10000, 'Other rewards still add points');
+bossReward.time(3.01); bossReward.expire(); bossReward.penalty(10);
+assert.equal(bossReward.state().negative, true, 'Normal feedback resumes after the boss reward');
+const visibilityCode = source.match(/feedback\.style\.visibility = [^;]+;/)[0];
+const rewardHud = {style: {}, classList: {contains: key => key === 'boss-reward'}};
+new Function('feedback', 'danger', 'paused', 'roundEnded', visibilityCode)(rewardHud, true, false, false);
+assert.equal(rewardHud.style.visibility, 'visible', 'Collision warnings cannot hide boss rewards');
+console.log('PASS boss reward duration, notification priority and visibility during danger');
 
 const penalties = makeGame();
 penalties.time(10); penalties.penalty(10); penalties.expire();
