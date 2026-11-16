@@ -452,7 +452,7 @@
     @media (orientation: landscape) and (max-width: 700px) {
       body:has(#round-end[open]) .hud-actions { flex-direction: column; }
     }
-    @media (orientation: landscape) and (min-width: 901px) and (min-height: 601px) {
+    @media (min-width: 901px) and (min-height: 601px) {
       /* Urgent desktop notices sit above the action-feedback lane, not at the top edge. */
       body:not(.touch-device) #flight-overview { gap: 16px; }
       body:not(.touch-device) #flight-overview:has(:is(#shower-warning, #end-countdown):not([hidden])) { top: auto; bottom: calc(50dvh + 160px); width: max(0px, min(720px, calc(100vw - 2 * var(--hud-clearance)))); }
