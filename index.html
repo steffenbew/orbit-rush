@@ -3792,6 +3792,7 @@
       updateScore();
       const sound = await import('./audio.js?v=audio-8');
       let soundEnabled = true, started = false, kills = 0, hitMarker = 0;
+      let updateRestored = false;
       const playSound = sound.playSound;
       const audioNotice = document.querySelector('#audio-notice');
       function audioError(error) {
@@ -3855,6 +3856,7 @@
       }
       updateIntroOrbit(0);
       async function startGame(withSound = true) {
+        if (globalThis.orbitUpdates?.locked) return;
         const button = document.querySelector('#start');
         const label = document.querySelector('#start-label');
         button.disabled = true;
@@ -3906,6 +3908,7 @@
           clearTimeout(audioTimeout);
           button.disabled = false;
           languagePicker.disabled = false;
+          globalThis.orbitUpdates?.check();
         }
       }
       document.querySelector('#start').addEventListener('click', () => startGame());
@@ -4064,9 +4067,11 @@
         successBurst.hidden = !celebrating;
         if (celebrating) playSound('reward');
         document.querySelector('#play-again').focus();
+        globalThis.orbitUpdates?.check();
       }
       roundDialog.addEventListener('cancel', event => event.preventDefault());
       function restartRound(mode = 'new') {
+        if (globalThis.orbitUpdates?.locked) return;
         touchControls.reset();
         if (!started || crashing) return;
         if (mode === 'next') {
@@ -4079,6 +4084,14 @@
         } else {
           level = 1; score = 0; kills = 0; retries = 3;
           levelCheckpoint = { score: 0, kills: 0 };
+        }
+        if (updateRestored) {
+          // A reload loses audio/fullscreen activation; reacquire both on this deliberate click.
+          updateRestored = false;
+          if (soundEnabled) sound.initAudio().catch(audioError);
+          if (fullscreenPreferred && document.fullscreenEnabled && !document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(error => console.warn('Fullscreen request failed:', error));
+          }
         }
         bestAtLevelStart = best;
         // Enemy pressure stays separate from the uncapped logarithmic flight-speed curve.
@@ -4755,7 +4768,7 @@
         if (started && !paused) togglePause();
       });
       async function endRun() {
-        if (!started || !paused) return;
+        if (!started || !paused || globalThis.orbitUpdates?.locked) return;
         document.querySelector('#end-run').disabled = true;
         try {
           if (document.fullscreenElement) await document.exitFullscreen();
@@ -5244,6 +5257,40 @@
         }
         renderer.render(scene, camera);
       }
+      function canApplyUpdate() {
+        return !renderDiagnostics.failed && !crashing
+          && (roundEnded || (!started && !document.querySelector('#start').disabled));
+      }
+      function captureUpdateCheckpoint() {
+        if (!started) return null;
+        return { version: 1, level, score, kills, retries, shield, levelCheckpoint: { ...levelCheckpoint },
+          celebrating, tutorialCompleted, bestAtLevelStart, soundEnabled, language };
+      }
+      function restoreUpdateCheckpoint(saved) {
+        const counts = [saved.level, saved.score, saved.kills, saved.retries, saved.bestAtLevelStart,
+          saved.levelCheckpoint?.score, saved.levelCheckpoint?.kills];
+        if (saved.version !== 1 || !counts.every(value => Number.isSafeInteger(value) && value >= 0)
+          || saved.level < 1 || saved.retries > 3 || !Number.isFinite(saved.shield) || saved.shield < 0 || saved.shield > 100
+          || !['celebrating', 'tutorialCompleted', 'soundEnabled'].every(key => typeof saved[key] === 'boolean')
+          || !['en', 'de'].includes(saved.language)) throw new Error('Invalid update checkpoint');
+        ({ level, score, kills, retries, shield, levelCheckpoint, celebrating, tutorialCompleted, bestAtLevelStart, soundEnabled } = saved);
+        setLanguage(saved.language); applyTranslations();
+        languagePicker.querySelector(`input[value="${language}"]`).checked = true;
+        document.querySelector('#sound').setAttribute('aria-pressed', String(soundEnabled));
+        document.querySelector('#sound').setAttribute('aria-label', t(soundEnabled ? 'soundOff' : 'soundOn'));
+        document.querySelector('#sound').title = t(soundEnabled ? 'soundOff' : 'soundOn');
+        started = true; updateRestored = true;
+        scene.fog.density = .00065;
+        camera.fov = reducedMotion ? 70 : 90; camera.updateProjectionMatrix();
+        document.body.classList.add('playing');
+        document.querySelector('#intro').hidden = true;
+        levelPressure = 1 - Math.exp(-(level - 1) / 6);
+        setupLevelFleet();
+        // Rebuild the result screen, not an active flight; a lost life was already counted before reload.
+        crashing = !celebrating;
+        finishRound(celebrating ? 'time' : 'collision');
+        updateScore();
+      }
       getRenderState = () => ({
         phase: renderPhase, level, gameTime, started, paused, roundEnded, crashing, reducedMotion, touchMode,
         effects: { particles: particles.length, shockwaves: shockwaves.length, rockets: rockets.length, enemyBolts: enemyBolts.length },
@@ -5272,6 +5319,8 @@
         });
       });
       if (renderDiagnostics.failed) stopRendering();
+      else globalThis.orbitUpdates?.configure({ canReload: canApplyUpdate,
+        capture: captureUpdateCheckpoint, restore: restoreUpdateCheckpoint });
     } catch (error) {
       document.querySelector('#intro').hidden = true;
       status.textContent = t('loadError');

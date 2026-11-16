@@ -59,7 +59,48 @@ self.addEventListener('install', event => {
       throw error;
     }
   })());
-  // No skipWaiting: existing tabs keep their complete previous release.
+  // Only the all-window safe-point handshake below may replace an active release.
+});
+
+let updateCheck = null;
+function gameWindows() {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then(clients => clients.filter(client => client.url.startsWith(self.registration.scope)));
+}
+function prepareWindow(client, id) {
+  return new Promise(resolve => {
+    const channel = new MessageChannel();
+    const finish = ready => {
+      clearTimeout(timer); channel.port1.close(); resolve(ready);
+    };
+    const timer = setTimeout(() => finish(false), 1000);
+    channel.port1.onmessage = event => finish(event.data?.ready === true);
+    try { client.postMessage({ type: 'orbit:prepare-update', id }, [channel.port2]); }
+    catch { channel.port2.close(); finish(false); }
+  });
+}
+async function activateWhenSafe() {
+  const id = crypto.randomUUID(), deadline = Date.now() + 2000;
+  const clients = await gameWindows();
+  let committed = false;
+  try {
+    const ready = await Promise.all(clients.map(client => prepareWindow(client, id)));
+    const approved = new Set(clients.filter((_, index) => ready[index]).map(client => client.id));
+    // A new/unresponsive/old-version window blocks the update. Closed windows no longer veto it.
+    const current = await gameWindows();
+    if (Date.now() >= deadline || current.some(client => !approved.has(client.id))) return;
+    await self.skipWaiting();
+    committed = true;
+  } finally {
+    if (!committed) for (const client of clients) {
+      try { client.postMessage({ type: 'orbit:cancel-update', id }); } catch {}
+    }
+  }
+}
+self.addEventListener('message', event => {
+  if (!RELEASE || event.data?.type !== 'orbit:check-update') return;
+  if (!updateCheck) updateCheck = activateWhenSafe().finally(() => { updateCheck = null; });
+  event.waitUntil(updateCheck);
 });
 
 self.addEventListener('activate', event => {

@@ -35,6 +35,7 @@ function worker({ scope = 'https://example.test/games/orbit-rush/', script = pre
   const handlers = new Map();
   let network = async request => responseFor(scope, request);
   let claimed = false, skippedWaiting = false;
+  let clients = [], clientLookup = () => clients;
   const caches = {
     async keys() { return [...stores.keys()]; },
     async delete(name) { return stores.delete(name); },
@@ -61,10 +62,14 @@ function worker({ scope = 'https://example.test/games/orbit-rush/', script = pre
     }
   };
   const context = vm.createContext({
-    self: { registration: { scope }, clients: { async claim() { claimed = true; } },
+    self: { registration: { scope }, clients: { async claim() { claimed = true; },
+      async matchAll(options) {
+        assert.equal(options.type, 'window'); assert.equal(options.includeUncontrolled, true);
+        return clientLookup();
+      } },
       async skipWaiting() { skippedWaiting = true; },
       addEventListener(type, handler) { handlers.set(type, handler); } },
-    caches, URL, Request, Response, console,
+    caches, URL, Request, Response, console, MessageChannel, crypto, setTimeout, clearTimeout,
     fetch: request => network(request)
   });
   vm.runInContext(script, context);
@@ -74,6 +79,13 @@ function worker({ scope = 'https://example.test/games/orbit-rush/', script = pre
     get claimed() { return claimed; },
     get skippedWaiting() { return skippedWaiting; },
     setNetwork(fn) { network = fn; },
+    setClients(value) { clients = value; },
+    lookupClients(fn) { clientLookup = fn; },
+    async message(data) {
+      let work;
+      handlers.get('message')({ data, waitUntil(promise) { work = promise; } });
+      await work;
+    },
     async lifecycle(type) {
       let work;
       handlers.get(type)({ waitUntil(promise) { work = promise; } });
@@ -121,19 +133,20 @@ test('install metadata uses only Orbit Rush and local, correctly sized PNG icons
 test('registration is secure-context-only and failure never breaks gameplay', async () => {
   let load, registration, warning;
   const context = {
-    window: { isSecureContext: true, addEventListener(event, callback) {
-      assert.equal(event, 'load'); load = callback;
+    window: { isSecureContext: true, location: { href: 'https://example.test/game/' }, addEventListener(event, callback) {
+      if (event === 'load') load = callback;
     } },
-    navigator: { serviceWorker: { register(path, options) {
+    document: { addEventListener() {} },
+    navigator: { serviceWorker: { addEventListener() {}, register(path, options) {
       registration = { path, options };
       return Promise.reject(new Error('storage blocked'));
     } } },
+    URL, setTimeout, clearTimeout,
     console: { warn(...args) { warning = args; } }
   };
   vm.runInNewContext(read('pwa.js'), context);
   assert.equal(registration, undefined, 'Wait for page load');
-  load();
-  await Promise.resolve();
+  await load();
   assert.equal(registration.path, './sw.js');
   assert.equal(registration.options.updateViaCache, 'none');
   assert.match(warning[0], /offline setup failed/);
@@ -202,7 +215,7 @@ test('a complete update waits, then switches HTML and modules together on activa
   const next = worker({ script: nextRelease(changes), stores: old.stores });
   next.setNetwork(request => responseFor(next.scope, request, changes));
   await next.lifecycle('install');
-  assert.equal(next.skippedWaiting, false, 'Never force a running game onto a different worker');
+  assert.equal(next.skippedWaiting, false, 'Installation alone never forces a running game onto a different worker');
   assert.equal(await (await old.request('./')).text(), html);
   assert.equal(await (await old.request('touch-controls.js?v=8')).text(), bodies.get('touch-controls.js').toString());
   await next.lifecycle('activate');
@@ -269,6 +282,62 @@ test('the source worker keeps local development fresh and removes only its own o
   assert.deepEqual(await sw.caches.keys(), ['another-app']);
   assert.equal(sw.request('./'), undefined);
   assert.equal(sw.request('touch-controls.js?v=8'), undefined);
+});
+
+function gameClient(sw, id, ready = true) {
+  return { id, url: sw.scope, ready, messages: [], postMessage(message, ports = []) {
+    this.messages.push(message);
+    if (message.type === 'orbit:prepare-update') {
+      if (this.ready !== null) ports[0].postMessage({ ready: this.ready });
+      ports[0].close();
+    }
+  } };
+}
+
+test('a verified update switches only when every game window has saved and locked its safe point', async () => {
+  const sw = worker(); await sw.lifecycle('install');
+  const home = gameClient(sw, 'home'), flying = gameClient(sw, 'flying', false);
+  sw.setClients([home, flying]);
+  await Promise.all([sw.message({ type: 'orbit:check-update' }), sw.message({ type: 'orbit:check-update' })]);
+  assert.equal(sw.skippedWaiting, false);
+  assert.deepEqual(home.messages.map(message => message.type), ['orbit:prepare-update', 'orbit:cancel-update'],
+    'Concurrent requests share a single attempt; a busy flight releases other windows');
+  assert.equal(home.messages[0].id, home.messages[1].id);
+  flying.ready = true;
+  await sw.message({ type: 'orbit:check-update' });
+  assert.equal(sw.skippedWaiting, true);
+  assert.equal(home.messages.at(-1).type, 'orbit:prepare-update');
+  assert.notEqual(home.messages[0].id, home.messages.at(-1).id, 'Retries cannot unlock an unrelated attempt');
+});
+
+test('old or unresponsive windows defer activation without hanging the other windows', async () => {
+  const sw = worker(); await sw.lifecycle('install');
+  const home = gameClient(sw, 'home'), old = gameClient(sw, 'old', null);
+  sw.setClients([home, old]);
+  await sw.message({ type: 'orbit:check-update' });
+  assert.equal(sw.skippedWaiting, false);
+  assert.equal(home.messages.at(-1).type, 'orbit:cancel-update');
+  sw.setClients([home]);
+  await sw.message({ type: 'orbit:check-update' });
+  assert.equal(sw.skippedWaiting, true, 'Closing the incompatible window allows the next safe-point attempt');
+});
+
+test('new windows veto an in-flight update check, closed windows and other app scopes do not', async () => {
+  for (const change of ['opened', 'closed', 'other-scope']) {
+    const sw = worker(); await sw.lifecycle('install');
+    const home = gameClient(sw, 'home'), other = gameClient(sw, 'other', false);
+    let lookups = 0;
+    if (change === 'other-scope') other.url = 'https://example.test/another-game/';
+    sw.lookupClients(() => {
+      lookups++;
+      return change === 'opened' ? (lookups === 1 ? [home] : [home, other])
+        : change === 'closed' ? (lookups === 1 ? [home, other] : [home]) : [home, other];
+    });
+    await sw.message({ type: 'orbit:check-update' });
+    assert.equal(sw.skippedWaiting, change !== 'opened', change);
+    if (change === 'opened') assert.equal(home.messages.at(-1).type, 'orbit:cancel-update');
+    if (change === 'other-scope') assert.equal(other.messages.length, 0);
+  }
 });
 
 test('deployment fingerprints change with assets or worker code, and publish the worker last', () => {
