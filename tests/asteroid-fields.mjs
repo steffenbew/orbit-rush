@@ -7,11 +7,13 @@ const layout = game => game.fieldGroups.map(group => ({position: group.position.
   tunnel: group.tunnel && {center: group.tunnel.center.toArray(), direction: group.tunnel.direction.toArray(), radius: group.tunnel.radius},
   pockets: group.pockets.map(pocket => ({center: pocket.center.toArray(), spread: pocket.spread.toArray(),
     weight: pocket.weight, sizePower: pocket.sizePower, sizeScale: pocket.sizeScale}))}));
-for (const reduced of [false, true]) for (const level of [1, 2, 4, 5, 8, 9, 11, 12, 17, 20, 100]) for (const seed of [123, 456, 789]) {
+for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 8, 9, 11, 12, 17, 20, 100]) for (const seed of [123, 456, 789]) {
   randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.camera.updateMatrixWorld();
   for (const event of game.getAsteroidEncounters().filter(event => event.kind === 'field')) {
     game.showerPool.forEach(rock => { rock.visible = false; });
+    // Inspect this field in isolation, without the scheduler selecting another phase first.
+    game.grit.visible = true;
     game.selectAsteroidEncounter(event); game.setTime(event.prepare); game.worldStep.set(0, 0, 0); game.updateAsteroidShower(0);
     const planned = layout(game), origin = game.coursePlan().origin, scale = reduced ? .35 : 1;
     const rocks = game.fieldGroups.flatMap(group => group.rocks), debris = game.fieldDebris;
@@ -103,7 +105,7 @@ for (const reduced of [false, true]) for (const level of [1, 2, 4, 5, 8, 9, 11, 
         'Close neighbours are allowed, but complete collision hulls never overlap');
     }
     if (!reduced) {
-      if (level === 2) assert.ok(game.fieldGroups.some(group => group.blocking), 'The field introduction includes an evasive route');
+      if ([2, 3].includes(level)) assert.ok(game.fieldGroups.some(group => group.blocking), 'The introductory and level-three fields require an evasive route');
       for (const group of game.fieldGroups.filter(group => group.blocking)) {
         const anchor = group.rocks[0], center = group.position.clone().add(origin);
         assert.ok(game.crossesPlayer(anchor, center.clone().add(new THREE.Vector3(0, 0, -300)), center.clone().add(new THREE.Vector3(0, 0, 300)), 0, center),
@@ -124,7 +126,7 @@ console.log('PASS debris volumes, contrasting settled sizes, separated bodies, c
 for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9, 20]) {
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
   const landmark = game.fieldBoulder;
-  if (level === 1 || level === 3 || level % 4 === 0) { assert.equal(landmark, null, 'No extra boulders in boss fights or the corridor-only level'); continue; }
+  if (level === 1 || level === 3 || level % 4 === 0) { assert.equal(landmark, null, 'No extra opening boulders in boss fights, the tutorial or the corridor-first level'); continue; }
   const [opening, next] = game.getAsteroidEncounters(), {rock, time} = landmark;
   assert.ok(time >= opening.exit + 3 && time <= next.entry - 3, 'A single larger remnant occupies the quiet gap, not a new field');
   assert.equal(rock.scale.x, 5 * (reduced ? .35 : 1));

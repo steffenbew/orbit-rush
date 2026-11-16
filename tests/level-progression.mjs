@@ -11,9 +11,9 @@ for (const reduced of [false, true]) for (let level = 1; level <= 100; level++) 
   const plan = planFor(level, reduced);
   assert.deepEqual(planFor(level, reduced), plan, 'No reroll of timing, type, strength, direction or bends');
   assert.deepEqual(plan.map(event => event.kind), level === 1 ? ['field', 'shower']
-    : level === 3 ? ['corridor'] : level === 4 ? ['field', 'field'] : ['field', 'shower', 'corridor']);
+    : level === 3 ? ['corridor', 'shower', 'field'] : level === 4 ? ['field', 'field'] : ['field', 'shower', 'corridor']);
   for (const event of plan) {
-    assert.ok(event.prepare < event.entry - 2 && event.entry < event.exit && event.exit <= 37);
+    assert.ok(event.prepare < event.entry - 2 && event.entry < event.exit && event.exit <= (level === 3 ? 38 : 37));
     assert.ok(Number.isInteger(event.strength) && event.strength >= 0 && event.strength <= 2);
     assert.ok(event.shape >= 0 && event.shape <= 2);
   }
@@ -27,6 +27,10 @@ for (const reduced of [false, true]) for (let level = 1; level <= 100; level++) 
     assert.equal(plan[2].shape, 0); assert.equal(plan[2].bend, 0);
   }
   if (level === 3) {
+    assert.deepEqual(plan.map(event => [event.kind, event.prepare, event.entry, event.exit, event.strength]),
+      reduced ? [['corridor', 0, 8, 13, 1], ['shower', 14, 24, 26, 1], ['field', 27, 35, 37, 1]]
+        : [['corridor', 0, 8, 20, 1], ['shower', 20.5, 25, 29, 1], ['field', 29.5, 34, 38, 2]],
+      'Tighten normal-mode follow-ups with a denser field; preserve slow-mode cleanup and seven seconds to finish');
     assert.equal(plan[0].shape, 0, 'Level three extends the straight corridor; bends still begin at level five');
     assert.equal(plan[0].strength, 1);
   }
@@ -38,7 +42,7 @@ for (const reduced of [false, true]) for (let level = 1; level <= 100; level++) 
     if (level % 4 === 0) assert.ok(plan.every(event => event.strength < 2), 'Keep later boss combinations lighter');
   }
 }
-console.log('PASS fields before showers, late level-two corridor, longer level-three corridor, first-boss bookends and repeatable plans');
+console.log('PASS fields before showers, late level-two corridor, level-three corridor/shower/field finale, first-boss bookends and repeatable plans');
 
 for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9, 12, 40, 100]) {
   randomState.seed = 123; // Each scenario is independent of how many random rocks earlier cases created.
@@ -61,6 +65,13 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
     assert.equal(gate.userData.radius, reduced ? 14 : 80, 'Difficulty comes from placement, not shrinking apertures');
   }
   assert.ok(Math.abs(gates.at(-1).position.z + game.flightDistanceAt(40)) < 1e-8);
+  if (level === 3) {
+    const field = game.getAsteroidEncounters().at(-1), gate = gates.at(-2);
+    assert.equal(gate.position.z, -game.flightDistanceAt(37), 'Move the last steering checkpoint into the field finale');
+    assert.ok(gate.position.z <= -game.flightDistanceAt(field.entry) && gate.position.z >= -game.flightDistanceAt(field.exit),
+      'The field and checkpoint form one navigation challenge, not two separate stretches');
+    assert.ok(Math.abs(gate.position.x) > gate.userData.radius, 'The late gate still demands a lateral correction');
+  }
   if (game.corridorPlan) {
     const {origin, length} = game.corridorPlan;
     for (const gate of gates) {
@@ -78,8 +89,9 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
 console.log('PASS lateral-to-vertical checkpoint progression, turn clearance, stable retries, straight tutorial, corridor exclusion and finish margin');
 
 // Follow the authored schedules too, not only the generic corridor geometry fixtures.
-for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 40, 100]) for (const fps of (level === 2 ? [5, 60, 144] : [60])) {
-  randomState.seed = 123;
+for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 40, 100]) for (const fps of ([2, 3].includes(level) ? [5, 60, 144] : [60]))
+for (const seed of (level === 3 ? [123, 456, 789] : [123])) {
+  randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   let time = 0;
   const clock = makeFlightClock(THREE, game, reduced, dt => {
@@ -103,7 +115,7 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 4
     const previousEncounter = game.encounterIndex;
     game.updateAsteroidShower(dt);
     if (game.encounterIndex !== previousEncounter) assert.ok(game.coursePlan().entry - time >= 4,
-      `Keep four seconds of field approach while steering: level=${level}, reduced=${reduced}, fps=${fps}, entry=${game.coursePlan().entry}, time=${time}`);
+      `Keep four seconds of field approach while steering: level=${level}, reduced=${reduced}, fps=${fps}, seed=${seed}, entry=${game.coursePlan().entry}, time=${time}`);
   });
   while (time < 45 && game.flightRings.some(gate => !gate.userData.resolved)) clock.frame(1 / fps);
   assert.deepEqual(game.sounds, Array(5).fill('checkpoint'), `Reach every authored checkpoint: level=${level}, reduced=${reduced}`);
