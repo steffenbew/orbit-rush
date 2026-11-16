@@ -132,7 +132,7 @@ const makeFlightClock = new Function('THREE', 'flight', 'reducedMotion', 'update
   ${section('      const simulationStep =', '      const progressionTimeScale =')}
   return {frame: advanceSimulation, move: (dt, difficulty) => {
     ${section('        const easing = 1 - Math.exp(-3 * dt);', '        worldStep.copy(flightMotion)')}
-    ${section('        const speedFov =', '        danger = false;')}
+    ${section('        camera.fov = started && !reducedMotion', '        danger = false;')}
   }};
 `);
 

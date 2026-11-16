@@ -59,6 +59,17 @@ for (let level = 2; level <= 1000; level++) {
 const midpoint = flightSpeed(false, 0, .5, 1);
 assert.ok(midpoint > 697 && midpoint < 699, 'The gentler level-one opening reaches about 698 halfway through');
 console.log('PASS faster normal opening/peak, earlier acceleration, stronger logarithmic scaling and unchanged reduced motion');
+const updateFov = new Function('camera', 'started', 'reducedMotion', 'speed', `
+  ${section('        camera.fov = started && !reducedMotion', '        danger = false;')}
+`);
+for (const started of [false, true]) for (const reduced of [false, true]) {
+  const camera = new THREE.PerspectiveCamera(110);
+  for (const speed of [0, 250, 500, 1000, 3000, 0]) {
+    updateFov(camera, started, reduced, speed);
+    assert.equal(camera.fov, started && !reduced ? 90 : 70, 'Acceleration and level resets cannot zoom the camera');
+  }
+}
+console.log('PASS fixed gameplay FOV, unchanged menu/reduced-motion FOV and no speed-based zoom');
 const pressureForLevel = new Function('level', 'return ' + source.match(/        levelPressure = ([^;]+);/)[1]);
 assert.equal(pressureForLevel(1), 0);
 for (let level = 2; level <= 100; level++) {

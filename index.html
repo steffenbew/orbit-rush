@@ -4944,8 +4944,7 @@
         }
         flash = Math.max(0, flash - dt * 3);
         updateSpaceBackground();
-        const speedFov = started ? 90 + THREE.MathUtils.clamp((speed - 250) / 1000, 0, 1) * 20 : 70;
-        camera.fov += ((reducedMotion ? 70 : speedFov) - camera.fov) * easing;
+        camera.fov = started && !reducedMotion ? 90 : 70;
         camera.updateProjectionMatrix();
         danger = false;
         camera.updateMatrixWorld();
