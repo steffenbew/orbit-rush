@@ -3867,6 +3867,7 @@
         const button = document.querySelector('#start');
         const label = document.querySelector('#start-label');
         button.disabled = true;
+        document.querySelector('#silent-start').disabled = true;
         languagePicker.disabled = true;
         label.dataset.i18n = 'loadingAudio';
         label.textContent = t('loadingAudio');
@@ -3875,8 +3876,12 @@
           // Unlock audio first: fullscreen can consume Safari's user activation.
           // Both calls must happen in the click handler, before the first await.
           const audioReady = withSound ? sound.initAudio() : Promise.resolve();
+          let fullscreenReady;
           if (fullscreenPreferred && document.fullscreenEnabled && !document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(error => {
+            fullscreenReady = document.documentElement.requestFullscreen().then(() => {
+              // Leave one paint for the resized intro canvas before starting the simulation.
+              return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            }).catch(error => {
               console.warn('Automatic fullscreen request failed:', error);
             });
           }
@@ -3886,6 +3891,7 @@
               audioTimeout = setTimeout(() => reject(new Error('Audio startup timed out. Retry or start without sound.')), 15000);
             })
           ]);
+          if (fullscreenReady) await fullscreenReady;
           soundEnabled = withSound;
           document.querySelector('#sound').setAttribute('aria-pressed', String(withSound));
           document.querySelector('#sound').setAttribute('aria-label', t(withSound ? 'soundOff' : 'soundOn'));

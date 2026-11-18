@@ -232,7 +232,8 @@ pointerEvent(canvas, 'pointerup', canvas, {pointerType: 'touch'});
 assert.equal(input.state().pointer, null);
 console.log('PASS continuous HUD steering, page exit, inactive/modal guards, no accidental shots, touch/capture and blur safety');
 
-const makeStart = (fullscreenPreferred = true) => new Function('THREE', 'fullscreenPreferred', `
+const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.resolve(), frame = queueMicrotask) =>
+  new Function('THREE', 'fullscreenPreferred', 'enterFullscreen', 'requestAnimationFrame', `
   let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true, lastPointerPosition = null;
   const mouseAim = new THREE.Vector2(.7, -.6), target = new THREE.Vector2(.7, -.6), reticle = {style: {}};
   const camera = new THREE.PerspectiveCamera(), scene = {fog: {}}, reducedMotion = false;
@@ -242,7 +243,7 @@ const makeStart = (fullscreenPreferred = true) => new Function('THREE', 'fullscr
   const clearTimeout = id => timers.delete(id);
   const document = {
     fullscreenEnabled: true, fullscreenElement: null,
-    documentElement: {requestFullscreen() { calls.push('fullscreen'); innerWidth = 1280; innerHeight = 900; return Promise.resolve(); }},
+    documentElement: {async requestFullscreen() { calls.push('fullscreen'); await enterFullscreen(); innerWidth = 1280; innerHeight = 900; }},
     body: {classList: {add() {}}}, activeElement: {blur() {}},
     querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, {disabled: false, hidden: false, dataset: {}, setAttribute() {}});
@@ -266,7 +267,30 @@ const makeStart = (fullscreenPreferred = true) => new Function('THREE', 'fullscr
       languageDisabled: languagePicker.disabled, label: document.querySelector('#start-label').textContent,
       silentDisabled: document.querySelector('#silent-start').disabled, noticeHidden: audioNotice.hidden})
   };
-`)(THREE, fullscreenPreferred);
+`)(THREE, fullscreenPreferred, enterFullscreen, frame);
+for (const withSound of [false, true]) {
+  let completeFullscreen;
+  const frames = [];
+  const start = makeStart(true, () => new Promise(resolve => { completeFullscreen = resolve; }), cb => frames.push(cb));
+  const loading = start.start(withSound);
+  start.loadAudio();
+  await new Promise(setImmediate);
+  assert.equal(start.state().started, false, 'Ready audio must not start flight during the fullscreen transition');
+  assert.deepEqual(frames, []);
+  completeFullscreen();
+  await new Promise(setImmediate);
+  frames.shift()();
+  await Promise.resolve();
+  assert.equal(start.state().introHidden, false, 'Keep the intro up for the first resized paint');
+  frames.shift()();
+  await loading;
+  assert.equal(start.state().started, true);
+}
+let deniedFrames = 0;
+const denied = makeStart(true, () => Promise.reject(new Error('Fullscreen denied')), cb => { deniedFrames++; queueMicrotask(cb); });
+await denied.start(false);
+assert.equal(deniedFrames, 0, 'No resize to wait for when fullscreen is denied');
+assert.equal(denied.state().started, true, 'A rejected fullscreen request still starts windowed');
 for (const withSound of [false, true]) {
   const start = makeStart(false);
   const loading = start.start(withSound);
