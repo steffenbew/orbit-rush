@@ -1,75 +1,48 @@
-# Audio-Quellen
+# Asset credits
 
-Die Audiodateien werden lokal aus `assets/audio/` abgespielt; es gibt keine Audio-Tracking- oder Streaming-Dienste.
+All assets are served locally. Audio source and license links are also available in the game's **Audio credits** dialog.
 
-## Zielerfassungs-Bestätigung
+## Sound effects
 
-- `lock-on.wav`: eigens für Orbit Rush synthetisierter Zweiklang, keine externen Samples.
-- Zwei kurze Sinustöne mit 540 und 720 Hz, weicher Ein-/Ausblendung und exponentiellem Ausklang; 160 ms, mono PCM-WAV, 16 Bit/44,1 kHz.
-- Feste Tonhöhe, Gain 0,19; einmalige, leise Bestätigung beim Einrasten eines Ziels.
+### Kenney — Sci-Fi Sounds (1.0)
 
-## Aktuelle Laser-, Leermagazin-, Treffer- und Explosionssounds
+[Source](https://opengameart.org/content/sci-fi-sounds) · [Original archive](https://opengameart.org/sites/default/files/sci-fi_sounds.zip) · [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) · [Bundled notice](assets/audio/KENNEY-LICENSE.txt)
 
-**Sci-Fi Sounds (1.0)** von **Kenney**
+| File in `assets/audio/` | Source in the pack's `Audio/` directory | Changes |
+| --- | --- | --- |
+| `checkpoint-pass.wav` | `forceField_001.ogg` | Converted to 44.1 kHz WAV. |
+| `shield-hard.wav` | `forceField_000.ogg` | Converted to 44.1 kHz WAV for shield-wall contact. |
+| `laser-soft.mp3` | `laserRetro_000.ogg` | Low-pass filtered at 1.5 kHz and converted to MP3. |
+| `empty-click.wav` | `impactMetal_000.ogg` | First 120 ms, filtered, faded, compressed and level-adjusted; mono WAV. |
+| `impact-1.mp3`, `impact-2.mp3`, `impact-3.mp3` | `impactMetal_000.ogg`, `impactMetal_001.ogg`, `impactMetal_003.ogg`, respectively | Loudness-normalized and converted to MP3. |
+| `blast-1.mp3`, `blast-2.mp3`, `blast-3.mp3` | `explosionCrunch_000.ogg`, `explosionCrunch_002.ogg`, `explosionCrunch_004.ogg`, respectively | Loudness-normalized and converted to MP3. |
 
-- Quelle: https://opengameart.org/content/sci-fi-sounds
-- Originalpaket: https://opengameart.org/sites/default/files/sci-fi_sounds.zip
-- Lizenz: **CC0 1.0 Universal**, https://creativecommons.org/publicdomain/zero/1.0/
-- Original-Lizenzdatei: `assets/audio/KENNEY-LICENSE.txt`
-- Checkpoint bestanden (Demo W4, Original-Sweep): `checkpoint-pass.wav` aus `Audio/forceField_001.ogg`, ursprünglicher Sweep des früheren streifenden Außenwandkontakts. WAV-Konvertierung mit 44,1 kHz, keine zusätzlichen Filter, Schnitte oder Tonhöhenänderungen. Feste Tonhöhe, Gain 0,157083; gegenüber dem vorherigen Gain 0,14 nochmals um 1 dB angehoben.
-- Außenwandkontakte verwenden jetzt ausschließlich `shield-hard.wav` aus `Audio/forceField_000.ogg` (WAV-Konvertierung mit 44,1 kHz, keine weiteren Effekte); feste Tonhöhe, Gain 0,19 (streifend) bzw. 0,24 (hart). Auswahl nach eingehender Normalgeschwindigkeit an der Außenwand: ab 150 hart (15 bei reduzierter Bewegung), darunter streifend. Schaden und Kontakt-Cooldown unverändert.
-- Aktiver Lasersound: `laser-soft.mp3`, abgeleitet von `Audio/laserRetro_000.ogg`, zusätzlich mit 1,5-kHz-Tiefpass bearbeitet. Leiser Mix und feste Abspielgeschwindigkeit 0,9; kein Variantenwechsel.
-- Leermagazin-Klick: `empty-click.wav`, erste 120 ms von `Audio/impactMetal_000.ogg`, 400-Hz-Hochpass, 2,4-kHz-Tiefpass, Ausklang von 40–120 ms, Lautstärke zunächst auf 70 %, anschließend Dynamikkompression (Schwelle 0,045, Verhältnis 4:1, Attack 0,1 ms, Release 20 ms, Makeup ×5) und +2 dB für einen besser hörbaren Klangkörper; mono PCM-WAV mit 44,1 kHz. Im Spiel mit fester Tonhöhe und Gain 0,28 abgespielt.
-- `impact-1.mp3`, `impact-2.mp3`, `impact-3.mp3`: `Audio/impactMetal_000.ogg`, `Audio/impactMetal_001.ogg`, `Audio/impactMetal_003.ogg`
-- `blast-1.mp3`, `blast-2.mp3`, `blast-3.mp3`: `Audio/explosionCrunch_000.ogg`, `Audio/explosionCrunch_002.ogg`, `Audio/explosionCrunch_004.ogg`
-- Änderungen: MP3-Konvertierung (44,1 kHz), Lautstärkeangleichung mit FFmpeg loudnorm (-18 LUFS Zielwert). Variable Abspielgeschwindigkeit/Tonhöhe im Spiel.
-- Explosionen: Basis-Gain 0,55 mit Variantenfaktoren 0,8 / 0,75 / 1,4 für `blast-1.mp3` / `blast-2.mp3` / `blast-3.mp3`; rein abspielseitiger Lautstärkeabgleich, keine erneute Dateibearbeitung.
-- Treffer und Explosionen: je drei Varianten, keine unmittelbar wiederholte Variante. Größere Schiffe explodieren mit tieferer Tonhöhe. Der Laser verwendet nur einen gleichbleibenden Sound.
+### dravenx — Space shooter sound effects
 
-## Checkpoint-, Combo-Sound und Kollisionsalarm
+[Source](https://opengameart.org/content/space-shooter-sound-effects) · [Original archive](https://opengameart.org/sites/default/files/sounds_1.zip) · [Creative Commons Attribution 3.0 Unported](https://creativecommons.org/licenses/by/3.0/)
 
-**Space shooter sound effects** von **dravenx (Dravenx)**
+| File in `assets/audio/` | Source in the pack | Changes |
+| --- | --- | --- |
+| `go-bing.wav` | `sounds/buttonselect/6.wav` | Unmodified; played after training. |
+| `reward.wav` | `sounds/powerups/1.wav` | Unmodified. |
+| `checkpoint-miss.wav` | `sounds/misc/error.wav` | Loudness-normalized and converted to 44.1 kHz mono WAV. |
+| `warning-low.wav` | `sounds/misc/alarm.wav` | Trimmed to the first 0.65 s, slowed to 85%, resampled to 44.1 kHz, low-pass filtered at 800 Hz, attenuated and faded at the edges. |
 
-- Quelle: https://opengameart.org/content/space-shooter-sound-effects
-- Originalpaket: https://opengameart.org/sites/default/files/sounds_1.zip
-- Lizenz: **Creative Commons Attribution 3.0 Unported (CC BY 3.0)**
-- Lizenztext: https://creativecommons.org/licenses/by/3.0/
-- `go-bing.wav`: `sounds/buttonselect/6.wav`, unverändert übernommen. Einmaliger Bestätigungston beim Erscheinen von „LOS!“ / „GO!“ nach dem Training; feste Tonhöhe, Gain 0,124775 (gegenüber dem vorherigen Gain 0,14 nochmals 1 dB leiser).
-- `reward.wav`: `sounds/powerups/1.wav`
-- Checkpoint verfehlt (Demo M1): `checkpoint-miss.wav` aus `sounds/misc/error.wav`; ersetzt nur den Checkpoint-Trefferton, nicht die normalen Kollisionstreffer.
-- Checkpoint-Fehlton: mono PCM-WAV mit 44,1 kHz, FFmpeg `loudnorm=I=-20:TP=-3:LRA=7`, keine zusätzlichen Schnitte oder Tonhöhenänderungen. Feste Tonhöhe, Gain 0,34 im Spiel; unverändert.
-- `warning-low.wav`: aus `sounds/misc/alarm.wav`. Erste 0,65 Sekunden verwendet, auf 85 % der ursprünglichen Tonhöhe/Abspielgeschwindigkeit abgesenkt, auf 44,1 kHz resampelt, 800-Hz-Tiefpass, Lautstärke auf 65 %, Schnittkanten mit 3/5 ms geglättet. Dauer ca. 0,765 Sekunden; im Spiel mit Ruhepause alle 0,95 Sekunden wiederholt.
-- `reward.wav` wurde unverändert übernommen; Lautstärke wird im Spiel angepasst.
+`lock-on.wav` is an original two-tone confirmation synthesized for Orbit Rush; it uses no external samples.
 
-## Aktuelle Hintergrundmusik
+## Music
 
-**Retro Game Music Pack · Level 1** von **Juhani Junkala (SubspaceAudio)**
+**Juhani Junkala (SubspaceAudio)** — *Retro Game Music Pack · Level 1*, from [5 Action Chiptunes by Juhani Junkala](https://opengameart.org/content/5-chiptunes-action). [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) · [Bundled notice](assets/audio/MUSIC-LICENSE.txt).
 
-- Quelle: https://opengameart.org/content/5-chiptunes-action
-- Sammlung: „5 Action Chiptunes By Juhani Junkala“
-- Original: `Juhani Junkala [Retro Game Music Pack] Level 1.wav`
-- Lokal: `assets/audio/orbit-arcade.mp3`
-- Lizenz: **CC0 1.0 Universal**, https://creativecommons.org/publicdomain/zero/1.0/
-- Original-Lizenzhinweis: `assets/audio/MUSIC-LICENSE.txt`
-- Änderungen: Tiefpass bei 11 kHz, Lautstärkeangleichung (-18 LUFS Zielwert), MP3-Konvertierung. Im Spiel leise als Loop unter den Effekten abgespielt.
+`assets/audio/orbit-arcade.mp3` was made from `Juhani Junkala [Retro Game Music Pack] Level 1.wav`: low-pass filtered at 11 kHz, loudness-normalized and converted to MP3.
 
-Die Quellen und Lizenzlinks der aktiven Sounds sind zusätzlich im Spiel über „Audio-Credits“ zugänglich.
+## Cockpit and asteroid fields
 
-## Cockpit
+The canopy, instruments and switches were drawn for Orbit Rush. The [cockpit from *Star Wars: Squadrons* (EA / Motive)](https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1222730/ss_3518ecebb8d16d25b675d139b3d0817db5248a33.jpg) was a visual reference for the segmented windshield and separate instrument pods. No images from that game are used.
 
-Kanzel, Instrumente und Schalter sind eigens für Orbit Rush gezeichnet. Visuelle Referenz für die segmentierte Frontscheibe und die getrennten Instrumentenkonsolen: [Cockpit-Screenshot aus *Star Wars: Squadrons* (EA / Motive)](https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1222730/ss_3518ecebb8d16d25b675d139b3d0817db5248a33.jpg). Keine Bilddateien aus dem Spiel werden verwendet.
+NASA's observations of [DART's ejecta cone and filaments](https://science.nasa.gov/missions/hubble/hubble-captures-movie-of-dart-asteroid-impact-debris/) and [Scheila's asymmetric debris plumes](https://science.nasa.gov/missions/hubble/nasas-swift-and-hubble-probe-asteroid-collision-debris/) informed the asteroid-field layouts. The game is not a scale simulation.
 
-## Phosphor Icons
+## Icons and rendering
 
-- Phosphor Icons (`@phosphor-icons/core` 2.1.1), https://phosphoricons.com/
-- Originalpaket: https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz
-- Regular-SVGs für die Oberfläche, einschließlich Rakete, Maus, Ton, Pause, Vollbild und Ergebnissymbole. Die Rakete wird auch als Favicon und für die PWA-/Home-Bildschirm-Icons verwendet. SVG-Quelle und PNG-Varianten liegen unter `assets/icons/`; das maskierbare Icon hat zusätzlichen Sicherheitsabstand.
-- Unveränderte SVG-Pfade als lokaler Symbol-Satz in `index.html`; keine Bibliothek, Webfont oder CDN-Anfrage zur Laufzeit.
-- MIT-Lizenz: `assets/vendor/PHOSPHOR-LICENSE.txt`
-
-## Three.js
-
-- Three.js 0.170.0, https://threejs.org/
-- Lokal: `assets/vendor/three.module.js`
-- MIT-Lizenz: `assets/vendor/THREE-LICENSE.txt`
-- Unverändert von jsDelivr bezogen; zur Laufzeit keine CDN-Verbindung nötig.
+- [Phosphor Icons](https://phosphoricons.com/), [`@phosphor-icons/core` 2.1.1](https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz), Regular. The HUD uses locally embedded SVG paths; the rocket also appears in the favicon and [app icons](assets/icons/). [MIT license](assets/vendor/PHOSPHOR-LICENSE.txt).
+- [Three.js](https://threejs.org/) 0.170.0, distributed unmodified via jsDelivr and bundled as [`assets/vendor/three.module.js`](assets/vendor/three.module.js). [MIT license](assets/vendor/THREE-LICENSE.txt).

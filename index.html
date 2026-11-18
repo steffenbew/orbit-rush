@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -523,7 +523,7 @@
     <symbol id="i-prohibit" data-phosphor="prohibit" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm88,104a87.56,87.56,0,0,1-20.41,56.28L71.72,60.4A88,88,0,0,1,216,128ZM40,128A87.56,87.56,0,0,1,60.41,71.72L184.28,195.6A88,88,0,0,1,40,128Z"/></symbol>
     <symbol id="i-close" data-phosphor="x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
   </defs></svg>
-  <canvas id="space" data-i18n-aria-label="spaceScene" aria-label="3D-Weltraumflug mit Sternen und Raumschiffen"></canvas>
+  <canvas id="space" data-i18n-aria-label="spaceScene" aria-label="3D space flight with stars and spaceships"></canvas>
   <!-- Original interceptor interior: faceted pressure glass, cast instrument housings and live flight instruments. -->
   <svg id="cockpit-frame" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <defs>
@@ -617,128 +617,128 @@
     <path d="M385 548l35-17h160l35 17" fill="none" stroke="#616669"/>
     <path d="M402 545h22m4 0h5m4 0h5" stroke="#da914e" stroke-width="2"/>
   </svg>
-  <canvas id="effects" data-i18n-aria-label="controls" aria-label="Mit der Maus lenken und zielen. Klicken oder gedrückt halten zum Lasern. Leertaste feuert den starken Laser; danach lädt er kurz auf."></canvas>
+  <canvas id="effects" data-i18n-aria-label="controls" aria-label="Steer and aim with the mouse. Click or hold to fire the laser. Space fires the power laser, followed by a short recharge."></canvas>
   <div class="brand"><span>ORBIT RUSH</span></div>
-  <section id="intro" class="intro" data-i18n-aria-label="startScreen" aria-label="Spiel starten">
+  <section id="intro" class="intro" data-i18n-aria-label="startScreen" aria-label="Start game">
     <div class="intro-card">
       <div class="intro-logo">
         <h1>ORBIT<span>RUSH</span></h1>
         <button id="start" aria-labelledby="start-label" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
-        <span id="start-label" data-i18n="loadingSpace" role="status">WELTRAUM WIRD GELADEN …</span>
+        <span id="start-label" data-i18n="loadingSpace" role="status">LOADING SPACE …</span>
       </div>
       <div class="intro-options">
-        <fieldset id="language" class="language-picker" data-i18n-aria-label="language" aria-label="Sprache" disabled>
+        <fieldset id="language" class="language-picker" data-i18n-aria-label="language" aria-label="Language" disabled>
           <label><input type="radio" name="language" value="en"><span lang="en">English</span></label>
           <label><input type="radio" name="language" value="de"><span lang="de">Deutsch</span></label>
           <div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>
         </fieldset>
-        <button id="silent-start" data-i18n="silentStart" disabled>Ohne Ton starten</button>
+        <button id="silent-start" data-i18n="silentStart" disabled>Start without sound</button>
       </div>
     </div>
   </section>
   <button id="audio-notice" data-i18n="audioError" hidden role="status"></button>
   <div id="touch-controls" hidden>
     <div id="touch-weapons">
-      <button id="touch-laser" type="button" data-i18n-aria-label="touchLaser" aria-label="Normalen Laser gedrückt halten">
-        <svg class="touch-charge" viewBox="0 0 84 84" role="progressbar" data-i18n-aria-label="laserEnergy" aria-label="Laserenergie" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="touch-charge-track" cx="42" cy="42" r="38"/><circle class="touch-charge-fill" cx="42" cy="42" r="38" pathLength="100" stroke-dasharray="100"/></svg>
+      <button id="touch-laser" type="button" data-i18n-aria-label="touchLaser" aria-label="Hold to fire the normal laser">
+        <svg class="touch-charge" viewBox="0 0 84 84" role="progressbar" data-i18n-aria-label="laserEnergy" aria-label="Laser energy" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="touch-charge-track" cx="42" cy="42" r="38"/><circle class="touch-charge-fill" cx="42" cy="42" r="38" pathLength="100" stroke-dasharray="100"/></svg>
         <span class="laser-dot" aria-hidden="true"></span>
       </button>
-      <button id="touch-power" type="button" data-i18n-aria-label="touchPower" aria-label="Power-Laser gedrückt halten (3× Schaden)">
-        <svg class="touch-charge" viewBox="0 0 84 84" role="progressbar" data-i18n-aria-label="powerCharge" aria-label="Schwerlaser-Ladung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="touch-charge-track" cx="42" cy="42" r="38"/><circle class="touch-charge-fill" cx="42" cy="42" r="38" pathLength="100" stroke-dasharray="100"/></svg>
+      <button id="touch-power" type="button" data-i18n-aria-label="touchPower" aria-label="Hold to fire the power laser (3× damage)">
+        <svg class="touch-charge" viewBox="0 0 84 84" role="progressbar" data-i18n-aria-label="powerCharge" aria-label="Power laser charge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="touch-charge-track" cx="42" cy="42" r="38"/><circle class="touch-charge-fill" cx="42" cy="42" r="38" pathLength="100" stroke-dasharray="100"/></svg>
         <span class="power-dot" aria-hidden="true"></span>
       </button>
     </div>
-    <div id="touch-joystick" role="group" data-i18n-aria-label="touchSteering" aria-label="Joystick zum Lenken und Zielen"><span class="joystick-knob" aria-hidden="true"></span></div>
+    <div id="touch-joystick" role="group" data-i18n-aria-label="touchSteering" aria-label="Joystick: steer and aim"><span class="joystick-knob" aria-hidden="true"></span></div>
   </div>
   <div id="success-burst" hidden aria-hidden="true"><span style="--dx:-40vw;--dy:-30vh">✦</span><span style="--dx:-22vw;--dy:-42vh">✦</span><span style="--dx:22vw;--dy:-42vh">✦</span><span style="--dx:40vw;--dy:-30vh">✦</span><span style="--dx:44vw;--dy:5vh">✦</span><span style="--dx:35vw;--dy:35vh">✦</span><span style="--dx:18vw;--dy:43vh">✦</span><span style="--dx:-18vw;--dy:43vh">✦</span><span style="--dx:-35vw;--dy:35vh">✦</span><span style="--dx:-44vw;--dy:5vh">✦</span></div>
   <dialog id="pause-menu" aria-labelledby="pause-title">
     <svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>
-    <h2 id="pause-title" data-i18n="pause">Spiel pausiert</h2>
+    <h2 id="pause-title" data-i18n="pause">Game paused</h2>
     <div class="pause-actions">
-      <button id="continue-flight" autofocus><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span data-i18n="resumeGame">Weiterspielen</span></button>
-      <button id="end-run"><svg class="icon" aria-hidden="true"><use href="#i-planet"/></svg><span data-i18n="endRun">Zurück zur Basis</span></button>
+      <button id="continue-flight" autofocus><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span data-i18n="resumeGame">Resume</span></button>
+      <button id="end-run"><svg class="icon" aria-hidden="true"><use href="#i-planet"/></svg><span data-i18n="endRun">Return to base</span></button>
     </div>
   </dialog>
   <dialog id="round-end" aria-labelledby="round-title">
     <div class="intro-card">
       <div class="round-heading">
         <svg id="round-symbol" class="icon" aria-hidden="true"><use href="#i-trophy"/></svg>
-        <div id="round-outcome" class="eyebrow" data-i18n="flightComplete">FLUG ABGESCHLOSSEN</div>
-        <h2 id="round-title" data-i18n="runEnded">Das war dein Run.</h2>
+        <div id="round-outcome" class="eyebrow" data-i18n="flightComplete">FLIGHT COMPLETE</div>
+        <h2 id="round-title" data-i18n="runEnded">Your run is over.</h2>
       </div>
-      <button id="play-again"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg><span data-i18n="continueFlight">WEITERFLIEGEN</span></button>
+      <button id="play-again"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg><span data-i18n="continueFlight">RESUME FLIGHT</span></button>
       <div class="round-summary">
-        <span class="label" data-i18n="yourScore">DEINE PUNKTE</span><strong id="final-score">0</strong>
-        <div id="new-record" hidden><svg class="icon" aria-hidden="true"><use href="#i-trophy"/></svg><span data-i18n="newHighscore">NEUER HIGHSCORE!</span></div>
+        <span class="label" data-i18n="yourScore">YOUR SCORE</span><strong id="final-score">0</strong>
+        <div id="new-record" hidden><svg class="icon" aria-hidden="true"><use href="#i-trophy"/></svg><span data-i18n="newHighscore">NEW HIGH SCORE!</span></div>
         <div id="retry-result" class="retry-lives" role="img" hidden><div class="retry-icons" aria-hidden="true"><span>🧑‍🚀</span><span>🧑‍🚀</span><span>🧑‍🚀</span></div></div>
-        <p id="round-reason" data-i18n="newRound">Neue Runde, neue Chance.</p>
+        <p id="round-reason" data-i18n="newRound">New run, new chance.</p>
       </div>
     </div>
   </dialog>
   <div id="flight-path" hidden aria-hidden="true"></div>
   <div id="danger-vignette" aria-hidden="true"></div>
-  <div id="capital-hud" hidden><strong>LEVIATHAN DREADNOUGHT</strong><progress id="capital-health" max="60" value="60" data-i18n-aria-label="capitalArmor" aria-label="Panzerung des Leviathan"></progress><span id="capital-state"></span></div>
+  <div id="capital-hud" hidden><strong>LEVIATHAN DREADNOUGHT</strong><progress id="capital-health" max="60" value="60" data-i18n-aria-label="capitalArmor" aria-label="Leviathan armor"></progress><span id="capital-state"></span></div>
   <div id="shield-hit" hidden aria-hidden="true"></div>
-  <div id="impact-label" data-i18n="collision" hidden role="status">KOLLISION</div>
+  <div id="impact-label" data-i18n="collision" hidden role="status">COLLISION</div>
   <div id="hit-cross" aria-hidden="true"></div>
   <div class="reticle">
-    <svg class="weapon-ring" viewBox="0 0 48 48" role="progressbar" data-i18n-aria-label="laserEnergy" aria-label="Laserenergie" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="cooldown-track" cx="24" cy="24" r="21"/><circle class="cooldown-fill" cx="24" cy="24" r="21" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>
+    <svg class="weapon-ring" viewBox="0 0 48 48" role="progressbar" data-i18n-aria-label="laserEnergy" aria-label="Laser energy" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><circle class="cooldown-track" cx="24" cy="24" r="21"/><circle class="cooldown-fill" cx="24" cy="24" r="21" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>
     <svg class="weapon-lock" aria-hidden="true"><use href="#i-prohibit"/></svg>
-    <progress id="heavy-energy" max="1" value="1" data-i18n-aria-label="powerCharge" aria-label="Schwerlaser-Ladung" hidden></progress>
+    <progress id="heavy-energy" max="1" value="1" data-i18n-aria-label="powerCharge" aria-label="Power laser charge" hidden></progress>
   </div>
   <div id="target" hidden aria-hidden="true"><div class="target-brackets"><i></i><i></i><i></i><i></i></div><span id="target-name"></span><div class="health"><i></i><i></i><i></i></div></div>
   <div id="flash" aria-hidden="true"></div>
   <header class="hud">
     <div class="score-panel">
-    <div class="scoreboard" data-i18n-aria-label="scoreboard" aria-label="Punktestand">
+    <div class="scoreboard" data-i18n-aria-label="scoreboard" aria-label="Scoreboard">
       <div>
         <span class="label" data-i18n="score">Score</span><span id="score" class="number">000000</span>
-        <div class="personal-best"><span class="label" data-i18n="highscore">Highscore</span><span id="best">000000</span></div>
+        <div class="personal-best"><span class="label" data-i18n="highscore">High score</span><span id="best">000000</span></div>
       </div>
       <div id="level-panel">
         <span class="label" data-i18n="level">Level</span><span id="level-label" class="number">1</span>
-        <div id="retry-hud" class="retry-lives" role="img" aria-label="3 von 3 Leben übrig"><div class="retry-icons" aria-hidden="true"><span>🧑‍🚀</span><span>🧑‍🚀</span><span>🧑‍🚀</span></div></div>
+        <div id="retry-hud" class="retry-lives" role="img" aria-label="3 of 3 lives remaining"><div class="retry-icons" aria-hidden="true"><span>🧑‍🚀</span><span>🧑‍🚀</span><span>🧑‍🚀</span></div></div>
       </div>
-      <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Verbleibende Spielzeit"><span class="label" data-i18n="time">Zeit</span><span id="performance-hud" aria-live="off" hidden data-i18n-title="frameStats" title="Gerenderte Bilder pro Sekunde und mittlere Framezeit, gemittelt über etwa eine Sekunde. Keine Simulationsrate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Levelfortschritt" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
+      <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Time remaining"><span class="label" data-i18n="time">Time</span><span id="performance-hud" aria-live="off" hidden data-i18n-title="frameStats" title="Rendered frames per second and average frame time, averaged over about one second. Not the simulation rate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Level progress" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
     </div>
     </div>
     <div id="flight-overview">
       <div id="flight-notices">
-        <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span><span data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span></div>
+        <div id="shower-warning" hidden role="status"><span aria-hidden="true">☄️ ☄️ ☄️</span><span data-i18n="asteroidShower">ASTEROID SHOWER</span></div>
       </div>
       <div id="end-countdown" role="timer" hidden><span id="countdown-number" aria-hidden="true">5</span><div class="countdown-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><svg class="icon"><use href="#i-finish"/></svg></div></div>
     </div>
     <aside id="control-hints" aria-labelledby="control-hints-title" role="status" aria-live="polite" aria-atomic="true" hidden>
-      <h2 id="control-hints-title" data-i18n="checkpointTitle">DURCH DIE CHECKPOINTS FLIEGEN</h2>
-      <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">MIT MAUS LENKEN</span></span>
+      <h2 id="control-hints-title" data-i18n="checkpointTitle">FLY THROUGH THE CHECKPOINTS</h2>
+      <span id="control-input"><svg id="control-cursor" class="icon" aria-hidden="true"><use href="#i-cursor-click"/></svg><svg id="control-mouse" class="icon" aria-hidden="true"><use href="#i-mouse-left"/></svg><span id="control-input-label" data-i18n="steerInput">STEER WITH MOUSE</span></span>
     </aside>
-    <div id="collision-alert" data-i18n="collisionWarning" hidden role="status" aria-atomic="true">KOLLISIONSKURS!</div>
+    <div id="collision-alert" data-i18n="collisionWarning" hidden role="status" aria-atomic="true">COLLISION COURSE!</div>
     <div id="action-feedback">
       <div id="feedback" aria-live="polite" aria-atomic="true"><strong id="feedback-value"></strong> <span id="feedback-detail"></span></div>
     </div>
     <div class="hud-right">
-      <div class="hud-actions" role="group" data-i18n-aria-label="gameControls" aria-label="Ton und Spielsteuerung">
-        <button id="sound" data-i18n-aria-label="soundOff" aria-label="Ton ausschalten" data-i18n-title="soundOff" title="Ton ausschalten" aria-pressed="true"><svg class="icon audible" aria-hidden="true"><use href="#i-volume"/></svg><svg class="icon muted" aria-hidden="true"><use href="#i-muted"/></svg></button>
-        <button id="camera-view" type="button" data-i18n-aria-label="canopyCameraAction" aria-label="Zur Cockpitansicht wechseln (V)" data-i18n-title="canopyCameraAction" title="Zur Cockpitansicht wechseln (V)" aria-keyshortcuts="V"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg></button>
-        <button id="pause" data-i18n-aria-label="pauseFlight" aria-label="Flug pausieren" data-i18n-title="pauseFlight" title="Flug pausieren" aria-pressed="false" aria-haspopup="dialog" aria-controls="pause-menu"><svg class="icon pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="icon play" aria-hidden="true"><use href="#i-play"/></svg></button>
-        <button id="fullscreen" data-i18n-aria-label="enterFullscreen" aria-label="Vollbild aktivieren" data-i18n-title="enterFullscreen" title="Vollbild aktivieren" aria-pressed="false" hidden><svg class="icon enter-fullscreen" aria-hidden="true"><use href="#i-fullscreen"/></svg><svg class="icon exit-fullscreen" aria-hidden="true"><use href="#i-exit-fullscreen"/></svg></button>
+      <div class="hud-actions" role="group" data-i18n-aria-label="gameControls" aria-label="Audio and game controls">
+        <button id="sound" data-i18n-aria-label="soundOff" aria-label="Mute sound" data-i18n-title="soundOff" title="Mute sound" aria-pressed="true"><svg class="icon audible" aria-hidden="true"><use href="#i-volume"/></svg><svg class="icon muted" aria-hidden="true"><use href="#i-muted"/></svg></button>
+        <button id="camera-view" type="button" data-i18n-aria-label="canopyCameraAction" aria-label="Switch to cockpit view (V)" data-i18n-title="canopyCameraAction" title="Switch to cockpit view (V)" aria-keyshortcuts="V"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg></button>
+        <button id="pause" data-i18n-aria-label="pauseFlight" aria-label="Pause flight" data-i18n-title="pauseFlight" title="Pause flight" aria-pressed="false" aria-haspopup="dialog" aria-controls="pause-menu"><svg class="icon pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="icon play" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button id="fullscreen" data-i18n-aria-label="enterFullscreen" aria-label="Enable fullscreen" data-i18n-title="enterFullscreen" title="Enable fullscreen" aria-pressed="false" hidden><svg class="icon enter-fullscreen" aria-hidden="true"><use href="#i-fullscreen"/></svg><svg class="icon exit-fullscreen" aria-hidden="true"><use href="#i-exit-fullscreen"/></svg></button>
       </div>
     </div>
   </header>
-  <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Schiffsschild"></progress><span id="shield-track" aria-hidden="true"><span id="shield-fill"></span></span><span id="shield-value" aria-hidden="true">100%</span></div>
-  <div id="repair-marker" hidden data-i18n-aria-label="collectRepair" aria-label="Schildreparatur einsammeln">✚ +25</div>
+  <div id="shield-hud"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><progress id="shield-energy" max="100" value="100" data-i18n-aria-label="shield" aria-label="Ship shield"></progress><span id="shield-track" aria-hidden="true"><span id="shield-fill"></span></span><span id="shield-value" aria-hidden="true">100%</span></div>
+  <div id="repair-marker" hidden data-i18n-aria-label="collectRepair" aria-label="Collect shield repair">✚ +25</div>
   <div id="flight-ring-wash" aria-hidden="true"></div>
   <div id="flight-ring-guide" hidden aria-hidden="true">➤</div>
-  <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio-Credits</a>
-  <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Schließen"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio-Credits</h2><p><strong data-i18n="creditsEffects">Soundeffekte</strong></p><ul><li><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li><li><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Teilweise bearbeitet.</span></li></ul><p><strong data-i18n="creditsMusic">Musik</strong></p><ul><li><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li></ul></dialog>
+  <a class="credits" href="#audio-credits" data-i18n="audioCredits">Audio credits</a>
+  <dialog id="audio-credits"><form method="dialog"><button data-i18n-aria-label="close" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></form><h2 data-i18n="audioCredits">Audio credits</h2><p><strong data-i18n="creditsEffects">Sound effects</strong></p><ul><li><a href="https://opengameart.org/content/sci-fi-sounds" target="_blank" rel="noopener">Sci-Fi Sounds – Kenney</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li><li><a href="https://opengameart.org/content/space-shooter-sound-effects" target="_blank" rel="noopener">Space shooter sound effects – dravenx</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a><span data-i18n="creditsComboChanges">. Some sounds modified.</span></li></ul><p><strong data-i18n="creditsMusic">Music</strong></p><ul><li><a href="https://opengameart.org/content/5-chiptunes-action" target="_blank" rel="noopener">Retro Game Music Pack · Level 1 – Juhani Junkala</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</li></ul></dialog>
   <div id="status" role="status"></div>
   <dialog id="render-diagnostics" aria-labelledby="render-diagnostics-title" aria-describedby="render-diagnostics-help">
-    <h2 id="render-diagnostics-title" data-i18n="diagnosticsTitle">Darstellung angehalten</h2>
-    <p id="render-diagnostics-help" data-i18n="diagnosticsHelp">Bitte diesen Bericht kopieren und uns vor dem Neuladen schicken. Es wird nichts automatisch hochgeladen.</p>
-    <button id="copy-render-report" type="button" data-i18n="diagnosticsCopy">Diagnose kopieren</button>
-    <button id="reload-render" type="button" data-i18n="diagnosticsReload">Spiel neu laden</button>
+    <h2 id="render-diagnostics-title" data-i18n="diagnosticsTitle">Rendering stopped</h2>
+    <p id="render-diagnostics-help" data-i18n="diagnosticsHelp">Please copy this report and send it to us before reloading. Nothing is uploaded automatically.</p>
+    <button id="copy-render-report" type="button" data-i18n="diagnosticsCopy">Copy diagnostics</button>
+    <button id="reload-render" type="button" data-i18n="diagnosticsReload">Reload game</button>
     <p id="render-copy-status" role="status" aria-live="polite"></p>
-    <textarea id="render-report" readonly spellcheck="false" data-i18n-aria-label="diagnosticsReport" aria-label="Diagnosebericht zum Darstellungsfehler"></textarea>
+    <textarea id="render-report" readonly spellcheck="false" data-i18n-aria-label="diagnosticsReport" aria-label="Rendering failure diagnostics"></textarea>
   </dialog>
   <script type="module">
     import { t, language, detectLanguage, setLanguage, applyTranslations } from './i18n.js?v=18';

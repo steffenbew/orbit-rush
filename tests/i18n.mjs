@@ -25,7 +25,10 @@ for (const [locale, shower, corridor] of [
   assert.equal(runtimeI18n.t('flightGo'), t('flightGo'), 'The actual page import includes the tutorial handoff message');
   assert.equal(t('asteroidCorridor'), corridor, 'Use the clear corridor name without an extra ring label');
 }
-assert.ok(source.includes('data-i18n="asteroidShower">ASTEROIDEN-SCHAUER</span>'), 'Initial markup also uses the hyphenated German label');
+assert.match(source, /<html lang="en">/, 'Use English before language detection runs');
+for (const [, key, text] of source.matchAll(/<[^<>]*\bdata-i18n="(\w+)"[^<>]*>([^<>]+)<\//g)) {
+  assert.equal(text, messages.en[key], `English fallback text: ${key}`);
+}
 const placeholders = value => [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
 assert.deepEqual(Object.keys(messages.en).sort(), Object.keys(messages.de).sort());
 for (const key of Object.keys(messages.en)) {
@@ -60,6 +63,10 @@ function makeDocument() {
       element.attributes[name] = value;
       if (name === 'data-i18n') element.dataset.i18n = value;
       if (name.startsWith('data-i18n')) assert.ok(messages.en[value], `Known static key: ${value}`);
+    }
+    for (const attr of ['aria-label', 'title']) {
+      const key = element.getAttribute(`data-i18n-${attr}`);
+      if (key) assert.equal(element.getAttribute(attr), messages.en[key], `English fallback ${attr}: ${key}`);
     }
     elements.push(element);
   }
