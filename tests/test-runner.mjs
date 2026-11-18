@@ -1,6 +1,6 @@
 // Check both test modes and their exit status without recursively running the real suites.
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -29,6 +29,16 @@ console.log('gameplay passed');\n`;
     assert.match(result.stdout, /gameplay passed/);
     assert.match(result.stdout + result.stderr, full === '1' ? /intentional server failure/ : /server passed/);
   }
+
+  // Exercise setup from outside the checkout, without actually installing dependencies.
+  const bin = join(directory, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'npm'), '#!/bin/sh\nprintf "%s\\n" "$PWD" "$@"\n', { mode: 0o755 });
+  const setup = spawnSync('bash', [join(directory, 'run'), 'setup'], {
+    cwd: tmpdir(), env: {...env, PATH: bin + ':' + env.PATH}, encoding: 'utf8', timeout: 15000
+  });
+  assert.equal(setup.status, 0, setup.stderr);
+  assert.equal(setup.stdout.trim(), realpathSync(directory) + '\nci');
 
   // Stub deployment: verify command routing without touching a remote server.
   mkdirSync(join(directory, 'scripts'));

@@ -34,7 +34,7 @@ async function servePreview(req, res) {
 async function startServer(port) {
   if (mode === 'start') {
     const { createServer } = await import('vite').catch(error => {
-      if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Install development dependencies with npm ci before running ./run start.');
+      if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Run ./run setup to install development dependencies before running ./run start.');
       throw error;
     });
     const vite = await createServer({

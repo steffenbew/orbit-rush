@@ -13,9 +13,10 @@ deploy() {
 
 usage() {
   printf '%s\n' \
-    'Usage: ./run {start|dev|stop|build|preview|test|test:full|deploy|help}' \
+    'Usage: ./run {setup|start|dev|stop|build|preview|test|test:full|deploy|help}' \
     '' \
-    '  start, dev  Serve with Vite live refresh (npm ci first; Node.js 22.12+)' \
+    '  setup       Install locked development dependencies (Node.js 22.12+)' \
+    '  start, dev  Serve with Vite live refresh' \
     '  stop        Stop only this checkout’s tracked server' \
     '  build       Generate the static production site in dist/' \
     '  preview     Serve dist/ locally, including its production worker' \
@@ -35,6 +36,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 case "${1:-help}" in
+  setup) exec npm ci ;;
   start|dev) exec node scripts/dev-server.mjs start ;;
   stop|preview) exec node scripts/dev-server.mjs "$1" ;;
   build) exec node scripts/build.mjs ;;

@@ -5,7 +5,7 @@
 ## Run locally
 
 ```sh
-npm ci          # Install the locked development dependencies
+./run setup     # Install the locked development dependencies
 ./run start     # Open the printed URL
 ```
 
