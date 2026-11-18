@@ -71,8 +71,8 @@ Use the default suite while iterating. It runs every test file, including real s
 ```sh
 ./run test                 # Fast regression suites, including the server and build tests
 ./run test:full            # Wider level, seed and FPS sweeps plus the five-minute simulated starfield soak
-node tests/camera-view.mjs # Focused suite
-ORBIT_TEST_FULL=1 node --test tests/asteroid-fields.mjs # Full sweep for just one feature
+./run test tests/camera-view.mjs            # Focused suite
+./run test:full tests/asteroid-fields.mjs   # Full sweep for just one feature
 ```
 
 For a browser check, add `?test` to the URL to show rendered FPS and frame time. On loopback only, `?test&level=5` skips training and starts at the specified level (1–1000). Level 5 is useful for testing an asteroid field, shower and corridor; level 4 is the first Leviathan encounter. Check mouse and touch, portrait and landscape, and reduced motion when changing flight or HUD behavior.

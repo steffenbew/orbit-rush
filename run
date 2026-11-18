@@ -4,7 +4,10 @@ set -euo pipefail
 cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 test() {
-  ORBIT_TEST_FULL="${1:-0}" node --test --test-concurrency=6 tests/*.mjs
+  local full="$1"
+  shift
+  if [[ $# -eq 0 ]]; then set -- tests/*.mjs; fi
+  ORBIT_TEST_FULL="$full" exec node --test -- "$@"
 }
 
 deploy() {
@@ -20,8 +23,8 @@ usage() {
     '  stop        Stop only this checkout’s tracked server' \
     '  build       Generate the static production site in dist/' \
     '  preview     Serve dist/ locally, including its production worker' \
-    '  test        Run fast regression suites' \
-    '  test:full   Run wider gameplay sweeps and the five-minute simulated starfield soak' \
+    '  test        Run fast regression suites (optional: pass test file paths)' \
+    '  test:full   Run wider gameplay sweeps and the starfield soak (optional: pass test file paths)' \
     '  deploy      Deploy to https://orbitrush.steffenbew.com (SSH/rsync)' \
     '  help        Show this help' \
     '' \
@@ -30,7 +33,7 @@ usage() {
     'Stop with Ctrl+C or ./run stop in another terminal.'
 }
 
-if [[ $# -gt 1 ]]; then
+if [[ $# -gt 1 && "$1" != test && "$1" != test:full ]]; then
   usage >&2
   exit 1
 fi
@@ -40,8 +43,8 @@ case "${1:-help}" in
   start|dev) exec node scripts/dev-server.mjs start ;;
   stop|preview) exec node scripts/dev-server.mjs "$1" ;;
   build) exec node scripts/build.mjs ;;
-  test) test ;;
-  test:full) test 1 ;;
+  test) shift; test 0 "$@" ;;
+  test:full) shift; test 1 "$@" ;;
   deploy) deploy ;;
   help|--help|-h) usage ;;
   *) usage >&2; exit 1 ;;

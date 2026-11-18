@@ -14,7 +14,7 @@ try {
   delete env.NODE_TEST_CONTEXT;
   for (const [command, full] of [['test', '0'], ['test:full', '1']]) {
     // The explicit command wins over an inherited setting from another test run.
-    const run = () => spawnSync('bash', [join(directory, 'run'), command], {
+    const run = (...files) => spawnSync('bash', [join(directory, 'run'), command, ...files], {
       cwd: tmpdir(), env: {...env, ORBIT_TEST_FULL: full === '1' ? '0' : '1'}, encoding: 'utf8', timeout: 15000
     });
     const gameplay = `import assert from 'node:assert/strict';
@@ -28,6 +28,11 @@ console.log('gameplay passed');\n`;
     assert.equal(result.status, full === '1' ? 1 : 0, result.stdout + result.stderr);
     assert.match(result.stdout, /gameplay passed/);
     assert.match(result.stdout + result.stderr, full === '1' ? /intentional server failure/ : /server passed/);
+
+    const focused = run('tests/gameplay.mjs');
+    assert.equal(focused.status, 0, focused.stdout + focused.stderr);
+    assert.match(focused.stdout, /gameplay passed/);
+    assert.doesNotMatch(focused.stdout + focused.stderr, /server passed|intentional server failure/);
   }
 
   // Exercise setup from outside the checkout, without actually installing dependencies.
@@ -51,4 +56,4 @@ console.log('gameplay passed');\n`;
 } finally {
   rmSync(directory, {recursive: true, force: true});
 }
-console.log('PASS fast/full mode selection, parallel runner success, failure propagation, checkout-relative paths and deployment without tests');
+console.log('PASS fast/full mode selection, focused runs, failure propagation, checkout-relative paths and deployment without tests');
