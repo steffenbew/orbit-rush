@@ -15,7 +15,7 @@ python3 scripts/prepare-pwa.py > "$temporary/sw.js"
 # Explicit allowlist: never publish repository metadata, tests or local secrets.
 ssh -o BatchMode=yes "$host" "mkdir -p '$target'"
 rsync -rtvz --chmod=D755,F644 -e 'ssh -o BatchMode=yes' \
-  .htaccess audio.js i18n.js touch-controls.js render-diagnostics.js pwa.js manifest.webmanifest CREDITS.md assets "$host:$target/"
+  .htaccess audio.js planet.js i18n.js touch-controls.js render-diagnostics.js pwa.js manifest.webmanifest CREDITS.md assets "$host:$target/"
 rsync -rtvz --chmod=F644 -e 'ssh -o BatchMode=yes' index.html "$host:$target/"
 # Publish the worker last. Interrupted uploads cannot advertise a partial release.
 rsync -rtvz --chmod=F644 -e 'ssh -o BatchMode=yes' "$temporary/sw.js" "$host:$target/sw.js"

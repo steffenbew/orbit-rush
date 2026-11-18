@@ -8,6 +8,7 @@ const FILES = [
   "pwa.js",
   "manifest.webmanifest",
   "audio.js",
+  "planet.js",
   "i18n.js",
   "touch-controls.js",
   "render-diagnostics.js",

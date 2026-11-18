@@ -838,6 +838,7 @@
     });
     try {
       const THREE = await import('./assets/vendor/three.module.js');
+      const { createPlanet } = await import('./planet.js');
       const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('#space'), antialias: true });
       // Stop after the current callback, once Three.js has scheduled its next frame.
@@ -858,6 +859,9 @@
       // One world-aligned sky: calm nebulae, with a trace of travel in the far stars.
       const distantSky = new THREE.Group();
       scene.add(distantSky);
+      const planet = createPlanet();
+      planet.visible = false;
+      distantSky.add(planet);
       const galaxy = new THREE.Mesh(new THREE.SphereGeometry(6000, 48, 24), new THREE.ShaderMaterial({
         side: THREE.BackSide, depthWrite: false,
         uniforms: { skyColor: { value: new THREE.Color('#030711') } },
@@ -1043,6 +1047,7 @@
       function updateSpaceBackground() {
         // Keep the sky centered, never copy camera rotation: stars and horizon turn together.
         distantSky.position.copy(camera.position);
+        planet.visible = started && level % 4 === 0;
         middleStars.visible = flightDust.visible = started && !reducedMotion;
         if (!flightDust.visible || (paused && !crashDrifting)) return;
         for (let i = 0; i < starCount; i++) {
@@ -4913,6 +4918,8 @@
       function resize() {
         renderer.setSize(innerWidth, innerHeight);
         camera.aspect = innerWidth / innerHeight;
+        // Keep the gas giant in the opening sky on narrow screens, too.
+        planet.position.x = Math.min(1250, 600 * camera.aspect);
         camera.updateProjectionMatrix();
         const ratio = Math.min(devicePixelRatio || 1, 2);
         canvas.width = Math.round(innerWidth * ratio);

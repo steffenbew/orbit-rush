@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createPlanet } from '../planet.js';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
@@ -14,10 +15,10 @@ const makeSky = (reducedMotion = false) => {
   let seed = 14767;
   const math = Object.create(Math);
   math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-  return new Function('THREE', 'Math', 'reducedMotion', `
+  return new Function('THREE', 'Math', 'reducedMotion', 'createPlanet', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
   const worldStep = new THREE.Vector3();
-  let started = false, paused = true, crashDrifting = false;
+  let level = 1, started = false, paused = true, crashDrifting = false;
   const random = (a, b) => a + Math.random() * (b - a);
   const pick = items => items[0];
   // CanvasTexture only needs a canvas reference for these geometry-only tests.
@@ -25,11 +26,11 @@ const makeSky = (reducedMotion = false) => {
     createRadialGradient: () => ({ addColorStop() {} }), fillRect() {}
   }) }) };
   ${background}
-  return { scene, camera, distantSky, galaxy, stars, starPositions, starGeometry,
+  return { scene, camera, distantSky, galaxy, planet, stars, starPositions, starGeometry,
     flightDust, dustPositions, dustGeometry, dustColors, dustSizes,
     middleStars, middlePositions, middleGeometry, middleParallax, worldStep, updateSpaceBackground,
-    setStarted: value => started = value, setPaused: value => paused = value };
-`)(THREE, math, reducedMotion);
+    setLevel: value => level = value, setStarted: value => started = value, setPaused: value => paused = value };
+`)(THREE, math, reducedMotion, createPlanet);
 };
 
 const visibility = distance => THREE.MathUtils.smoothstep(distance, 3000, 4000)
@@ -57,6 +58,7 @@ function assertUniformSpace(sky, stage) {
 }
 
 const sky = makeSky();
+assert.equal(sky.planet.parent, sky.distantSky, 'The ringed planet belongs to the world-aligned sky, not the gameplay fleet');
 const originalStars = sky.starPositions.slice();
 const cloudPositions = sky.distantSky.children.filter(child => child.isSprite).map(cloud => cloud.position.clone());
 assert.equal(sky.stars.parent, sky.galaxy.parent);
@@ -88,6 +90,12 @@ const renderState = () => {
 };
 const projectStar = () => sky.stars.localToWorld(new THREE.Vector3().fromArray(sky.starPositions, 0)).project(sky.camera);
 renderState(); assert.deepEqual(sky.starPositions, originalStars, 'The intro must not drift');
+assert.equal(sky.planet.visible, false, 'No planet on the home screen');
+sky.setStarted(true);
+for (const level of [1, 3, 4, 5, 8, 9, 1]) {
+  sky.setLevel(level); renderState();
+  assert.equal(sky.planet.visible, level % 4 === 0, `Planet visibility on level ${level}`);
+}
 sky.setStarted(true); sky.setPaused(false);
 sky.starPositions.set([1000, 500, -5300], 0);
 sky.middlePositions.set([100, 50, -2000], 0);
