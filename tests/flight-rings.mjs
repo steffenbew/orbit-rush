@@ -13,6 +13,7 @@ function section(start, end) {
 }
 const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedMotion', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
+  const viewCamera = camera;
   const sounds = [], crashes = [], messages = [], elements = new Map(), storage = new Map();
   const document = { querySelector(selector) {
     if (!elements.has(selector)) {

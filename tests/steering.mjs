@@ -150,6 +150,8 @@ document.querySelector = () => modal ? hud : null;
 const input = new Function('THREE', 'window', 'document', 'canvas', `
   const innerWidth = 1000, innerHeight = 800;
   const mouseAim = new THREE.Vector2(), target = new THREE.Vector2(), reticle = {style: {}};
+  let steeringInput = null;
+  const cameraMode = 'clear';
   let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
   let lastPointerPosition = null, pointer = null, spaceHeld = false, shots = 0, drawings = 0;
   const fireRocket = () => shots++, sprayEmojis = () => drawings++;
@@ -236,6 +238,8 @@ const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.r
   new Function('THREE', 'fullscreenPreferred', 'enterFullscreen', 'requestAnimationFrame', `
   let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true, lastPointerPosition = null;
   const mouseAim = new THREE.Vector2(.7, -.6), target = new THREE.Vector2(.7, -.6), reticle = {style: {}};
+  let steeringInput = null;
+  const cameraMode = 'clear';
   const camera = new THREE.PerspectiveCamera(), scene = {fog: {}}, reducedMotion = false;
   const elements = new Map(), calls = [], timers = new Map(), errors = [];
   let timerId = 0;

@@ -161,7 +161,8 @@ const makeCursor = (width, height) => new Function('innerWidth', 'innerHeight', 
   const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
   const camera = new THREE.PerspectiveCamera(), playerHullRotation = new THREE.Quaternion();
   const paused = false, reducedMotion = false, speed = 400;
-  let lastPointerPosition = {clientX: 100, clientY: 100};
+  let steeringInput = null, lastPointerPosition = {clientX: 100, clientY: 100};
+  const cameraMode = 'clear';
   const callbacks = { ${source.slice(callbackStart, callbackEnd)} };
   ${section('      function steer(event)', '      // Suppress accidental secondary clicks')}
   ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
@@ -209,7 +210,7 @@ for (const [width, height] of [[390, 844], [844, 390], [568, 320], [932, 430], [
 }
 assert.ok(!source.includes('touchControls.advance('), 'No velocity-based cursor integration remains');
 const restart = source.slice(source.indexOf('      function restartRound('), source.indexOf("      document.querySelector('#play-again').addEventListener"));
-assert.match(restart, /if \(touchMode\) \{\s*lastPointerPosition = null;\s*steer\(\{ clientX: innerWidth \/ 2, clientY: innerHeight \/ 2 \}\);/, 'New levels and retries center the touch cursor');
+assert.match(restart, /if \(touchMode\) \{\s*lastPointerPosition = null;\s*steeringInput = 'stick';/, 'New levels and retries anchor the idle touch cursor to its steering neutral');
 assert.match(source, /#touch-weapons \{[^}]*bottom: calc\(130px \+ env\(safe-area-inset-bottom\)\)/);
 assert.match(source, /#touch-joystick \{[^}]*bottom: calc\(120px \+ env\(safe-area-inset-bottom\)\)/);
 assert.match(source, /#touch-joystick \{[^}]*right: calc\(48px \+ env\(safe-area-inset-right\)\)/);

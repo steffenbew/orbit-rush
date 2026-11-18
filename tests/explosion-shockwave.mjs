@@ -19,6 +19,7 @@ const math = Object.create(Math);
 math.random = () => .5; // Normal-sized destruction, not the rare spectacular variant.
 const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reducedMotion', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const viewCamera = camera;
   const flightVelocity = new THREE.Vector2(), shockwaves = [];
   const worldStep = new THREE.Vector3(), particleView = new THREE.Vector3();
   let particles = [];

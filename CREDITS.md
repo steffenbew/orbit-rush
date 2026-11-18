@@ -55,6 +55,10 @@ Die Audiodateien werden lokal aus `assets/audio/` abgespielt; es gibt keine Audi
 
 Die Quellen und Lizenzlinks der aktiven Sounds sind zusätzlich im Spiel über „Audio-Credits“ zugänglich.
 
+## Cockpit
+
+Kanzel, Instrumente und Schalter sind eigens für Orbit Rush gezeichnet. Visuelle Referenz für die segmentierte Frontscheibe und die getrennten Instrumentenkonsolen: [Cockpit-Screenshot aus *Star Wars: Squadrons* (EA / Motive)](https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1222730/ss_3518ecebb8d16d25b675d139b3d0817db5248a33.jpg). Keine Bilddateien aus dem Spiel werden verwendet.
+
 ## Phosphor Icons
 
 - Phosphor Icons (`@phosphor-icons/core` 2.1.1), https://phosphoricons.com/

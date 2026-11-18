@@ -15,6 +15,7 @@ math.random = () => .8; // Exercise solid fragments, not the alternate dust-only
 const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reducedMotion', `
   const scene = new THREE.Scene(), glow = new THREE.Texture();
   const camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
+  const viewCamera = camera;
   const worldStep = new THREE.Vector3(), particleView = new THREE.Vector3();
   const ships = [];
   const random = (a, b) => (a + b) / 2, pick = values => values[0];

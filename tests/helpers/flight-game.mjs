@@ -16,6 +16,7 @@ const section = (start, end) => {
 const code = `
   const scene = new THREE.Scene(), glow = new THREE.Texture();
   const camera = new THREE.PerspectiveCamera(reducedMotion ? 70 : 90, 16 / 9, .03, 14000);
+  const viewCamera = camera;
   const flightMotion = new THREE.Vector3(0, 0, -400), flightDirection = new THREE.Vector3(0, 0, -1);
   const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ'), worldStep = new THREE.Vector3();
   const flightTurn = new THREE.Vector2(), flightVelocity = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
