@@ -26,7 +26,7 @@ assert.doesNotMatch(source, /translate: 0 30px/, 'No arbitrary downward offsets 
 const countdownStyle = section('    #end-countdown {', '    #countdown-number {');
 assert.doesNotMatch(countdownStyle, /position: fixed|translate/, 'Countdown stays in its reserved layout row, not an independent floating overlay');
 assert.ok(source.includes('.hud:has(#control-hints:not([hidden])) #action-feedback { display: none; }'), 'Tutorial takes precedence even when feedback has inline visibility');
-assert.ok(source.includes('if (flightState.textContent !== flightStatus)'), 'Do not re-announce unchanged live status every frame');
+assert.doesNotMatch(source, /flight-state|flightState|flightStatus|finalSprint/, 'The speed-triggered hyperspeed notice is removed entirely');
 assert.match(source, /#impact-label \{[^}]*width: min\(720px,[^}]*text-align: center/, 'Long crash labels have a bounded, centered layout');
 assert.ok(source.includes('body:has(#impact-label:not([hidden]))'), 'Crash presentation clears competing gameplay overlays');
 console.log('PASS separate HUD zones, shared repairs and bounded crash labels');
