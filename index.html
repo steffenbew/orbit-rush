@@ -76,7 +76,7 @@
     #capital-hud strong, #capital-state { display: block; }
     #capital-health { width: 100%; height: 5px; margin: 7px 0; accent-color: #ff6266; }
     #capital-hud.charging { border-color: #ffcc77; color: #ffe1a8; }
-    #shield-hit { position: fixed; inset: 0; z-index: 5; pointer-events: none; border: 5px solid #ffab52; box-shadow: inset 0 0 100px #ff692966; }
+    #shield-hit { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: #e51b2b26; border: 5px solid #ff3b4b; box-shadow: inset 0 0 100px #ff173880; }
     #shield-hit[hidden] { display: none; }
     #retry-hud .retry-icons { gap: 3px; }
     #retry-hud .retry-icons span { width: 18px; font-size: 16px; line-height: 20px; }
@@ -303,11 +303,11 @@
     .hud:has(#collision-alert:not([hidden])) #control-hints { visibility: hidden; }
     .hud:has(#control-hints:not([hidden])) #action-feedback { display: none; }
     #danger-vignette { position: fixed; inset: 0; z-index: 2; background: #cd19183d; box-shadow: inset 0 0 125px #ef352b88; opacity: 0; pointer-events: none; transition: opacity .2s; }
+    body.defeated #danger-vignette { background: #320a1429; box-shadow: inset 0 0 140px #18030b4d; }
     #danger-vignette.warning { animation: danger-pulse .84s ease-in-out infinite; }
     @keyframes danger-pulse { 0%, 100% { opacity: .25; } 50% { opacity: .8; } }
     #impact-label { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); width: min(720px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))); color: #fff0d9; font-size: clamp(24px, 5vw, 42px); font-weight: 800; line-height: 1.2; letter-spacing: .06em; text-align: center; text-wrap: balance; text-shadow: 0 2px 25px #5b100a; pointer-events: none; }
     body:has(#impact-label:not([hidden])) :is(.hud, #shield-hud, .reticle, #flight-path, #touch-controls) { visibility: hidden; }
-    #crash-fire { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 6; pointer-events: none; }
     #impact-label { z-index: 7; }
     #flash.impact { background: radial-gradient(ellipse, #ffab4844 0%, #ff773333 45%, #49111b44 100%); }
     @media (prefers-reduced-motion: reduce) { #danger-vignette { transition: none; } #danger-vignette.warning { animation: none; opacity: .4; } }
@@ -578,7 +578,6 @@
   <div id="danger-vignette" aria-hidden="true"></div>
   <div id="capital-hud" hidden><strong>LEVIATHAN DREADNOUGHT</strong><progress id="capital-health" max="60" value="60" data-i18n-aria-label="capitalArmor" aria-label="Panzerung des Leviathan"></progress><span id="capital-state"></span></div>
   <div id="shield-hit" hidden aria-hidden="true"></div>
-  <canvas id="crash-fire" hidden aria-hidden="true"></canvas>
   <div id="impact-label" data-i18n="collision" hidden role="status">KOLLISION</div>
   <div id="hit-cross" aria-hidden="true"></div>
   <div class="reticle">
@@ -943,7 +942,7 @@
         // Keep the sky centered, never copy camera rotation: stars and horizon turn together.
         distantSky.position.copy(camera.position);
         middleStars.visible = flightDust.visible = started && !reducedMotion;
-        if (!flightDust.visible || paused) return;
+        if (!flightDust.visible || (paused && !crashDrifting)) return;
         for (let i = 0; i < starCount; i++) {
           starDirection.fromArray(starPositions, i * 3).addScaledVector(worldStep, .025);
           // Wrap across the outer sphere while fully transparent, never at a screen edge.
@@ -1603,39 +1602,6 @@
       }
       updateIntroShips(0);
       const canvas = document.querySelector('#effects');
-      const crashFire = document.querySelector('#crash-fire');
-      const fireContext = crashFire.getContext('2d');
-      let crashFlames = [];
-      function drawCrashFire() {
-        crashFire.hidden = !crashing || crashTime >= .65;
-        if (crashFire.hidden) return;
-        const width = crashFire.width, height = crashFire.height;
-        const progress = crashTime / .65;
-        const motion = reducedMotion ? .85 : 1 - Math.exp(-progress * 8);
-        crashFire.style.opacity = reducedMotion ? '.45'
-          : String(Math.min(1, crashTime / .035) * Math.min(1, (1 - progress) / .65));
-        fireContext.clearRect(0, 0, width, height);
-        const background = fireContext.createRadialGradient(width * .5, height * .5, 0, width * .5, height * .5, Math.hypot(width, height) * (.15 + motion * .65));
-        background.addColorStop(0, 'rgba(255, 205, 95, .6)');
-        background.addColorStop(.4, 'rgba(255, 145, 25, .85)');
-        background.addColorStop(.75, 'rgba(235, 65, 8, .7)');
-        background.addColorStop(1, 'rgba(120, 25, 5, 0)');
-        fireContext.fillStyle = background;
-        fireContext.fillRect(0, 0, width, height);
-        for (const flame of crashFlames) {
-          const spread = .3 + motion * 2.6;
-          const x = width * (.5 + (flame.x - .5) * spread);
-          const y = height * (.5 + (flame.y - .5) * spread);
-          const radius = Math.max(width, height) * flame.size * (.8 + motion * 2.4);
-          const fire = fireContext.createRadialGradient(x, y, 0, x, y, radius);
-          fire.addColorStop(0, `rgba(255, 190, 60, ${.8 * (1 - motion * .6)})`);
-          fire.addColorStop(.3, 'rgba(255, 103, 12, .75)');
-          fire.addColorStop(.65, 'rgba(170, 32, 5, .5)');
-          fire.addColorStop(1, 'rgba(60, 12, 5, 0)');
-          fireContext.fillStyle = fire;
-          fireContext.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-        }
-      }
       const debrisGeometry = new THREE.TetrahedronGeometry(1, 0);
       const asteroidFragmentShapes = Array.from({ length: 6 }, (_, variant) => {
         const geometry = new THREE.IcosahedronGeometry(1, 0);
@@ -1813,7 +1779,7 @@
         resetFrameStats();
       }
       function advanceSimulation(elapsed) {
-        if (document.hidden || (started && paused && !crashing)) {
+        if (document.hidden || (started && paused && !crashDrifting)) {
           simulationRemainder = 0;
           return;
         }
@@ -1822,7 +1788,7 @@
         while (simulationRemainder + 1e-10 >= simulationStep) {
           simulationRemainder = Math.max(0, simulationRemainder - simulationStep);
           updateSimulation(simulationStep);
-          if (started && paused && !crashing) { simulationRemainder = 0; break; }
+          if (started && paused && !crashDrifting) { simulationRemainder = 0; break; }
         }
       }
       const progressionTimeScale = roundDuration / 30;
@@ -3063,8 +3029,10 @@
       let roundEnded = false, difficulty = 0;
       let celebrating = false;
       const comboWindows = [0, 2.5, 1.8, 1.2, .8, .8];
-      let crashing = false, crashTime = 0;
-      let shield = 100, shieldHitTime = 0;
+      let crashing = false, crashTime = 0, crashDrifting = false, crashCoastSpeed = 0;
+      const crashSpin = new THREE.Vector3();
+      const crashRotation = new THREE.Quaternion(), crashRotationStep = new THREE.Quaternion();
+      let shield = 100, shieldHitTime = 0, shieldHitStrength = 1;
       const shieldHit = document.querySelector('#shield-hit');
       const shieldHud = document.querySelector('#shield-hud');
       const shieldFill = document.querySelector('#shield-fill');
@@ -3340,7 +3308,8 @@
           shield = Math.max(0, shield - 10);
           updateShield();
           showFeedback(t('ringMissed'), true);
-          shieldHitTime = .55; shieldHit.hidden = false; shieldHit.style.opacity = '1';
+          shieldHitStrength = .76; // Ten shield points: same intensity as a boundary hit.
+          shieldHitTime = .55; shieldHit.hidden = false;
           playSound('checkpointMiss');
           if (shield === 0) startCrash(gate);
         }
@@ -3706,6 +3675,7 @@
           startCrash(flightBoundary);
           return;
         }
+        shieldHitStrength = .76;
         shieldHitTime = .55; shieldHit.hidden = false;
         if (!reducedMotion) shake = Math.max(shake, .45);
         // Use incoming normal speed, before the rebound; forward/tangential speed is irrelevant.
@@ -3763,9 +3733,10 @@
           startCrash(object);
           return;
         }
+        // A strong baseline keeps every hit readable; heavy hits still reach full red.
+        shieldHitStrength = .7 + .3 * Math.min(1, damage / 50);
         shieldHitTime = .55;
         shieldHit.hidden = false;
-        shieldHit.style.opacity = '1';
         shake = reducedMotion ? 0 : Math.max(shake, .9 + damage / 60);
         // Push away from the impact; existing steering inertia lets the pilot recover.
         const impulse = Math.max(speed, 180) * (.15 + damage / 200) * (reducedMotion ? .15 : 1);
@@ -3826,7 +3797,7 @@
         if (combo > 1) playSound('reward');
       }
       updateScore();
-      const sound = await import('./audio.js?v=audio-8');
+      const sound = await import('./audio.js?v=audio-9');
       let soundEnabled = true, started = false, kills = 0, hitMarker = 0;
       let updateRestored = false;
       const playSound = sound.playSound;
@@ -4013,20 +3984,28 @@
       }
       function startCrash(ship) {
         if (crashing || roundEnded) return;
-        crashing = true; crashTime = 0; paused = true; speed = 0;
+        crashing = true; crashTime = 0; crashDrifting = true; paused = true;
+        crashCoastSpeed = reducedMotion ? 3 : Math.min(120, speed * .08);
+        // Read the impact in cockpit space, so banking does not reverse its direction.
+        camera.updateMatrixWorld();
+        const contact = camera.worldToLocal(ship.position.clone());
+        const awayX = contact.x > 0 ? -1 : 1, awayY = contact.y > 0 ? -1 : 1;
+        crashSpin.set(reducedMotion ? 0 : awayY * .09, reducedMotion ? 0 : -awayX * .12,
+          reducedMotion ? 0 : -awayX * .55);
+        // Keep the bank in the attitude: the tumble axes belong to the aircraft, not the world.
+        crashRotation.setFromEuler(new THREE.Euler(flightOrientation.x, flightOrientation.y, flightTilt.z, 'YXZ'));
         touchControls.reset();
         if (pauseMenu.open) pauseMenu.close();
         showerWarning.hidden = true;
         repairPickup.visible = false; repairMarker.hidden = true;
-        shieldHitTime = 0; shieldHit.hidden = true;
+        shieldHitStrength = 1; // Losing a life always has full impact, even on a low-shield hit.
+        shieldHitTime = .55; shieldHit.hidden = false;
         updateShield(false);
-        crashFlames = Array.from({ length: 24 }, () => ({
-          x: Math.random(), y: Math.random(), size: random(.06, .14)
-        }));
         retries = Math.max(0, retries - 1);
         updateRetries();
-        pointer = null; spaceHeld = false; worldStep.set(0, 0, 0);
-        ship.visible = false;
+        pointer = null; spaceHeld = false;
+        for (const rocket of rockets) scene.remove(rocket.object);
+        rockets.length = 0;
         clearEnemyBolts();
         capitalHud.hidden = true;
         flightPath.hidden = true;
@@ -4034,17 +4013,43 @@
         updateClock();
         feedback.classList.remove('pop');
         clearTargetLock();
-        document.querySelector('#impact-label').textContent = t(ship.userData.flightRing ? 'shieldDepleted' : ship.userData.enemyBolt ? 'incomingFire' : 'collision');
+        document.querySelector('#impact-label').textContent = t(ship.userData.flightRing || ship === flightBoundary ? 'shieldDepleted' : ship.userData.enemyBolt ? 'incomingFire' : 'collision');
         document.querySelector('#impact-label').hidden = false;
         document.querySelector('#flash').classList.add('impact');
         camera.updateMatrixWorld();
-        const impact = new THREE.Vector3(0, 0, -22).applyMatrix4(camera.matrixWorld);
-        explode(impact, reducedMotion ? 35 : 100, true);
-        flash = reducedMotion ? 0 : .8;
-        shake = reducedMotion ? 0 : 1.3;
+        const impact = new THREE.Vector3(-awayX * 3, -1, -22).applyMatrix4(camera.matrixWorld);
+        const firstParticle = particles.length;
+        explode(impact, reducedMotion ? 12 : 120, true);
+        // Particles receive the full world step, so inherit the full flight velocity too.
+        for (let i = firstParticle; i < particles.length; i++) {
+          particles[i].vx += flightMotion.x;
+          particles[i].vy += flightMotion.y;
+          particles[i].vz += flightMotion.z;
+        }
+        flash = reducedMotion ? 0 : .45;
+        shake = reducedMotion ? 0 : 1;
         sound.setAlarm(false);
         syncMusic();
         playSound('explosion', 3, true);
+        sound.playEngineFailure(speed);
+      }
+      function updateCrashFlight(dt) {
+        if (!crashDrifting || document.hidden) return;
+        // Cosmetic flight only: gameplay stays paused, with no more damage or score changes.
+        speed += (crashCoastSpeed - speed) * (1 - Math.exp(-.9 * dt));
+        const spinStep = (1 - Math.exp(-.85 * dt)) / .85;
+        const spinSpeed = crashSpin.length();
+        if (spinSpeed > 0) {
+          crashRotationStep.setFromAxisAngle(crashSpin.clone().divideScalar(spinSpeed), spinSpeed * spinStep);
+          crashRotation.multiply(crashRotationStep);
+          flightOrientation.setFromQuaternion(crashRotation, 'YXZ');
+          flightTilt.set(flightOrientation.x + flightViewOffset.x, flightOrientation.y + flightViewOffset.y, flightOrientation.z);
+        }
+        crashSpin.multiplyScalar(Math.exp(-.85 * dt));
+        flightVelocity.multiplyScalar(Math.exp(-2 * dt));
+        flightMotion.set(0, 0, -speed).applyEuler(flightOrientation);
+        flightMotion.x += flightVelocity.x; flightMotion.y += flightVelocity.y;
+        flightDirection.copy(flightMotion).normalize();
       }
       function finishRound(reason = 'time') {
         if (roundEnded) return;
@@ -4073,7 +4078,6 @@
         shieldHitTime = 0; shieldHit.hidden = true;
         updateShield(false);
         document.querySelector('#impact-label').hidden = true;
-        crashFire.hidden = true;
         document.querySelector('#flash').classList.remove('impact');
         document.querySelector('#flash').style.opacity = 0;
         roundEnded = true; celebrating = !crashed; paused = crashed;
@@ -4081,11 +4085,11 @@
         clearEnemyBolts();
         capitalHud.hidden = true;
         showerWarning.hidden = true;
-        showerGrit.visible = false;
+        if (!crashed) showerGrit.visible = false;
         repairPickup.visible = false; repairMarker.hidden = true;
         updateRetries();
         updateClock();
-        if (crashed) speed = 0;
+        if (crashed && !crashDrifting) speed = 0;
         if (crashed) pointer = null;
         spaceHeld = false;
         document.body.classList.toggle('celebrating', celebrating);
@@ -4171,8 +4175,9 @@
         collisionAlert.hidden = true;
         dangerVignette.style.opacity = 0;
         dangerVignette.classList.remove('warning');
-        crashing = false; crashTime = 0; sound.setAlarm(false);
-        crashFire.hidden = true;
+        crashing = false; crashTime = 0; crashDrifting = false; crashCoastSpeed = 0;
+        crashSpin.set(0, 0, 0); crashRotation.identity(); crashRotationStep.identity();
+        sound.setAlarm(false);
         document.querySelector('#impact-label').hidden = true;
         camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0);
         camera.fov = reducedMotion ? 70 : 90;
@@ -4631,22 +4636,25 @@
         const explosionSize = sizeFactor * (capital ? (reducedMotion ? 2.1 : 3.2)
           : destruction ? (spectacular ? 2.8 : random(.65, 1.35)) : 1);
         const particleCount = capital ? (reducedMotion ? 28 : 180) : Math.round(count * Math.sqrt(explosionSize));
-        const motion = capital && reducedMotion ? .25 : 1;
+        const motion = (capital || crashBurst) && reducedMotion ? .25 : 1;
         const lifetime = capital ? 1.8 : 1;
         // Real destructions, including nearby ship/asteroid accidents, carry a blast.
         // Ordinary hit sparks and the separate player-crash sequence do not.
         if (!crashBurst && (count >= 65 || asteroid)) applyExplosionShockwave(position, explosionSize, screenFlash);
-        if (count >= 65) {
-          const ring = new THREE.Mesh(capital ? capitalShockGeometry : shockGeometry, new THREE.MeshBasicMaterial({ color: 0xffb46d, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: !capital, blending: THREE.AdditiveBlending }));
+        if (count >= 65 || crashBurst) {
+          const ring = new THREE.Mesh(capital || crashBurst ? capitalShockGeometry : shockGeometry, new THREE.MeshBasicMaterial({ color: 0xffb46d, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: !capital, blending: THREE.AdditiveBlending }));
           ring.position.copy(position);
+          if (crashBurst) ring.quaternion.copy(camera.quaternion);
           const fireball = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffa340, transparent: true, depthWrite: false, fog: !capital, blending: THREE.AdditiveBlending }));
           fireball.position.copy(position);
           scene.add(ring, fireball);
-          shockwaves.push({ ring, fireball, age: 0, size: (crashBurst ? 1 : 1.5) * explosionSize, life: capital ? 2.6 : 1.1 });
+          shockwaves.push({ ring, fireball, age: 0, crashBurst,
+            size: (crashBurst ? (reducedMotion ? .3 : 1.8) : 1.5) * explosionSize,
+            life: crashBurst ? .8 : capital ? 2.6 : 1.1 });
         }
         for (let i = 0; i < particleCount; i++) {
           const kind = i % 5 === 0 ? 'smoke' : i % 3 === 0 ? 'spark' : 'fire';
-          const scale = crashBurst ? .25 : count >= 65 ? 1.5 * explosionSize : 1;
+          const scale = crashBurst ? (reducedMotion ? .25 : .4) : count >= 65 ? 1.5 * explosionSize : 1;
           const spread = capital ? 18 : 4;
           const object = new THREE.Sprite(new THREE.SpriteMaterial({
             map: glow, color: kind === 'smoke' ? 0x443b36 : 0xffe5a0,
@@ -4667,7 +4675,7 @@
         }
         if (!asteroid && (count >= 65 || crashBurst)) {
           const scale = (crashBurst ? .25 : 1) * explosionSize;
-          const debrisCount = reducedMotion ? 5 : capital ? 48 : Math.min(36, Math.round(16 * explosionSize));
+          const debrisCount = crashBurst ? (reducedMotion ? 3 : 7) : reducedMotion ? 5 : capital ? 48 : Math.min(36, Math.round(16 * explosionSize));
           for (let i = 0; i < debrisCount; i++) {
             const object = new THREE.Mesh(debrisGeometry, new THREE.MeshStandardMaterial({
               color: 0x4b3028, metalness: .6, roughness: .65,
@@ -4710,9 +4718,6 @@
         canvas.height = Math.round(innerHeight * ratio);
         canvas.style.width = `${innerWidth}px`;
         canvas.style.height = `${innerHeight}px`;
-        const fireRatio = Math.min(1, 1280 / innerWidth);
-        crashFire.width = Math.round(innerWidth * fireRatio);
-        crashFire.height = Math.round(innerHeight * fireRatio);
         reticle.style.left = `${(mouseAim.x * .5 + .5) * innerWidth}px`;
         reticle.style.top = `${(-mouseAim.y * .5 + .5) * innerHeight}px`;
       }
@@ -4917,11 +4922,11 @@
         }
         if (crashing && !document.hidden) {
           crashTime += dt;
-          if (crashTime >= 1.35) finishRound('collision');
+          if (crashTime >= 2) finishRound('collision');
         }
         updateFlightTutorial(); // Advance lesson stages before this step moves the world.
         updateRingShipArrivals();
-        if (!paused && shieldHitTime > 0) shieldHitTime = Math.max(0, shieldHitTime - dt);
+        if ((!paused || crashing) && shieldHitTime > 0) shieldHitTime = Math.max(0, shieldHitTime - dt);
         updateShieldAnimation(dt);
         if (!successBurst.hidden && !document.hidden) {
           successTime += dt;
@@ -4944,7 +4949,8 @@
         }
         const easing = 1 - Math.exp(-3 * dt);
         const cruiseSpeed = celebrating ? (reducedMotion ? 35 : 150) : levelFlightSpeed(difficulty);
-        speed = paused ? 0 : speed + (cruiseSpeed - speed) * easing;
+        if (crashDrifting) updateCrashFlight(dt);
+        else speed = paused ? 0 : speed + (cruiseSpeed - speed) * easing;
         if (!paused) hitMarker = Math.max(0, hitMarker - dt);
         if (!paused) {
           // Aircraft steering: inertia changes the heading; centering holds the new course.
@@ -4968,10 +4974,10 @@
           // Follow the aircraft, never cosmetic camera shake.
           playerHullRotation.copy(camera.quaternion);
         }
-        worldStep.copy(flightMotion).multiplyScalar(paused ? 0 : -dt);
+        worldStep.copy(flightMotion).multiplyScalar(paused && !crashDrifting ? 0 : -dt);
         constrainFlightToBoundary();
         if (started && !paused && !roundEnded && !crashing) courseWorldOffset.addScaledVector(worldStep, .85);
-        if (crashing) camera.rotation.set(flightTilt.x, flightTilt.y, flightTilt.z, 'YXZ');
+        if (crashDrifting) camera.rotation.set(flightTilt.x, flightTilt.y, flightTilt.z, 'YXZ');
         if ((!paused || crashing) && shake > 0) {
           shake = Math.max(0, shake - dt * 3);
           camera.rotation.x += random(-.008, .008) * shake;
@@ -4985,6 +4991,7 @@
         camera.updateMatrixWorld();
         viewFrustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
         updateShipArrivals(dt);
+        if (crashDrifting && showerGrit.visible) showerGrit.position.addScaledVector(worldStep, .85);
         activeAsteroids.length = 0;
         for (const ship of ships) {
           if (!ship.visible) continue;
@@ -5000,11 +5007,11 @@
           }
         }
         for (const ship of ships) {
-          if (roundEnded) break;
+          if (roundEnded && !crashDrifting) break;
           if (!ship.visible) continue;
           const previous = ship.userData.previousPosition;
           ship.position.addScaledVector(worldStep, .85);
-          if (!paused) {
+          if (!paused || crashDrifting) {
             ship.position.addScaledVector(ship.userData.courseVelocity, dt);
             if (!ship.userData.type.asteroid) constrainShipToBoundary(ship);
             // Ignore player travel: stationary or barely drifting rocks (≤5 units/s) do not tumble.
@@ -5045,7 +5052,7 @@
         updateFlightRing();
         updateFlightBoundary(dt);
         danger = danger || incomingFire;
-        if (roundEnded && !celebrating) return;
+        if (roundEnded && !celebrating && !crashDrifting) return;
         updateTargetLock(dt);
         if (!paused && !roundEnded) {
           if (pointer || touchControls.normalHeld) fireRocket();
@@ -5127,14 +5134,17 @@
         }
         for (let i = shockwaves.length - 1; i >= 0; i--) {
           const wave = shockwaves[i];
-          if (!paused || crashing) wave.age += dt;
-          for (const object of [wave.ring, wave.fireball]) object.position.add(worldStep);
+          if (!paused || crashDrifting) wave.age += dt;
+          // The brief hull blast travels with us; the surrounding world keeps moving.
+          if (!wave.crashBurst) for (const object of [wave.ring, wave.fireball]) object.position.add(worldStep);
           const age = wave.age * (1.1 / wave.life);
-          wave.ring.scale.setScalar((5 + age * 140) * wave.size);
-          wave.ring.material.opacity = .45 * Math.max(0, 1 - age / 1.1);
-          wave.fireball.scale.setScalar((40 + age * 110) * wave.size);
+          const quietCrash = wave.crashBurst && reducedMotion;
+          const expansion = quietCrash ? 0 : age;
+          wave.ring.scale.setScalar((5 + expansion * 140) * wave.size);
+          wave.ring.material.opacity = (quietCrash ? .15 : .45) * Math.max(0, 1 - age / 1.1);
+          wave.fireball.scale.setScalar((40 + expansion * 110) * wave.size);
           wave.fireball.material.color.setRGB(1, Math.max(.12, .65 - age), .025);
-          wave.fireball.material.opacity = Math.max(0, 1 - age / .7);
+          wave.fireball.material.opacity = (quietCrash ? .3 : 1) * Math.max(0, 1 - age / .7);
           if (wave.age > wave.life) {
             scene.remove(wave.ring, wave.fireball);
             wave.ring.material.dispose(); wave.fireball.material.dispose();
@@ -5143,7 +5153,7 @@
         }
         const fragmentHits = [];
         particles = particles.filter(p => {
-          if (!paused || crashing) p.age += dt;
+          if (!paused || crashDrifting) p.age += dt;
           const isRock = p.kind === 'rock';
           let rockVisible = false;
           if (isRock) {
@@ -5162,7 +5172,7 @@
           const previous = isRock ? p.object.position.clone() : null;
           // Drawings and fragments stay in the world as the player flies in any direction.
           p.object.position.addScaledVector(worldStep, p.worldFactor ?? 1);
-          if (!paused || crashing) {
+          if (!paused || crashDrifting) {
             p.object.position.x += p.vx * dt;
             p.object.position.y += p.vy * dt;
             if (p.kind) p.object.position.z += p.vz * dt;
@@ -5235,12 +5245,11 @@
         updateControlHints();
         recordVisibleObjects();
         recordVisibleShowerRocks();
-        drawCrashFire();
         updateClock();
         updateHeavyHud();
         updateWeaponHud();
         shieldHit.hidden = shieldHitTime === 0;
-        shieldHit.style.opacity = reducedMotion ? '.6' : String(shieldHitTime / .55);
+        shieldHit.style.opacity = String((reducedMotion ? .35 : 1) * shieldHitStrength * shieldHitTime / .55);
         renderShieldHud();
         const cross = document.querySelector('#hit-cross');
         cross.style.opacity = hitMarker > 0 ? 1 : 0;
@@ -5251,7 +5260,10 @@
         updateCollisionAlert();
         feedback.style.visibility = danger && !paused && !roundEnded && !feedback.classList.contains('boss-reward') && !feedback.classList.contains('negative') ? 'hidden' : 'visible';
         dangerVignette.classList.toggle('warning', danger && !paused && !roundEnded);
-        dangerVignette.style.opacity = crashing ? (reducedMotion ? .35 : .7) : danger && !paused && !roundEnded ? .4 : 0;
+        // The crash pulse fades; defeat keeps a static dark-red tint beneath the results.
+        const crashTint = Math.min(1, crashTime / .45) * Math.min(1, Math.max(0, (2 - crashTime) / 1.2));
+        dangerVignette.style.opacity = roundEnded && !celebrating ? 1
+          : crashing ? (reducedMotion ? .3 : .7) * crashTint : danger && !paused && !roundEnded ? .4 : 0;
         sound.setAlarm(danger && !paused && !roundEnded);
         flightPath.hidden = !started || (roundEnded && !celebrating) || crashing;
         if (started && speed > 1) {

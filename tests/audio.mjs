@@ -25,7 +25,8 @@ const context = {
 function makeAudio(url, random = Math.random) {
   return new Function('moduleUrl', 'fetch', 'Math', `
     ${source.replaceAll('import.meta.url', 'moduleUrl').replaceAll('export ', '')}
-    return { decode, banks, playSound, setup(ctx) { context = ctx; master = {}; ready = true; paused = false; } };
+    return { decode, banks, playSound, playEngineFailure, activeSounds,
+      setup(ctx, options = {}) { context = ctx; master = {}; ready = true; paused = options.paused || false; muted = options.muted || false; } };
   `)(url.href, async request => {
     requests.push(request);
     return {ok, status: ok ? 200 : 404, arrayBuffer: async () => bytes};
@@ -84,3 +85,39 @@ for (let variant = 0; variant < 3; variant++) {
   assert.equal(played.at(-1).output.gain.value, .55 * [.52, .75, .6][variant], 'Explosion trim follows the chosen sample');
 }
 console.log('PASS versioned audio-file URLs, local assets, fixed checkpoint pitch, balanced gains and per-variant explosion trims');
+
+const failureTones = [], envelopes = [];
+const parameter = () => ({events: [],
+  setValueAtTime(value, time) { this.events.push([value, time]); },
+  exponentialRampToValueAtTime(value, time) { this.events.push([value, time]); }
+});
+const failureContext = {
+  state: 'running', currentTime: 10,
+  createOscillator() {
+    const tone = {frequency: parameter(), connect(node) { return node; },
+      start(time) { this.startTime = time; }, stop(time) { this.stopTime = time; },
+      disconnect() { this.disconnected = true; }};
+    failureTones.push(tone); return tone;
+  },
+  createGain() {
+    const envelope = {gain: parameter(), connect() {}, disconnect() { this.disconnected = true; }};
+    envelopes.push(envelope); return envelope;
+  }
+};
+const failure = makeAudio(moduleUrl);
+failure.setup(failureContext, {paused: true});
+failure.playEngineFailure(800);
+const tone = failureTones[0], envelope = envelopes[0];
+assert.equal(tone.startTime, 10, 'Engine failure plays even though gameplay has paused');
+assert.equal(tone.stopTime, 11.25, 'The sound is bounded, not a new engine loop');
+assert.deepEqual(tone.frequency.events, [[106, 10], [24, 11.2]], 'The engine winds down in pitch');
+assert.equal(envelope.gain.events.at(-1)[0], .001, 'The two soft dropouts end in silence');
+assert.equal(failure.activeSounds.size, 1, 'Lifecycle pause can stop the tone');
+tone.onended();
+assert.equal(failure.activeSounds.size, 0);
+assert.ok(tone.disconnected && envelope.disconnected, 'Both audio nodes are released');
+failure.setup(failureContext, {muted: true}); failure.playEngineFailure(800);
+assert.equal(failureTones.length, 1, 'Muted games do not create a failure tone');
+failure.setup(failureContext); failureContext.state = 'suspended'; failure.playEngineFailure(800);
+assert.equal(failureTones.length, 1, 'Suspended audio does not queue a stale tone');
+console.log('PASS engine shutdown pitch/gain envelopes, paused-crash playback, mute/suspend guards and audio-node cleanup');

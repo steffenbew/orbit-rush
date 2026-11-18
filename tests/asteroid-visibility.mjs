@@ -18,7 +18,7 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reduc
   const worldStep = new THREE.Vector3(), particleView = new THREE.Vector3();
   const ships = [];
   const random = (a, b) => (a + b) / 2, pick = values => values[0];
-  let particles = [], paused = false, crashing = false, roundEnded = false, gameTime = 0;
+  let particles = [], paused = false, crashing = false, crashDrifting = false, roundEnded = false, gameTime = 0;
   const hits = [];
   const collideWith = object => { object.userData.collisionHandled = true; hits.push(object); };
   ${section('      const inverseRotation =', '      const mouseAim =')}

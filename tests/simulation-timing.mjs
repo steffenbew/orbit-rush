@@ -21,7 +21,7 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('THRE
   const camera = new THREE.PerspectiveCamera(), distance = new THREE.Vector3();
   const playerHullRotation = new THREE.Quaternion();
   const roundDuration = 45, level = 10, levelPressure = .8;
-  let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
+  let started = true, paused = false, crashing = false, crashDrifting = false, roundEnded = false, celebrating = false;
   let renderPhase;
   const renderDiagnostics = {failed: false, runFrame: callback => callback()};
   let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0, feedbackUntil = 0;
@@ -45,7 +45,7 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('THRE
   function updateSimulation(dt) {
     steps++;
     ${section('        if (!paused && !roundEnded) {\n          gameTime =', '        worldStep.copy(flightMotion)')}
-    ${section('        worldStep.copy(flightMotion)', '        if (crashing) camera.rotation')}
+    ${section('        worldStep.copy(flightMotion)', '        if (crashDrifting) camera.rotation')}
     distance.sub(worldStep);
     if (normalHeld) { firingHeavy = false; fireRocket(); }
     if (heavyHeld && heavyEnergy === 1) { firingHeavy = true; fireRocket(false, true); }

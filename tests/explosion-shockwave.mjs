@@ -12,6 +12,9 @@ const waveStart = source.indexOf('        for (let i = shockwaves.length - 1; i 
 const waveEnd = source.indexOf('        const fragmentHits = [];', waveStart);
 const particleEnd = source.indexOf('      }\n      function recordVisibleObjects()', waveEnd);
 assert.ok(waveStart >= 0 && waveEnd > waveStart && particleEnd > waveEnd);
+const momentumStart = source.indexOf('        // Particles receive the full world step');
+const momentumEnd = source.indexOf('        flash = reducedMotion', momentumStart);
+assert.ok(momentumStart >= 0 && momentumEnd > momentumStart);
 const math = Object.create(Math);
 math.random = () => .5; // Normal-sized destruction, not the rare spectacular variant.
 const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reducedMotion', `
@@ -23,14 +26,19 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reduc
   ${source.slice(source.indexOf('      const shockGeometry ='), source.indexOf('      function updateScore()'))}
   const debrisGeometry = new THREE.TetrahedronGeometry(1, 0);
   const pick = values => values[0], random = (a, b) => (a + b) / 2;
-  let started = true, paused = false, roundEnded = false, crashing = false;
+  let started = true, paused = false, roundEnded = false, crashing = false, crashDrifting = false;
   let speed = 400, shake = 0, flash = 0, shield = 100, score = 123;
   ${source.slice(start, end)}
   return {
     scene, camera, flightVelocity, applyExplosionShockwave, explode, shockwaves,
     get particles() { return particles; },
-    tick: dt => {
-      worldStep.set(0, 0, paused ? 0 : dt * 100);
+    inheritCrashMotion: flightMotion => {
+      const firstParticle = 0;
+      ${source.slice(momentumStart, momentumEnd)}
+    },
+    tick: (dt, movement) => {
+      if (movement) worldStep.copy(movement);
+      else worldStep.set(0, 0, paused ? 0 : dt * 100);
       camera.updateMatrixWorld();
       ${source.slice(waveStart, particleEnd)}
     },
@@ -38,7 +46,7 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reduc
     reset: () => { shake = flash = 0; flightVelocity.set(0, 0); },
     setMode: mode => {
       started = mode !== 'intro'; paused = mode === 'paused';
-      roundEnded = mode === 'result'; crashing = mode === 'crash';
+      roundEnded = mode === 'result'; crashing = crashDrifting = mode === 'crash';
     }
   };
 `)(THREE, math, reducedMotion);
@@ -119,6 +127,64 @@ assert.equal(game.state().shake, 0); assert.equal(game.state().flash, 0);
 game.reset(); game.explode(close);
 assert.ok(game.state().shake > 0 && game.state().flash > 0);
 console.log('PASS actual explosion wiring: destructions and asteroid accidents, not hit sparks or crash bursts');
+
+for (const reducedMotion of [false, true]) {
+  const crash = makeGame(reducedMotion);
+  crash.setMode('crash');
+  const origin = new THREE.Vector3(7, -4, -22);
+  crash.explode(origin, reducedMotion ? 12 : 120, true);
+  assert.equal(crash.shockwaves.length, 1, 'Both motion modes get an opening hull blast');
+  const wave = crash.shockwaves[0];
+  assert.equal(wave.life, .8);
+  assert.equal(wave.size, reducedMotion ? .3 : 1.8, 'Larger fatal-impact blast keeps the reduced-motion size unchanged');
+  assert.equal(crash.particles.length, reducedMotion ? 15 : 127, 'Crash particle/debris budget stays bounded');
+  assert.equal(crash.state().shield, 100); assert.equal(crash.state().score, 123);
+  assert.equal(crash.flightVelocity.length(), 0, 'The opening blast cannot apply a second gameplay impulse');
+  crash.tick(.1);
+  assert.ok(wave.fireball.position.equals(origin), 'The hull blast stays visible despite forward travel');
+  const firstSize = wave.fireball.scale.x, firstOpacity = wave.fireball.material.opacity;
+  crash.tick(.15);
+  assert.ok(wave.fireball.material.opacity < firstOpacity, 'The fireball fades without repeated flashes');
+  if (reducedMotion) {
+    assert.equal(wave.fireball.scale.x, firstSize, 'Reduced-motion blast does not expand');
+    assert.ok(firstSize <= 12 && firstOpacity < .3, 'Reduced-motion blast stays small and soft');
+  } else {
+    assert.ok(wave.fireball.scale.x > firstSize && firstSize > 60, 'The opening fireball fills much of the view');
+  }
+  crash.tick(.3);
+  assert.equal(wave.fireball.material.opacity, 0, 'Fire clears into drifting debris within about half a second');
+  let disposed = 0;
+  wave.ring.material.addEventListener('dispose', () => disposed++);
+  wave.fireball.material.addEventListener('dispose', () => disposed++);
+  crash.tick(.3);
+  assert.equal(crash.shockwaves.length, 0); assert.equal(disposed, 2, 'The whole blast is cleaned up before the result screen');
+}
+console.log('PASS brief moving-cockpit crash blast, expanding fireball, soft static reduced-motion version, no extra damage and timely cleanup');
+
+// Drive real particle movement/cleanup with the same coast-down as the crash flight.
+const makeDrift = new Function('THREE', 'initialSpeed', `
+  let speed = initialSpeed;
+  const crashDrifting = true, document = {hidden: false}, crashCoastSpeed = Math.min(120, speed * .08);
+  const flightVelocity = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
+  const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3(), flightTilt = new THREE.Vector3();
+  const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ'), crashSpin = new THREE.Vector3();
+  const crashRotation = new THREE.Quaternion(), crashRotationStep = new THREE.Quaternion();
+  ${source.slice(source.indexOf('      function updateCrashFlight('), source.indexOf('      function finishRound('))}
+  return dt => { updateCrashFlight(dt); return flightMotion.clone().multiplyScalar(-dt); };
+`);
+for (const speed of [800, 1500, 2500, 5000]) {
+  const crash = makeGame(), drift = makeDrift(THREE, speed);
+  crash.setMode('crash'); crash.explode(new THREE.Vector3(0, 0, -22), 120, true);
+  const fragments = crash.particles.filter(p => p.kind === 'debris');
+  fragments.forEach((p, i) => { p.vx = (i - 3) * 4; p.vy = (i - 3) * 2; p.vz = (i - 3) * 12; });
+  crash.inheritCrashMotion(new THREE.Vector3(0, 0, -speed));
+  for (let step = 0; step < 36; step++) crash.tick(1 / 60, drift(1 / 60));
+  assert.ok(fragments.every(p => crash.particles.includes(p)),
+    'At ' + speed + ' units/s the fragments survive the opening blast instead of crossing the cleanup plane');
+  for (let step = 0; step < 96; step++) crash.tick(1 / 60, drift(1 / 60));
+  assert.equal(crash.particles.length, 0, 'Matching momentum must not bypass ordinary lifetime cleanup');
+}
+console.log('PASS actual crash-debris movement and cleanup at 800–5000 units/s, with full inherited momentum');
 
 const distant = new THREE.Vector3(0, 0, -2500);
 const previousCapital = makeGame(); previousCapital.explode(distant, 65, false, false, 2.5);

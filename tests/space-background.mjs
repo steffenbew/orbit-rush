@@ -17,7 +17,7 @@ const makeSky = (reducedMotion = false) => {
   return new Function('THREE', 'Math', 'reducedMotion', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
   const worldStep = new THREE.Vector3();
-  let started = false, paused = true;
+  let started = false, paused = true, crashDrifting = false;
   const random = (a, b) => a + Math.random() * (b - a);
   const pick = items => items[0];
   // CanvasTexture only needs a canvas reference for these geometry-only tests.

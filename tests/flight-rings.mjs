@@ -30,10 +30,10 @@ const makeGame = (reducedMotion = false) => new Function('THREE', 't', 'reducedM
   const playSound = name => sounds.push(name), updateShield = () => {}, updateScore = () => {};
   const showFeedback = (message, negative = false) => messages.push({message, negative});
   const startCrash = object => { crashes.push(object); crashing = true; paused = true; };
-  let started = true, paused = false, roundEnded = false, crashing = false, celebrating = false;
+  let started = true, paused = false, roundEnded = false, crashing = false, crashDrifting = false, celebrating = false;
   let tutorialStage = 3, tutorialRetryAt = 0;
   const completeTutorialStep = () => {};
-  let gameTime = 0, difficulty = 0, levelPressure = 0, level = 1, shield = 100, shieldHitTime = 0, hitMarker = 0;
+  let gameTime = 0, difficulty = 0, levelPressure = 0, level = 1, shield = 100, shieldHitTime = 0, shieldHitStrength = 1, hitMarker = 0;
   let score = 0, best = 0, speed = 0;
   const simulationStep = 1 / 60, roundDuration = 45;
   const target = new THREE.Vector2(), flightVelocity = new THREE.Vector2(), flightTurn = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();

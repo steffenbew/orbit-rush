@@ -115,6 +115,24 @@ export function updateEngine(speed) {
   engineGain.gain.setTargetAtTime(.018 + speed * .00003, context.currentTime, .15);
   engineOscillator.frequency.setTargetAtTime(42 + speed * .08, context.currentTime, .2);
 }
+export function playEngineFailure(speed) {
+  if (!ready || muted || context.state !== 'running') return;
+  // A short falling motor tone with two soft dropouts; independent of the paused engine loop.
+  const source = context.createOscillator(), gain = context.createGain();
+  const now = context.currentTime;
+  source.type = 'sine';
+  source.frequency.setValueAtTime(42 + Math.min(speed, 1000) * .08, now);
+  source.frequency.exponentialRampToValueAtTime(24, now + 1.2);
+  gain.gain.setValueAtTime(.035, now);
+  for (const [time, value] of [[.16, .012], [.24, .03], [.42, .008], [.51, .02], [1.2, .001]]) {
+    gain.gain.exponentialRampToValueAtTime(value, now + time);
+  }
+  source.connect(gain).connect(master);
+  activeSounds.add(source);
+  source.onended = () => { activeSounds.delete(source); source.disconnect(); gain.disconnect(); };
+  source.start(now);
+  source.stop(now + 1.25);
+}
 export function playCountdownTick() {
   if (!ready || muted || paused || context.state !== 'running') return;
   const source = context.createOscillator();
@@ -131,7 +149,7 @@ export function playCountdownTick() {
   source.stop(now + .13);
 }
 export function playSound(kind, shipScale = 2.4, allowPaused = false) {
-  // The final crash sound may play over the paused result screen.
+  // The fatal impact may play while gameplay is paused for the crash drift.
   if (!ready || muted || (paused && !allowPaused) || context.state !== 'running') return;
   const bank = banks[kind];
   let variant = Math.floor(Math.random() * bank.buffers.length);

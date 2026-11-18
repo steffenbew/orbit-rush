@@ -127,7 +127,7 @@ const makeFlightClock = new Function('THREE', 'flight', 'reducedMotion', 'update
   const flightDirection = new THREE.Vector3(), flightTilt = new THREE.Vector3(), flightViewOffset = new THREE.Vector2();
   const initialDirection = new THREE.Vector3(0, 0, -1).applyEuler(flightOrientation);
   let speed = flightMotion.dot(initialDirection) - flightVelocity.x * initialDirection.x - flightVelocity.y * initialDirection.y, hitMarker = 0;
-  const started = true, paused = false, crashing = false, celebrating = false, document = {hidden: false};
+  const started = true, paused = false, crashing = false, crashDrifting = false, celebrating = false, document = {hidden: false};
   const resetFrameStats = () => {};
   ${section('      const simulationStep =', '      const progressionTimeScale =')}
   return {frame: advanceSimulation, move: (dt, difficulty) => {
@@ -147,7 +147,7 @@ function assertShipInsideBoundary(game, ship) {
 }
 
 // Exercise the actual per-step movement/rotation block, not a test-only approximation.
-const moveRock = new Function('ship', 'dt', 'paused', 'reducedMotion',
-  section('          if (!paused) {\n            ship.position.addScaledVector(ship.userData.courseVelocity, dt);', '\n          updateShipHitFlash(ship);'));
+const moveRock = new Function('ship', 'dt', 'paused', 'reducedMotion', 'crashDrifting = false',
+  section('          if (!paused || crashDrifting) {\n            ship.position.addScaledVector(ship.userData.courseVelocity, dt);', '\n          updateShipHitFlash(ship);'));
 
 export { THREE, t, source, section, code, randomState, math, makeGame, hazardInterval, makeFlightClock, assertShipInsideBoundary, moveRock };

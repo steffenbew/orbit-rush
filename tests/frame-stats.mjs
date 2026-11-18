@@ -18,7 +18,7 @@ const makeMonitor = (search = '?test') => new Function('search', 't', `
   const document = { hidden: false, querySelector: () => hud };
   const performance = { now: () => wallTime };
   const renderer = { setAnimationLoop: callback => { frameCallback = callback; } };
-  let started = true, paused = false, crashing = false, roundEnded = false;
+  let started = true, paused = false, crashing = false, crashDrifting = false, roundEnded = false;
   let renderPhase;
   const renderDiagnostics = {failed: false, runFrame: callback => callback()};
   function updateSimulation() { steps++; }
@@ -32,7 +32,7 @@ const makeMonitor = (search = '?test') => new Function('search', 't', `
     setHidden: hidden => { document.hidden = hidden; resetSimulationClock(); },
     mode: mode => {
       started = mode !== 'intro'; paused = ['pause', 'crash', 'end'].includes(mode);
-      crashing = mode === 'crash'; roundEnded = mode === 'end'; resetSimulationClock();
+      crashing = crashDrifting = mode === 'crash'; roundEnded = mode === 'end'; resetSimulationClock();
     },
     state: () => ({ text, hidden: hud.hidden, writes, renders, steps, sampleTime: frameSampleTime, sampleCount: frameSampleCount })
   };

@@ -20,7 +20,7 @@ function makeGame(seed = 12345, reducedMotion = false) {
     const shipTypes = [null, null, null, {asteroid: true}], fadeAsteroidShader = () => {};
     const document = {querySelector: () => ({})};
     let started = true, paused = false, roundEnded = false, crashing = false, gameTime = 0;
-    let shield = 100, shieldHitTime = 0, shake = 0, speed = 400, hitMarker = 0;
+    let shield = 100, shieldHitTime = 0, shieldHitStrength = 1, shake = 0, speed = 400, hitMarker = 0;
     const shieldHit = {hidden: true, style: {}}, hits = [];
     const updateShield = () => hits.push({index: showerRockCollider.userData.instanceIndex, shield});
     const effects = [], awards = [], sounds = [];
