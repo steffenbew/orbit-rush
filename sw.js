@@ -1,44 +1,8 @@
-// scripts/prepare-pwa.py fills RELEASE for deployment. The source worker is
-// deliberately pass-through so ./run start always serves current local files.
+// The build embeds the verified snapshot. The source worker passes requests through.
 const RELEASE = null;
 const CACHE_PREFIX = `orbit-rush:${self.registration.scope}:`;
 const CACHE_NAME = RELEASE ? `${CACHE_PREFIX}${RELEASE.id}` : null;
-const FILES = [
-  "index.html",
-  "pwa.js",
-  "manifest.webmanifest",
-  "audio.js",
-  "planet.js",
-  "i18n.js",
-  "touch-controls.js",
-  "render-diagnostics.js",
-  "CREDITS.md",
-  "assets/vendor/three.module.js",
-  "assets/vendor/THREE-LICENSE.txt",
-  "assets/vendor/PHOSPHOR-LICENSE.txt",
-  "assets/icons/icon-192.png",
-  "assets/icons/icon-512.png",
-  "assets/icons/icon-maskable-512.png",
-  "assets/icons/apple-touch-icon.png",
-  "assets/audio/laser-soft.mp3",
-  "assets/audio/empty-click.wav",
-  "assets/audio/lock-on.wav",
-  "assets/audio/shield-hard.wav",
-  "assets/audio/impact-1.mp3",
-  "assets/audio/impact-2.mp3",
-  "assets/audio/impact-3.mp3",
-  "assets/audio/blast-1.mp3",
-  "assets/audio/blast-2.mp3",
-  "assets/audio/blast-3.mp3",
-  "assets/audio/go-bing.wav",
-  "assets/audio/checkpoint-pass.wav",
-  "assets/audio/checkpoint-miss.wav",
-  "assets/audio/reward.wav",
-  "assets/audio/orbit-arcade.mp3",
-  "assets/audio/warning-low.wav",
-  "assets/audio/KENNEY-LICENSE.txt",
-  "assets/audio/MUSIC-LICENSE.txt"
-];
+const FILES = Object.keys(RELEASE?.integrity || {});
 const FILE_URLS = new Set(FILES.map(file => new URL(file, self.registration.scope).href));
 
 self.addEventListener('install', event => {
@@ -53,7 +17,8 @@ self.addEventListener('install', event => {
       // Cache.addAll commits the batch only when every fetch succeeds. Integrity
       // rejects stale files and mixed uploads even when the server returns 200.
       await cache.addAll(FILES.map(file => new Request(new URL(file, self.registration.scope), {
-        cache: 'reload', integrity: RELEASE.integrity[file]
+        // Reuse immutable HTTP-cache entries; SRI still checks the bytes. Re-fetch mutable URLs.
+        cache: file.startsWith('assets/') ? 'force-cache' : 'reload', integrity: RELEASE.integrity[file]
       })));
     } catch (error) {
       await caches.delete(CACHE_NAME);

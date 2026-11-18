@@ -1,49 +1,52 @@
+import { css, game as gameSource, sourceSection } from './helpers/app-source.mjs';
 // Run from the project root: node tests/damage-feedback.mjs
+import { collisionDamage, hitFlashStrength } from '../src/flight/shield-damage.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import * as THREE from '../assets/vendor/three.module.js';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const section = (start, end) => {
-  const from = source.indexOf(start), to = source.indexOf(end, from);
-  assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
-  return source.slice(from, to);
-};
-const hitStyle = section('    #shield-hit {', '    #shield-hit[hidden]');
+
+const section = (start, end) => sourceSection(gameSource, start, end);
+const hitStyle = sourceSection(css, '#shield-hit {', '#shield-hit[hidden]');
 assert.match(hitStyle, /background: #e51b2b26/);
 assert.match(hitStyle, /border: 5px solid #ff3b4b/);
 assert.match(hitStyle, /pointer-events: none/, 'Damage feedback never blocks controls');
-const makeHit = (reducedMotion = false) => new Function('THREE', 'reducedMotion', `
+const makeHit = (reducedMotion = false) => new Function('collisionDamage', 'hitFlashStrength', 'THREE', 'reducedMotion', `
   const camera = new THREE.PerspectiveCamera(), flightVelocity = new THREE.Vector2();
   const shieldHit = {hidden: true, style: {}};
   let paused = false, roundEnded = false, crashing = false, shield = 100, shieldHitTime = 0, shieldHitStrength = 1, speed = 400, shake = 0;
   const updateShield = () => {}, showFeedback = () => {}, playSound = () => {}, t = key => key;
   const startCrash = () => { crashing = true; };
-  ${section('      function collideWith(', '      const successBurst =')}
+  ${section('  function damageShield(', '  function updateShieldAnimation(')}
+  ${section('  function collideWith(', '  const successBurst =')}
   function render() {
-    ${section('        shieldHit.hidden = shieldHitTime === 0;', '        renderShieldHud();')}
+    ${section('    shieldHit.hidden = shieldHitTime === 0;', '    renderShieldHud();')}
   }
   return {
     hit(object) { collideWith(object); render(); },
     tick(dt) {
-      ${section('        if ((!paused || crashing) && shieldHitTime > 0)', '        updateShieldAnimation(dt);')}
+      ${section('    if ((!paused || crashing) && shieldHitTime > 0)', '    updateShieldAnimation(dt);')}
       render();
     },
     pause(value) { paused = value; },
-    state: () => ({shield, time: shieldHitTime, hidden: shieldHit.hidden, opacity: Number(shieldHit.style.opacity)})
+    state: () => ({shield, drift: flightVelocity.length(), time: shieldHitTime, hidden: shieldHit.hidden, opacity: Number(shieldHit.style.opacity)})
   };
-`)(THREE, reducedMotion);
+`)(collisionDamage, hitFlashStrength, THREE, reducedMotion);
 
-for (const reduced of [false, true]) for (const userData of [
-  {type: {name: 'INTERCEPTOR'}}, {type: {name: 'NOVA SAUCER'}}, {type: {name: 'TITAN CARRIER'}},
-  {type: {capital: true}}, ...[1, 2, 3].map(asteroidTier => ({type: {asteroid: true}, asteroidTier})),
-  {enemyBolt: true}, {} // A rock fragment has no ship type.
-]) {
+const contacts = [
+  [{type: {name: 'INTERCEPTOR'}}, 30], [{type: {name: 'NOVA SAUCER'}}, 45], [{type: {name: 'TITAN CARRIER'}}, 60],
+  [{type: {capital: true}}, 85], ...[15, 30, 50].map((damage, i) => [{type: {asteroid: true}, asteroidTier: i + 1}, damage]),
+  [{enemyBolt: true}, 12], [{}, 8] // A loose fragment at scale 2.
+];
+for (const [scale, damage] of [[.25, 6], [2.4, 10], [10, 18]]) {
+  assert.equal(collisionDamage({userData: {}, scale: {x: scale}}), damage);
+}
+for (const reduced of [false, true]) for (const [userData, damage] of contacts) {
   const game = makeHit(reduced), object = new THREE.Object3D();
   object.userData = structuredClone(userData); object.position.set(10, 5, -10); object.scale.setScalar(2);
   game.hit(object);
   const first = game.state();
-  assert.ok(first.shield < 100 && first.shield > 0);
+  assert.equal(first.shield, 100 - damage);
+  assert.equal(first.drift > 0, !userData.enemyBolt, 'Hull contacts push the player; enemy bolts do not');
   assert.equal(first.hidden, false); assert.equal(first.time, .55);
   const strength = .7 + .3 * Math.min(1, (100 - first.shield) / 50);
   assert.ok(Math.abs(first.opacity - strength * (reduced ? .35 : 1)) < 1e-9,
@@ -57,13 +60,6 @@ for (const reduced of [false, true]) for (const userData of [
   game.pause(true); game.tick(3); assert.deepEqual(game.state(), faded, 'Normal pause freezes damage feedback');
   game.pause(false); game.tick(.36);
   assert.equal(game.state().hidden, true); assert.equal(game.state().opacity, 0);
-}
-for (const [start, end] of [
-  ['      function resolveFlightRing(', '      function updateFlightRing('],
-  ['      function constrainFlightToBoundary(', '      function updateFlightBoundary(']
-]) {
-  assert.match(section(start, end), /shieldHitTime = \.55; shieldHit.hidden = false/, 'Checkpoint penalties and boundary contacts share the red flash');
-  assert.match(section(start, end), /shieldHitStrength = \.76/, 'Ten-point damage has the same scaled intensity on both paths');
 }
 for (const reduced of [false, true]) {
   const strengths = [1, 2, 3].map(asteroidTier => {
@@ -81,7 +77,7 @@ for (const reduced of [false, true]) {
 }
 const tint = new Function('crashTime', 'reducedMotion', 'crashing', 'danger', 'paused', 'roundEnded', 'celebrating = false', `
   const dangerVignette = {style: {}};
-  ${section('        const crashTint =', '        sound.setAlarm(danger')}
+  ${section('    const crashTint =', '    sound.setAlarm(danger')}
   return dangerVignette.style.opacity;
 `);
 for (const reduced of [false, true]) {
@@ -97,8 +93,8 @@ for (const reduced of [false, true]) {
   assert.equal(tint(2, reduced, false, false, false, true, true), 0, 'Victory does not get the defeat tint');
   assert.equal(tint(0, reduced, false, false, false, false), 0, 'Normal flight has no lingering defeat tint');
 }
-assert.match(source, /body\.defeated #danger-vignette \{ background: #320a1429; box-shadow: inset 0 0 140px #18030b4d; \}/);
-assert.match(section('    #danger-vignette {', '    body.defeated #danger-vignette'), /z-index: 2/);
-assert.match(source, /#round-end \{ position: fixed; z-index: 4;/, 'The result panel sits above the scene tint');
-assert.match(section('      function restartRound(', '      function updateCapitalShip('), /classList.remove\('celebrating', 'defeated'\)/, 'Retry and new run remove defeat styling');
+assert.match(css, /body\.defeated #danger-vignette \{ background: #320a1429; box-shadow: inset 0 0 140px #18030b4d; \}/);
+assert.match(sourceSection(css, '#danger-vignette {', 'body.defeated #danger-vignette'), /z-index: 2/);
+assert.match(css, /#round-end \{ position: fixed; z-index: 4;/, 'The result panel sits above the scene tint');
+assert.match(section('  function restartRound(', '  function updateCapitalShip('), /classList.remove\('celebrating', 'defeated'\)/, 'Retry and new run remove defeat styling');
 console.log('PASS scaled red hit flashes, fade/pause/reduced motion, crash aftermath and persistent scene-only defeat tint with victory/restart isolation');

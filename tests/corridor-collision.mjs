@@ -1,10 +1,17 @@
 // Real instanced geometry, spatial queries, visibility and shield damage; no render-only wall proxies.
 // Run from the project root: node tests/corridor-collision.mjs
 import {readFileSync} from 'node:fs';
+import { activeFlightSource } from './helpers/app-source.mjs';
+import { createAsteroidEncounter } from '../src/course/asteroid-encounter.js';
+import { playerLaserSpeed } from '../src/weapons/rules.js';
+import { createPlayerProjectiles } from '../src/weapons/projectiles.js';
+import { collisionDamage, hitFlashStrength } from '../src/flight/shield-damage.js';
+import { createPlayerCollision } from '../src/flight/player-collision.js';
 import assert from 'node:assert/strict';
+const full = process.env.ORBIT_TEST_FULL === '1';
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
@@ -13,7 +20,7 @@ const section = (start, end) => {
 function makeGame(seed = 12345, reducedMotion = false) {
   const math = Object.create(Math);
   math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-  return new Function('THREE', 'Math', 'reducedMotion', `
+  return new Function('collisionDamage', 'hitFlashStrength', 'createAsteroidEncounter', 'createPlayerProjectiles', 'playerLaserSpeed', 'createPlayerCollision', 'THREE', 'Math', 'reducedMotion', `
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(reducedMotion ? 70 : 90, 16 / 9, .03, 14000);
     const flightMotion = new THREE.Vector3(0, 0, -400), flightVelocity = new THREE.Vector2();
     const random = (a, b) => a + Math.random() * (b - a);
@@ -21,39 +28,53 @@ function makeGame(seed = 12345, reducedMotion = false) {
     const document = {querySelector: () => ({})};
     let started = true, paused = false, roundEnded = false, crashing = false, gameTime = 0;
     let shield = 100, shieldHitTime = 0, shieldHitStrength = 1, shake = 0, speed = 400, hitMarker = 0;
+    ${activeFlightSource}
     const shieldHit = {hidden: true, style: {}}, hits = [];
-    const updateShield = () => hits.push({index: showerRockCollider.userData.instanceIndex, shield});
+    const updateShield = () => hits.push({shield});
     const effects = [], awards = [], sounds = [];
     const startCrash = () => { crashing = true; }, playSound = (...args) => sounds.push(args);
     const explode = (...args) => effects.push(args), award = collider => awards.push(collider.userData.instanceIndex);
     const showFeedback = () => {}, t = () => ''; // Feedback rendering is covered by scoring.mjs.
-    ${section('      const inverseRotation =', '      const mouseAim =')}
-    ${section('      const showerPool =', '      let spawnQueue =')}
-    ${section('      function collideWith(', '      const successBurst =')}
+    ${section('  const { playerHull,', '  const fragments =')}
+    const courseOrigin = new THREE.Vector3(), courseWorldOffset = new THREE.Vector3(), worldStep = new THREE.Vector3();
+    const createShip = () => { const rock = new THREE.Group();
+      rock.userData = { type: {radius: 10}, previousPosition: new THREE.Vector3(), courseVelocity: new THREE.Vector3() };
+      return rock;
+    }, resetShip = rock => { rock.visible = true; };
+    const viewCamera = camera, flightRings = [];
+    const roundDuration = 45, firstCheckpointTime = 5, flightDistanceAt = t => t * 200, levelFlightSpeed = () => 200;
+    ${section('  const showerWarning =', '  const tutorial = createFlightTutorial()')}
+    const { origin: showerOrigin, rotation: showerRotation, velocity: showerVelocity } = encounter;
+    const showerGritMaterial = showerGrit.material;
+    const event = {kind:'corridor', prepare:0, entry:0, exit:15, strength:2, shape:0, bend:1.15, direction:0};
+    ${section('  function damageShield(', '  function updateShieldAnimation(')}
+    ${section('  function collideWith(', '  const successBurst =')}
+    const targets = [];
+    const projectiles = createPlayerProjectiles({ scene, camera, flightMotion, ships: targets, findWallHit: findShowerLaserHit,
+      onWallHit: damageShowerRock, onShipHit: (ship, heavy, damage) => { ship.userData.health -= damage; } });
     return {
-      camera, scene, flightMotion, playerHullRotation, rocks: showerRocks, cells: showerRockCells,
+      camera, scene, flightMotion, playerHullRotation, rocks: debrisField.rocks, clear: debrisField.clear, add: debrisField.add,
+      indexed: () => debrisField.nearby(showerGrit.boundingBox.min, showerGrit.boundingBox.max, 0),
       grit: showerGrit, origin: showerOrigin, previousOrigin: showerPreviousOrigin, rotation: showerRotation, velocity: showerVelocity,
       hits, effects, awards, sounds, findShowerLaserHit, damageShowerRock,
-      prepareShowerRock, nearbyShowerRocks, update: updateShowerRockCollisions, corridorCenter,
+      prepareShowerRock: debrisField.colliderFor, nearbyShowerRocks: debrisField.nearby, update: updateShowerRockCollisions, corridorCenter,
       get shield() { return shield; }, setPaused: value => { paused = value; },
-      setKind: value => { showerKind = value; showerCorridor = value === 'corridor'; },
+      setKind: kind => encounter.select({ ...event, kind }),
       seed: (strength = 2, shape = 0, corridor = true, kind = corridor ? 'corridor' : 'shower') => {
-        showerCorridor = corridor; showerKind = kind; showerStrength = strength; showerShape = shape;
-        showerLength = 3000; showerHalfGap = 27; showerHalfWidth = corridor ? 900 : 650; showerBend = 27 * 1.15;
+        encounter.reset(1, [{ ...event, strength, kind, shape }]);
+        encounter.update(0, 0, 0, true, false);
         showerOrigin.set(0, 0, 0); showerPreviousOrigin.copy(showerOrigin);
         showerRotation.identity(); showerGrit.position.copy(showerOrigin); showerVelocity.set(0, 0, 0);
         shield = 100; hits.length = 0; crashing = paused = false; gameTime = 0;
-        seedShowerGrit(); showerGritMaterial.opacity = 1;
+        showerGritMaterial.opacity = 1;
       },
       opacity: value => { showerGritMaterial.opacity = value; },
       shoot: (previous, end, damage = 1, ships = []) => {
-        const rocket = {object: new THREE.Object3D(), damage, radius: 1, age: 0};
-        rocket.object.position.copy(end);
-        const rocketRay = new THREE.Raycaster(), rockets = [rocket], i = 0;
-        const updateShipHitFlash = () => {}, queueShip = ship => { ship.visible = false; };
-        const shatterAsteroid = () => {}, completeTutorialStep = () => {};
-        ${section('          // Test the entire step so fast rockets', '        }\n        for (let i = shockwaves.length')}
-        return rockets.length === 0;
+        targets.splice(0, targets.length, ...ships);
+        const heavy = damage === 3;
+        projectiles.fire(previous, end.clone().sub(previous).normalize(), heavy);
+        projectiles.update(previous.distanceTo(end) / playerLaserSpeed(flightMotion, heavy), new THREE.Vector3());
+        return projectiles.count === 0;
       },
       render: () => {
         showerGrit.position.copy(showerOrigin); showerGrit.quaternion.copy(showerRotation);
@@ -69,12 +90,12 @@ function makeGame(seed = 12345, reducedMotion = false) {
         return updateShowerRockCollisions();
       }
     };
-  `)(THREE, math, reducedMotion);
+  `)(collisionDamage, hitFlashStrength, createAsteroidEncounter, createPlayerProjectiles, playerLaserSpeed, createPlayerCollision, THREE, math, reducedMotion);
 }
 
 const game = makeGame(); game.seed();
 assert.equal(game.rocks.length, 12000);
-assert.equal([...game.cells.values()].reduce((sum, cell) => sum + cell.length, 0), 12000);
+assert.equal(game.indexed().length, 12000);
 assert.equal(game.scene.children.length, 1, 'Do not allocate thousands of extra meshes for collisions');
 const matrix = new THREE.Matrix4(), point = new THREE.Vector3();
 const vertices = game.grit.geometry.attributes.position;
@@ -99,11 +120,11 @@ for (const strength of [0, 1, 2]) {
   const free = makeGame(); free.seed(strength, 0, false);
   const count = [300, 900, 1800][strength];
   assert.equal(free.rocks.length, count); assert.equal(free.grit.count, count);
-  assert.equal(new Set([...free.cells.values()].flat()).size, count, 'Every visible instance has exactly one spatial-index record');
+  assert.equal(new Set(free.indexed()).size, count, 'Every visible instance has exactly one spatial-index record');
   assert.equal(free.scene.children.length, 1, 'Reuse the existing instanced mesh');
   free.rocks.forEach((record, index) => assert.equal(record.index, index));
 }
-for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) for (const strength of [0, 1, 2]) {
+for (const reducedMotion of [false, true]) for (const fps of full ? [5, 30, 60, 144] : [5]) for (const strength of full ? [0, 1, 2] : [0]) {
   for (const turn of [false, true]) for (const hit of [false, true]) {
     const free = makeGame(7123 + strength, reducedMotion); free.seed(strength, 0, false);
     const record = free.rocks[0];
@@ -127,7 +148,7 @@ for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) f
     assert.equal(free.hits.length, hit ? 1 : 0, 'The same shower rock cannot damage twice');
   }
 }
-console.log('PASS every free-shower instance indexed, real tiny-rock wing hits, misses, rotated stream motion and single-hit damage at 5–144 FPS');
+console.log('PASS every free-shower instance indexed, real tiny-rock wing hits, misses, rotated stream motion and single-hit damage');
 
 // A large boulder can reach a wing across a cell boundary that the old 17-unit query missed.
 const boundary = makeGame(); boundary.seed();
@@ -136,7 +157,7 @@ transform.position.set(0, 128, -100); transform.scale.set(26, 26, 26 * 1.7);
 transform.rotation.x = Math.PI / 2; transform.updateMatrix();
 boundary.grit.setMatrixAt(boulder.index, transform.matrix);
 boulder.position.copy(transform.position); boulder.seen = true;
-boundary.cells.clear(); boundary.cells.set('0,1,-1', [boulder]);
+boundary.clear(); boundary.add(boulder);
 boundary.camera.position.set(0, 75, 0);
 boundary.playerHullRotation.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
 assert.equal(boundary.nearbyShowerRocks(new THREE.Vector3(0, 75, 0), new THREE.Vector3(0, 75, -500), 26 + 17 + 8).length, 0,
@@ -153,7 +174,7 @@ const drifter = drifting.rocks[0];
 transform.position.set(80, 0, 0); transform.rotation.set(0, 0, 0); transform.scale.setScalar(10); transform.updateMatrix();
 drifting.grit.setMatrixAt(drifter.index, transform.matrix);
 drifter.position.copy(transform.position); drifter.seen = true;
-drifting.cells.clear(); drifting.cells.set('0,0,0', [drifter]);
+drifting.clear(); drifting.add(drifter);
 assert.equal(drifting.update(), false, 'A stationary rock off to the side is not an incoming threat');
 drifting.velocity.set(-55, 0, 0);
 assert.equal(drifting.update(), true, 'Include stream velocity in the real collision warning forecast');
@@ -171,7 +192,7 @@ const fastStream = makeGame(); fastStream.seed(); fastStream.velocity.set(0, 0, 
 const fastRock = fastStream.rocks[0];
 transform.position.set(0, 0, -450); transform.scale.setScalar(10); transform.updateMatrix();
 fastStream.grit.setMatrixAt(fastRock.index, transform.matrix); fastRock.position.copy(transform.position);
-fastStream.cells.clear(); fastStream.cells.set('0,0,-4', [fastRock]);
+fastStream.clear(); fastStream.add(fastRock);
 fastStream.render();
 assert.equal(fastRock.seen, true, 'Visibility look-ahead includes stream speed so fast rendered rocks are registered before contact');
 console.log('PASS fast-stream visibility look-ahead for low-frame-rate collision eligibility');
@@ -211,7 +232,7 @@ for (const reducedMotion of [false, true]) for (const turn of [false, true]) for
   flight.seed(0, 0, false);
   const count = reducedMotion ? 30 : 300;
   assert.equal(flight.rocks.length, count);
-  assert.equal([...flight.cells.values()].reduce((count, cell) => count + cell.length, 0), count);
+  assert.equal(flight.indexed().length, count);
   assert.ok(flight.rocks.every(rock => !rock.hit && !rock.seen), 'Switching to a free shower rebuilds only its own collision records');
   assert.equal(flight.update(), false, 'New, never-rendered shower instances must not hit yet');
 }
@@ -220,7 +241,7 @@ console.log('PASS actual shield loss on off-screen wing contacts, no unseen hits
 // Fly through actual seeded layers. Checking an idealized solid ceiling would miss the original bug.
 let wallRuns = 0, wallHits = 0, centeredHits = 0;
 const byStrength = [0, 0, 0];
-for (const strength of [0, 1, 2]) for (const shape of [0, 1, 2]) for (let sample = 0; sample < 4; sample++) {
+for (const strength of [0, 1, 2]) for (const shape of full ? [0, 1, 2] : [strength]) for (let sample = 0; sample < (full ? 4 : 1); sample++) {
   for (const side of [-1, 0, 1]) {
     const flight = makeGame(600 + sample * 101 + shape * 19 + strength * 7); flight.seed(strength, shape);
     flight.camera.position.set(-150 + sample * 100, flight.corridorCenter(1500), -1500);
@@ -237,29 +258,27 @@ for (const strength of [0, 1, 2]) for (const shape of [0, 1, 2]) for (let sample
 }
 assert.equal(centeredHits, 0, 'Centered passage must remain open in every corridor shape');
 assert.ok(wallHits >= wallRuns * .65, `Crossing the visible layers must usually hurt, not pass through decoration (${wallHits}/${wallRuns}; ${byStrength})`);
-assert.ok(byStrength.every(count => count >= 12), 'Both light and dense layers need real collision coverage');
+assert.ok(byStrength.every(count => count >= wallRuns / 6), 'Both light and dense layers need real collision coverage');
 console.log(`PASS real corridor traversal: ${wallHits}/${wallRuns} wall crossings hit; centered runs stay clear (${byStrength.join('/')} by strength)`);
 assert.ok(source.includes('danger = updateShowerRockCollisions() || danger;'), 'The gameplay loop must actually apply ring collisions and warnings');
-assert.ok(source.includes('recordVisibleObjects();\n        recordVisibleShowerRocks();'), 'Visibility must be recorded on rendered frames, not simulation ticks');
+assert.ok(source.includes('recordVisibleObjects();\n    recordVisibleShowerRocks();'), 'Visibility must be recorded on rendered frames, not simulation ticks');
 
 // Controlled instances exercise the real spatial query, transformed triangles and destruction.
 for (const kind of ['corridor', 'field']) for (const rotated of [false, true]) for (const damage of [1, 3]) {
   const laser = makeGame(); laser.seed(); laser.setKind(kind);
-  laser.cells.clear();
-  for (const rock of laser.rocks) rock.destroyed = true;
+  const [front, rear] = laser.rocks;
+  laser.clear();
   if (rotated) laser.rotation.setFromEuler(new THREE.Euler(.3, -.6, .2));
   laser.origin.set(120, -40, 500); laser.previousOrigin.copy(laser.origin);
   const world = point => point.clone().applyQuaternion(laser.rotation).add(laser.origin);
   const transform = new THREE.Object3D();
-  const [front, rear] = laser.rocks;
   [front, rear].forEach((rock, index) => {
     rock.position.set(0, 0, -100 - index * 120);
     rock.health = 3; rock.destroyed = false; rock.seen = true; rock.hit = false;
     transform.position.copy(rock.position); transform.scale.set(12, 18, 24);
     transform.rotation.set(.2, .4, .1); transform.updateMatrix();
     laser.grit.setMatrixAt(rock.index, transform.matrix);
-    const key = `0,0,${Math.floor(rock.position.z / 128)}`;
-    laser.cells.set(key, [rock]);
+    laser.add(rock);
   });
   const from = world(new THREE.Vector3()), to = world(new THREE.Vector3(0, 0, -300));
   assert.equal(laser.findShowerLaserHit(from, to), front, 'Nearest actual surface wins');
@@ -296,7 +315,4 @@ for (const kind of ['corridor', 'field']) for (const rotated of [false, true]) f
   laser.seed();
   assert.ok(laser.rocks.every(rock => !rock.destroyed && rock.health >= 1 && rock.health <= 3), 'Reset restores all instances and health');
 }
-assert.ok(source.includes('const wallHit = findShowerLaserHit(previous, rocket.object.position, shipDistance);'));
-assert.ok(source.includes('damageShowerRock(wallHit, rocket.damage);'));
-assert.ok(source.includes('if (wallHit || hit || rocket.age > 8'), 'A wall hit consumes the projectile');
 console.log('PASS wall and stationary-field lasers: nearest transformed mesh, ship occlusion, normal/heavy damage, holes, no collisions, bounded effects and reset');

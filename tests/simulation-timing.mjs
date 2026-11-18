@@ -1,68 +1,77 @@
 // Run from the project root: node tests/simulation-timing.mjs
 import { readFileSync } from 'node:fs';
+import { activeFlightSource } from './helpers/app-source.mjs';
+import * as physics from '../src/flight/physics.js';
+import { advanceWeapons, createWeapons, requestShot } from '../src/weapons/rules.js';
+import { createFrameStats } from '../src/presentation/frame-stats.js';
+import { createSimulationClock } from '../src/flight/simulation-clock.js';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
   return source.slice(from, to);
 };
-const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('THREE', 'reducedMotion', 'trainingTime', `
+const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('createFrameStats', 'createSimulationClock', 'advanceWeapons', 'createWeapons', 'requestShot', 'physics', 'THREE', 'reducedMotion', 'trainingTime', `
   let wallTime = 0, frameCallback, renders = 0, steps = 0;
-  const performance = { now: () => wallTime }, document = { hidden: false };
+  const hud = {}, location = {search: '?test'};
+  const performance = { now: () => wallTime }, document = { hidden: false, querySelector: () => hud };
   const renderer = { setAnimationLoop: callback => { frameCallback = callback; } };
-  const resetFrameStats = () => {}, updateFrameStats = () => {}; // HUD is covered by frame-stats.mjs.
-  const target = new THREE.Vector2(.6, .2), flightVelocity = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
-  const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3(), worldStep = new THREE.Vector3();
-  const flightTurn = new THREE.Vector2(), flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
-  const camera = new THREE.PerspectiveCamera(), distance = new THREE.Vector3();
-  const playerHullRotation = new THREE.Quaternion();
-  const roundDuration = 45, level = 10, levelPressure = .8;
-  let started = true, paused = false, crashing = false, crashDrifting = false, roundEnded = false, celebrating = false;
+  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const { target, flightVelocity, flightMotion, flightTurn, flightOrientation } = playerFlight;
+  target.set(.6, .2);
+  const worldStep = new THREE.Vector3(), distance = new THREE.Vector3();
+  const roundDuration = 45, level = 10;
+  let started = true, paused = false, crashing = false, crashDrifting = false, roundEnded = false;
   let renderPhase;
   const renderDiagnostics = {failed: false, runFrame: callback => callback()};
-  let gameTime = 0, difficulty = 0, speed = 0, hitMarker = 0, lastKill = -Infinity, combo = 0, feedbackUntil = 0;
+  let gameTime = 0, difficulty = 0, speed = 0, feedbackUntil = 0;
   let normalHeld = false, heavyHeld = false;
-  const comboWindows = [], feedback = {classList: {remove() {}}};
-  const updateScore = () => {}, updateWeaponHud = () => {}, updateHeavyHud = () => {};
+  const feedback = {classList: {remove() {}}};
+  const updateScore = () => {}, renderWeaponHud = () => {};
   const constrainFlightToBoundary = () => {}; // Physical rebounds are covered by flight-boundary.mjs.
-  const tutorialStage = 3; // The timed course begins after the guided tutorial.
+  const tutorial = {active: false}; // The timed course begins after the guided tutorial.
   const shots = [];
   let firingHeavy = false;
   const playSound = name => { if (name === 'shot') shots.push({heavy: firingHeavy, time: gameTime}); };
   const finishRound = () => { gameTime = courseStartTime + roundDuration; roundEnded = true; paused = true; };
-  ${section('      const simulationStep =', '      const progressionTimeScale =')}
-  ${section('      function levelFlightSpeed(', '      let capitalShip =')}
-  ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
-  ${section('      let heavyEnergy =', '      function updateHeavyHud()')}
-  ${section('      let lastShot =', '      const heatColors =')}
-  ${section('      function fireRocket(', '        camera.updateMatrixWorld();')}
+  ${section('  const frameStats =', '  const progressionTimeScale =')}
+  ${activeFlightSource}
+  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, reducedMotion, progress);
+  const courseWorldOffset = new THREE.Vector3();
+  let courseStartTime = 0;
+  const weapons = createWeapons();
+  let shotFlashUntil = 0, emptyFlashUntil = 0;
+  ${section('  function fireRocket(', '    camera.updateMatrixWorld();')}
   }
   gameTime = courseStartTime = trainingTime;
   function updateSimulation(dt) {
     steps++;
-    ${section('        if (!paused && !roundEnded) {\n          gameTime =', '        worldStep.copy(flightMotion)')}
-    ${section('        worldStep.copy(flightMotion)', '        if (crashDrifting) camera.rotation')}
+    ${section('    if (!paused && !roundEnded) {\n      gameTime =', '  }\n\n  function movePlayerAndCamera')}
+    if (!paused && !roundEnded) advanceWeapons(weapons, gameTime, dt);
+    if (isFlightActive()) speed = playerFlight.advance(dt, speed, levelFlightSpeed(difficulty));
+    ${section('    worldStep.copy(flightMotion)', '    if (crashDrifting) camera.rotation')}
     distance.sub(worldStep);
     if (normalHeld) { firingHeavy = false; fireRocket(); }
-    if (heavyHeld && heavyEnergy === 1) { firingHeavy = true; fireRocket(false, true); }
+    if (heavyHeld && weapons.heavyCharge === 1) { firingHeavy = true; fireRocket(false, true); }
   }
   const renderFrame = () => { renders++; };
-  ${section('      resetSimulationClock();\n      renderer.setAnimationLoop(', '    } catch (error)')}
+  ${section('  resetSimulationClock();\n  renderer.setAnimationLoop(', '} catch (error)')}
   return {
-    target, resetSimulationClock,
+    target, resetSimulationClock, hud,
+    beginTraining: () => { tutorial.active = true; },
     frame: dt => { wallTime += dt * 1000; frameCallback(wallTime); },
     elapseWithoutFrame: dt => { wallTime += dt * 1000; },
     setPaused: value => { paused = value; resetSimulationClock(); },
     setHidden: value => { document.hidden = value; resetSimulationClock(); },
     fire: (normal, heavy) => { normalHeld = normal; heavyHeld = heavy; },
     state: () => ({gameTime, speed, velocity: flightVelocity.toArray(), turn: flightTurn.toArray(), orientation: flightOrientation.toArray(), distance: distance.toArray(),
-      heat: weaponHeat, overheated, heavyEnergy, shots, steps, renders, roundEnded, remainder: simulationRemainder})
+      heat: weapons.heat, overheated: weapons.overheated, heavyEnergy: weapons.heavyCharge, shots, steps, renders, roundEnded, remainder: simulationClock.remainder})
   };
-`)(THREE, reducedMotion, trainingTime);
+`)(createFrameStats, createSimulationClock, advanceWeapons, createWeapons, requestShot, physics, THREE, reducedMotion, trainingTime);
 
 function advance(game, duration, frameTimes) {
   let elapsed = 0, frame = 0;
@@ -100,6 +109,19 @@ for (const reducedMotion of [false, true]) {
 }
 console.log('PASS identical flight, level time, braking, cooling and both fire rates at 5–144 FPS and irregular frames');
 
+const monitor = makeGame();
+monitor.frame(0); monitor.frame(8);
+assert.equal(monitor.state().renders, 2);
+assert.equal(monitor.state().steps, 15);
+assert.equal(monitor.hud.textContent, '0.1 FPS · 8000 ms', 'Report elapsed render time, not bounded physics catch-up');
+monitor.resetSimulationClock();
+assert.equal(monitor.hud.textContent, '— FPS · — ms');
+
+const training = makeGame(); training.beginTraining();
+advance(training, 46, [1 / 30]);
+assert.ok(training.state().gameTime > 45);
+assert.equal(training.state().roundEnded, false, 'Waiting at a lesson cannot expire the round');
+
 const paused = makeGame(); paused.fire(true, true); advance(paused, 1, [1 / 60]);
 paused.setPaused(true); const before = simulatedState(paused);
 paused.frame(20); assert.deepEqual(simulatedState(paused), before, 'Pause must not build a catch-up backlog');
@@ -126,9 +148,8 @@ for (const fps of [5, 10, 20, 60, 144]) for (const trainingTime of [0, 53.1, 180
   assert.equal(game.state().roundEnded, true); assert.equal(game.state().gameTime, trainingTime + 45);
   assert.equal(game.state().steps, 2700, 'A level must end after exactly 45 simulated seconds');
 }
-assert.ok(source.includes('const step = simulationStep, acceleration ='), 'Hazard prediction must share the physics timestep');
-assert.equal((section('      function updateSimulation(dt)', '      function recordVisibleObjects()').match(/renderer.render/g) || []).length, 0,
+assert.equal((section('  function updateSimulation(dt)', '  function recordVisibleObjects()').match(/renderer.render/g) || []).length, 0,
   'Never render inside a catch-up tick');
-assert.equal((section('      function updateSimulation(dt)', '      function recordVisibleObjects()').match(/lastVisibleTime = gameTime/g) || []).length, 0,
+assert.equal((section('  function updateSimulation(dt)', '  function recordVisibleObjects()').match(/lastVisibleTime = gameTime/g) || []).length, 0,
   'Unrendered catch-up ticks must not authorize collisions with unseen objects');
 console.log('PASS bounded long stalls, one render per display frame, exact level duration and rendered-only collision visibility');

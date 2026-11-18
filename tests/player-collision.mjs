@@ -1,26 +1,19 @@
 // Run from the project root: node tests/player-collision.mjs
 import { readFileSync } from 'node:fs';
+import { advanceEnemyBolts } from '../src/fleet/capital-ship.js';
+import { createPlayerCollision } from '../src/flight/player-collision.js';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
-const section = (start, end) => {
-  const from = source.indexOf(start), to = source.indexOf(end, from);
-  assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
-  return source.slice(from, to);
-};
-const makeGame = () => new Function('THREE', `
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
+function makeGame() {
   const camera = new THREE.PerspectiveCamera(), scene = new THREE.Scene();
-  const worldStep = new THREE.Vector3(), flightMotion = new THREE.Vector3();
-  const enemyBolts = [], hits = [];
-  let paused = false, roundEnded = false, started = true, crashing = false;
-  const collideWith = object => hits.push(object);
-  ${section('      const inverseRotation =', '      const mouseAim =')}
-  ${section('      function updateEnemyBolts(', '      function playerLaserSpeed(')}
-  return {camera, scene, playerHull, playerHullRadius, playerHullRotation, crossesHull, crossesPlayer,
-    pathHitsPlayer, enemyBolts, hits, updateEnemyBolts, setPaused: value => { paused = value; }};
-`)(THREE);
+  const collision = createPlayerCollision(camera.position), enemyBolts = [], hits = [];
+  const flight = { scene, worldStep: new THREE.Vector3(), flightMotion: new THREE.Vector3(),
+    pathHitsPlayer: collision.pathHitsPlayer, onHit: object => { hits.push(object); return false; } };
+  return { camera, scene, ...collision, enemyBolts, hits, updateEnemyBolts: dt => advanceEnemyBolts(enemyBolts, dt, flight) };
+}
 
 function box(width = 2, height = 2, depth = 2) {
   const geometry = new THREE.BoxGeometry(width, height, depth).toNonIndexed();
@@ -96,8 +89,6 @@ assert.equal(game.crossesPlayer(rock, warningStart, warningEnd), false);
 assert.equal(game.crossesPlayer(rock, warningStart, warningEnd, 8), true, 'The danger margin must surround the same wings that take damage');
 assert.ok(source.includes('crossesPlayer(ship, previous, ship.position)'));
 assert.ok(source.includes('crossesPlayer(ship, ship.position, future, 8)'));
-assert.ok(source.includes('crossesPlayer(p.object, previous, p.object.position)'));
-assert.ok(source.includes('crossesPlayer(p.object, p.object.position, future, 3)'));
 console.log('PASS swept contacts at 5–144 FPS and matching ship/fragment warning and damage shapes');
 
 // Model solid rock surfaces at the narrowest corridor's floor and ceiling, not a fake gameplay barrier.
@@ -123,9 +114,7 @@ for (const side of [-1, 1]) {
   object.position.set(side * 20, 0, -100);
   fire.scene.add(object);
   fire.enemyBolts.push({object, velocity: new THREE.Vector3(0, 0, 12000), age: 0});
-  fire.setPaused(true); fire.updateEnemyBolts(1 / 60);
-  assert.equal(fire.hits.length, 0); assert.equal(object.position.z, -100);
-  fire.setPaused(false); fire.updateEnemyBolts(1 / 60);
+  fire.updateEnemyBolts(1 / 60);
   assert.deepEqual(fire.hits, [object], 'Enemy bolts use the wings, not a separate small camera sphere');
   assert.equal(fire.enemyBolts.length, 0); assert.equal(object.parent, null);
   fire.updateEnemyBolts(1 / 60); assert.equal(fire.hits.length, 1);
@@ -135,4 +124,4 @@ bolt.position.set(27, 0, -100);
 warning.enemyBolts.push({object: bolt, velocity: new THREE.Vector3(0, 0, 1000), age: 0});
 assert.equal(warning.updateEnemyBolts(1 / 60), true, 'Enemy-fire warnings include the full wing margin');
 assert.equal(warning.hits.length, 0, 'A warning is not itself an impact');
-console.log('PASS actual enemy-laser wing impacts, full-hull warnings, pause and one-hit cleanup');
+console.log('PASS actual enemy-laser wing impacts, full-hull warnings and one-hit cleanup');

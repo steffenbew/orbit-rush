@@ -1,11 +1,8 @@
+import { css, game as gameSource } from './helpers/app-source.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const start = html.indexOf('    function anchorTouchViewport(');
-const end = html.indexOf('    // Keep this helper with the entry point:', start);
-assert.ok(start > 0 && end > start);
+import { anchorTouchViewport } from '../src/platform/touch-ui.js';
 
 function setup(withVisualViewport = true) {
   const window = Object.assign(new EventTarget(), { scrollX: 0, scrollY: 0 });
@@ -19,10 +16,9 @@ function setup(withVisualViewport = true) {
       window.visualViewport.dispatchEvent(new Event('scroll'));
     }
   };
-  new Function('window', 'requestAnimationFrame', 'onSync', `
-    ${html.slice(start, end)}
-    anchorTouchViewport(onSync);
-  `)(window, callback => frames.push(callback), () => syncs++);
+  globalThis.window = window;
+  globalThis.requestAnimationFrame = callback => frames.push(callback);
+  anchorTouchViewport(() => syncs++);
   const frame = () => { for (const callback of frames.splice(0)) callback(); };
   return { window, frames, scrolls, frame, syncs: () => syncs };
 }
@@ -72,6 +68,6 @@ test('works without VisualViewport and leaves already anchored pages alone', () 
   game.window.scrollY = 68;
   game.window.dispatchEvent(new Event('resize')); game.frame();
   assert.deepEqual(game.scrolls, [[0, 0]]);
-  assert.match(html, /body\.touch-device \{ position: fixed; inset: 0; width: 100%; \}/);
-  assert.match(html, /if \(touchMode\) anchorTouchViewport\(updateHudClearance\);/, 'Desktop layout and scrolling are unchanged');
+  assert.match(css, /body\.touch-device \{ position: fixed; inset: 0; width: 100%; \}/);
+  assert.match(gameSource, /if \(touchMode\) anchorTouchViewport\(updateHudClearance\);/, 'Desktop layout and scrolling are unchanged');
 });

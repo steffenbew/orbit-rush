@@ -19,9 +19,7 @@ const banks = {
 };
 const activeSounds = new Set();
 async function decode(file) {
-  const url = new URL(`assets/audio/${file}`, import.meta.url);
-  // Share the module version so replacing a sound also invalidates its cached file.
-  url.search = new URL(import.meta.url).search;
+  const url = new URL(`../../assets/audio/${file}`, import.meta.url);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Audio file unavailable: ${file} (${response.status})`);
   return context.decodeAudioData(await response.arrayBuffer());

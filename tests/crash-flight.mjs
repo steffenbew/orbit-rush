@@ -1,43 +1,48 @@
 // Run from the project root: node tests/crash-flight.mjs
+import { createCrashMotion } from '../src/flight/crash-motion.js';
+import { livesAfterImpact } from '../src/run/progression.js';
+import { createSimulationClock } from '../src/flight/simulation-clock.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from '../assets/vendor/three.module.js';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
   return source.slice(from, to);
 };
-const makeCrash = (reducedMotion = false, side = 1) => new Function('THREE', 'reducedMotion', 'side', `
+const makeCrash = (reducedMotion = false, side = 1) => new Function('createCrashMotion', 'createSimulationClock', 'livesAfterImpact', 'THREE', 'reducedMotion', 'side', `
   const camera = new THREE.PerspectiveCamera(), scene = new THREE.Scene();
   const flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
   const flightViewOffset = new THREE.Vector2();
   const flightVelocity = new THREE.Vector2(), flightMotion = new THREE.Vector3(0, 0, reducedMotion ? -40 : -800);
   const flightDirection = new THREE.Vector3(0, 0, -1), worldStep = new THREE.Vector3(), distance = new THREE.Vector3();
-  const crashSpin = new THREE.Vector3();
-  const crashRotation = new THREE.Quaternion(), crashRotationStep = new THREE.Quaternion();
-  let speed = -flightMotion.z, crashing = false, crashDrifting = false, crashTime = 0, crashCoastSpeed = 0;
-  let started = true, paused = false, roundEnded = false, retries = 3, shieldHitTime = 0, shieldHitStrength = 1, pointer = {}, spaceHeld = true;
+  ${section('  const crashMotion =', '  let shieldHitTime =')}
+  let speed = -flightMotion.z, crashing = false, crashDrifting = false, crashTime = 0;
+  let started = true, paused = false, roundEnded = false, retries = 3, shieldHitTime = 0, shieldHitStrength = 1;
   let flash = 0, shake = 0, results = 0;
   const elements = new Map(), document = {hidden: false, querySelector(key) {
     if (!elements.has(key)) elements.set(key, {hidden: false, textContent: '', classList: {add() {}, remove() {}}});
     return elements.get(key);
   }};
-  const touchControls = {reset() {}}, pauseMenu = {open: false}, showerWarning = {}, repairPickup = {}, repairMarker = {};
+  const controls = {reset() {}}, pauseMenu = {open: false}, showerWarning = {}, repair = {hide() {}};
   const shieldHit = {}, capitalHud = {}, flightPath = {}, collisionAlert = {}, feedback = {classList: {remove() {}}};
   const sound = {setAlarm() {}, failures: 0, playEngineFailure() { this.failures++; }}, particles = [], rockets = [new THREE.Object3D()];
-  const updateShield = () => {}, updateRetries = () => {}, clearEnemyBolts = () => {}, updateClock = () => {};
+  const projectiles = { clear() { rockets.length = 0; } };
+  const updateShield = () => {}, updateRetries = () => {}, clearEnemyBolts = () => {}, renderRoundClock = () => {};
   const sounds = [], bursts = [];
   const clearTargetLock = () => {}, syncMusic = () => {}, playSound = (...args) => sounds.push(args), t = key => key;
-  const explode = (...args) => { bursts.push(args); particles.push({vx: 0, vy: 0, vz: 0}); };
-  const performance = {now: () => 0}, resetFrameStats = () => {};
+  const effects = { crashBurst(impact, motion) { bursts.push([impact, reducedMotion ? 12 : 120, true]); particles.push({vx: motion.x, vy: motion.y, vz: motion.z}); } };
   const finishRound = () => { results++; crashing = false; roundEnded = true; };
-  ${section('      const simulationStep =', '      const progressionTimeScale =')}
-  ${section('      function startCrash(', '      function finishRound(')}
+  const target = new THREE.Vector2(), flightTurn = new THREE.Vector2(), flightView = {reset() {}};
+  const dangerVignette = {style: {}, classList: {remove() {}}};
+  ${section('  function resetPlayerFlight()', '  function resetPlayerWeapons()')}
+  const clock = createSimulationClock(updateSimulation, () => document.hidden || (paused && !crashDrifting));
+  ${section('  function startCrash(', '  function finishRound(')}
   function updateSimulation(dt) {
-    ${section('        if (crashing && !document.hidden) {', '        updateFlightTutorial();')}
-    ${section('        if ((!paused || crashing) && shieldHitTime > 0)', '        updateShieldAnimation(dt);')}
+    ${section('    if (crashing && !document.hidden) {', '    updateFlightTutorial();')}
+    ${section('    if ((!paused || crashing) && shieldHitTime > 0)', '    updateShieldAnimation(dt);')}
     updateCrashFlight(dt);
     worldStep.copy(flightMotion).multiplyScalar(paused && !crashDrifting ? 0 : -dt);
     distance.add(worldStep);
@@ -45,11 +50,12 @@ const makeCrash = (reducedMotion = false, side = 1) => new Function('THREE', 're
   const object = new THREE.Object3D(); object.position.set(side * 20, 5, -10);
   const flightBoundary = new THREE.Object3D(); flightBoundary.position.copy(object.position);
   return {
+    resetPlayerFlight,
     crash(cause = 'ship') {
       object.userData = cause === 'checkpoint' ? {flightRing: true} : cause === 'laser' ? {enemyBolt: true}
         : cause === 'asteroid' ? {type: {asteroid: true}} : cause === 'ship' ? {type: {name: 'INTERCEPTOR'}} : {};
       startCrash(cause === 'boundary' ? flightBoundary : object);
-    }, frame: advanceSimulation, particles, rockets, sounds, bursts, sound,
+    }, frame: clock.advance, particles, rockets, sounds, bursts, sound,
     setFlashStrength: value => {shieldHitStrength = value;},
     setFlight({pitch = 0, yaw = 0, bank = 0, velocity = speed, offsetX = 0, offsetY = 0, hitX = side * 20, hitY = 5}) {
       speed = velocity; flightOrientation.set(pitch, yaw, 0, 'YXZ');
@@ -60,13 +66,13 @@ const makeCrash = (reducedMotion = false, side = 1) => new Function('THREE', 're
       flightBoundary.position.copy(object.position);
     },
     get cameraRotation() { return camera.quaternion.clone(); },
-    hide: value => {document.hidden = value; resetSimulationClock();},
+    hide: value => {document.hidden = value; clock.reset();},
     pauseWithoutCrash: () => {paused = true;},
     state: () => ({speed, retries, crashing, crashDrifting, crashTime, roundEnded, paused, results, shieldHitTime, shieldHitStrength, flash, shake,
       label: document.querySelector('#impact-label').textContent,
-      tilt: flightTilt.toArray(), spin: crashSpin.toArray(), motion: flightMotion.toArray(), distance: distance.toArray()})
+      tilt: flightTilt.toArray(), motion: flightMotion.toArray(), distance: distance.toArray()})
   };
-`)(THREE, reducedMotion, side);
+`)(createCrashMotion, createSimulationClock, livesAfterImpact, THREE, reducedMotion, side);
 
 function advance(game, seconds, fps = 60) {
   for (let i = 0; i < seconds * fps; i++) game.frame(1 / fps);
@@ -167,12 +173,20 @@ console.log('PASS ±90° banked impacts, pitched/yawed headings, all hit quadran
 const pause = makeCrash(); pause.pauseWithoutCrash(); const frozen = pause.state(); advance(pause, 3);
 assert.deepEqual(pause.state(), frozen, 'Normal pause still freezes simulation');
 assert.doesNotMatch(source, /crash-fire|drawCrashFire|crashFlames/, 'No full-screen fire overlay remains');
-const restart = section('      function restartRound(', '      function updateCapitalShip(');
-assert.match(restart, /crashDrifting = false; crashCoastSpeed = 0/);
-assert.match(restart, /crashSpin.set\(0, 0, 0\)/);
-const finish = section('      function finishRound(', '      function restartRound(');
-assert.match(finish, /if \(crashed && !crashing\) retries = Math.max\(0, retries - 1\)/);
+const retry = makeCrash();
+retry.crash(); advance(retry, .5);
+retry.resetPlayerFlight();
+assert.equal(retry.state().crashDrifting, false);
+assert.deepEqual(retry.state().tilt, [0, 0, 0]);
+assert.deepEqual(retry.state().motion, [0, 0, 0]);
+const fresh = makeCrash();
+for (const flight of [retry, fresh]) {
+  flight.setFlight({velocity: 800, hitX: -20});
+  flight.crash(); advance(flight, .5);
+}
+assert.deepEqual(retry.state().motion, fresh.state().motion, 'A new crash after retry has no leftover spin or coast');
+assert.deepEqual(retry.state().tilt, fresh.state().tilt);
+const finish = section('  function finishRound(', '  function restartRound(');
 assert.match(finish, /if \(crashed && !crashDrifting\) speed = 0/);
 assert.match(source, /if \(roundEnded && !crashDrifting\) break/);
-assert.match(source, /if \(!paused \|\| crashDrifting\) p.age \+= dt/);
 console.log('PASS directional crash drift, momentum, two-second results, one life, 5–144 FPS, hidden tabs, reduced motion, normal pause and reset wiring');

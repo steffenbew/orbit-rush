@@ -1,11 +1,7 @@
+import { css, game } from './helpers/app-source.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const helperStart = html.indexOf('    function bindTouchButtons(');
-const helperEnd = html.indexOf('    const touchMode', helperStart);
-assert.ok(helperStart > 0 && helperEnd > helperStart);
-const bindTouchButtons = new Function(`${html.slice(helperStart, helperEnd)}; return bindTouchButtons;`)();
+import { bindTouchButtons } from '../src/platform/touch-ui.js';
 
 function event(type, properties = {}) {
   return Object.assign(new Event(type, { cancelable: true }), properties);
@@ -132,9 +128,9 @@ test('rotation, app switching and focus loss cancel unfinished taps', () => {
 });
 
 test('mobile UI uses larger separated targets, inert icons and touch binding outside held-fire controls', () => {
-  assert.match(html, /body\.touch-device \.hud-actions \{ gap: 10px; \}/);
-  assert.match(html, /body\.touch-device \.hud-actions button \{ width: 48px; height: 48px; flex-shrink: 0; \}/);
-  assert.match(html, /\.hud-actions \.icon \{ pointer-events: none; \}/);
-  assert.ok(html.includes("bindTouchButtons(document.querySelectorAll('button:not(#touch-laser, #touch-power)'))"));
-  assert.ok(html.includes('fullscreenButton.hidden = !document.fullscreenEnabled;'));
+  assert.match(css, /body\.touch-device \.hud-actions \{ gap: 10px; \}/);
+  assert.match(css, /body\.touch-device \.hud-actions button \{ width: 48px; height: 48px; flex-shrink: 0; \}/);
+  assert.match(css, /\.hud-actions \.icon \{ pointer-events: none; \}/);
+  assert.ok(game.includes("bindTouchButtons(document.querySelectorAll('button:not(#touch-laser, #touch-power)'))"));
+  assert.ok(game.includes('fullscreenButton.hidden = !document.fullscreenEnabled;'));
 });

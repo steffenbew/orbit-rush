@@ -1,52 +1,49 @@
 // The stream must sweep across the screen, not merely have a nonzero world velocity.
-import {readFileSync} from 'node:fs';
+import { getAsteroidEncounters, planEncounterLayout, corridorHeightAt } from '../src/course/encounter-plan.js';
+import * as THREE from '../assets/vendor/three.module.js';
 import assert from 'node:assert/strict';
-const root = new URL('../', import.meta.url);
-const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
-const from = source.indexOf('      function planAsteroidShower() {') + '      function planAsteroidShower() {'.length;
-const to = source.indexOf('\n      }\n      function advanceAsteroidShower', from);
-assert.ok(from > 0 && to > from);
-const initialize = source.slice(from, to);
-const selection = source.match(/const direction = \[[^;]+;/);
-assert.ok(selection, 'Exercise the production level-based direction plan');
-const choose = new Function('level', selection[0] + '\nreturn direction;');
+const choose = level => getAsteroidEncounters(level, false)[0].direction;
 const counts = [0, 0, 0, 0];
 for (let level = 1; level <= 1000; level++) counts[choose(level)]++;
 assert.deepEqual(counts, [400, 400, 100, 100], 'Keep 40/40/10/10 across the repeating direction cycle');
 assert.equal(choose(1), choose(11), 'Directions are repeatable rather than rerolled on retry');
 console.log('PASS deterministic shower directions with predominantly lateral approaches');
-function field(course, speed, reducedMotion, width = 1280, height = 720, yaw = 0, pitch = 0, corridor = false) {
-  return new Function('THREE', 'selectedCourse', 'speed', 'reducedMotion', 'width', 'height', 'yaw', 'pitch', 'showerCorridor', `
-    const random = (a, b) => a === 0 && b === 1 ? [.2, .6, .85, .95][selectedCourse] : (a + b) / 2;
-    const camera = new THREE.PerspectiveCamera(reducedMotion ? 70 : 100, width / height, .03, 14000);
-    const flightOrientation = new THREE.Euler(pitch, yaw, 0, 'YXZ');
-    const flightMotion = new THREE.Vector3(0, 0, -speed).applyEuler(flightOrientation);
-    // Simulate velocity left over from a previous rain event.
-    const showerVelocity = new THREE.Vector3(99, -22, 33), showerDirection = new THREE.Vector3(), showerOrigin = new THREE.Vector3();
-    const showerRotation = new THREE.Quaternion(), showerCourseOrigin = new THREE.Vector3(), courseOrigin = camera.position.clone();
-    const courseStartTime = 0;
-    const levelFlightSpeed = () => speed, flightDistanceAt = time => time * speed * .85;
-    const level = 1, roundDuration = 45, maxShowerRocks = 144, showerStart = 0, showerEntry = 12, showerEnd = 30, showerStrength = 2;
-    const showerCourse = selectedCourse, showerShape = 0, showerKind = 'shower'; let corridorPlan = null;
-    let showerPending = true, showerLength, showerSpacing, showerObstacleSpacing, nextShowerObstacle, showerHalfGap, showerHalfWidth, showerBend = 1.15;
-    ${initialize}
-    showerOrigin.copy(showerCourseOrigin);
-    camera.rotation.copy(flightOrientation); camera.updateMatrixWorld();
-    return {camera, velocity: showerVelocity, direction: showerDirection, origin: showerOrigin,
-      rotation: showerRotation, heading: new THREE.Quaternion().setFromEuler(flightOrientation), flightMotion, lead, approachSpeed};
-  `)(THREE, course, speed, reducedMotion, width, height, yaw, pitch, corridor);
+function field(course, speed, reducedMotion, width = 1280, height = 720, yaw = 0, pitch = 0) {
+  const camera = new THREE.PerspectiveCamera(reducedMotion ? 70 : 100, width / height, .03, 14000);
+  camera.rotation.set(pitch, yaw, 0, 'YXZ'); camera.updateMatrixWorld();
+  const flightMotion = new THREE.Vector3(0, 0, -speed).applyEuler(camera.rotation);
+  const layout = planEncounterLayout({ kind: 'shower', direction: course, strength: 2,
+    prepare: 0, entry: 12, exit: 30, shape: 0, bend: 0 }, { courseOrigin: camera.position, level: 1, roundDuration: 45,
+    reducedMotion, maxShowerRocks: 144, levelFlightSpeed: () => speed, flightDistanceAt: time => time * speed * .85 });
+  return { ...layout, camera, flightMotion };
 }
-for (const reduced of [false, true]) for (const speed of [35, 300, 1100]) for (let course = 0; course < 4; course++) {
-  const fixed = field(course, speed, reduced, 1280, 720, -.7, .3, true);
-  assert.equal(fixed.velocity.lengthSq(), 0, 'The corridor clears any previous rain velocity');
-  assert.ok(fixed.rotation.angleTo(new THREE.Quaternion()) < 1e-7, 'Corridor stays aligned with the fixed course, not the current player heading');
-  assert.ok(fixed.direction.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-8);
-  assert.ok(fixed.origin.distanceTo(fixed.direction.clone().multiplyScalar(fixed.lead)) < 1e-8,
-    'The fixed passage has no sideways rain crossing offset');
-  assert.ok(Math.abs(fixed.approachSpeed - speed * .85) < 1e-8, 'Corridor pacing depends on player travel only');
+// Planning a future corridor must not activate it or change the current event's drift.
+for (const reducedMotion of [false, true]) {
+  const courseOrigin = new THREE.Vector3(80, -50, 320);
+  const speed = reducedMotion ? 35 : 600;
+  const flightDistanceAt = time => time * speed * .85;
+  const options = { level: 5, reducedMotion, roundDuration: 45, levelFlightSpeed: () => speed,
+    flightDistanceAt, courseOrigin, maxShowerRocks: 144 };
+  const [fieldEvent, showerEvent, corridorEvent] = getAsteroidEncounters(5, reducedMotion);
+  const shower = planEncounterLayout(showerEvent, options);
+  const velocity = shower.velocity.clone(), field = planEncounterLayout(fieldEvent, options);
+  const corridor = planEncounterLayout(corridorEvent, options);
+  assert.ok(velocity.lengthSq() > 0 && shower.velocity.equals(velocity));
+  for (const fixed of [field, corridor]) {
+    assert.equal(fixed.velocity.lengthSq(), 0);
+    assert.ok(fixed.rotation.angleTo(new THREE.Quaternion()) < 1e-7);
+    assert.ok(fixed.direction.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-8);
+    assert.ok(fixed.origin.distanceTo(courseOrigin.clone().addScaledVector(fixed.direction, flightDistanceAt(fixed.entry))) < 1e-8);
+  }
+  assert.equal(corridor.length, flightDistanceAt(corridorEvent.exit) - flightDistanceAt(corridorEvent.entry));
+  assert.equal(corridor.gap, reducedMotion ? 26 : 38);
+  assert.equal(corridor.firstObstacle, reducedMotion ? corridor.spacing : corridor.length * .22);
+  assert.equal(corridor.bend, corridorEvent.bend * corridor.gap);
+  assert.equal(corridorHeightAt(corridor.length / 2, corridor, reducedMotion), corridor.bend);
+  assert.deepEqual(planEncounterLayout(corridorEvent, options), corridor, 'Retries reproduce the layout without scaling the bend twice');
+  assert.deepEqual(courseOrigin.toArray(), [80, -50, 320]);
 }
-console.log('PASS the corridor stays fixed, aligned and free of previous rain velocity or crossing offsets');
+console.log('PASS independent field, rain and corridor plans; fixed entry planes, obstacle spacing and repeatable bends');
 const measured = [];
 for (const reduced of [false, true]) for (const speed of reduced ? [35, 60] : [200, 600, 1100]) {
   for (const [width, height] of [[1280, 720], [390, 844]]) for (let course = 0; course < 4; course++) {

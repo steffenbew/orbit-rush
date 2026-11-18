@@ -5,7 +5,7 @@
 node_modules/
 *.log
 .run/
-__pycache__/
+dist/
 
 # Local secrets
 .env

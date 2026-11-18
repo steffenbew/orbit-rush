@@ -3,14 +3,6 @@ set -euo pipefail
 
 cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
-start() {
-  exec python3 "$PWD/scripts/dev-server.py" start
-}
-
-stop() {
-  exec python3 "$PWD/scripts/dev-server.py" stop
-}
-
 test() {
   ORBIT_TEST_FULL="${1:-0}" node --test --test-concurrency=6 tests/*.mjs
 }
@@ -21,16 +13,18 @@ deploy() {
 
 usage() {
   printf '%s\n' \
-    'Usage: ./run {start|dev|stop|test|test:full|deploy|help}' \
+    'Usage: ./run {start|dev|stop|build|preview|test|test:full|deploy|help}' \
     '' \
-    '  start, dev  Serve locally in the foreground (Python 3)' \
+    '  start, dev  Serve with Vite live refresh (npm ci first; Node.js 22.12+)' \
     '  stop        Stop only this checkout’s tracked server' \
-    '  test        Run fast regression suites (Python 3 and Node.js 20+)' \
-    '  test:full   Also run exhaustive traversals and the five-minute starfield soak' \
+    '  build       Generate the static production site in dist/' \
+    '  preview     Serve dist/ locally, including its production worker' \
+    '  test        Run fast regression suites' \
+    '  test:full   Run wider gameplay sweeps and the five-minute simulated starfield soak' \
     '  deploy      Deploy to https://orbitrush.steffenbew.com (SSH/rsync)' \
     '  help        Show this help' \
     '' \
-    'Default: port 8080, or a free port if occupied; prints the actual URL.' \
+    'Defaults: start on 8080, preview on 8081, or a free port if occupied.' \
     'Custom port: PORT=8082 ./run start (fails if that port is occupied)' \
     'Stop with Ctrl+C or ./run stop in another terminal.'
 }
@@ -41,8 +35,9 @@ if [[ $# -gt 1 ]]; then
 fi
 
 case "${1:-help}" in
-  start|dev) start ;;
-  stop) stop ;;
+  start|dev) exec node scripts/dev-server.mjs start ;;
+  stop|preview) exec node scripts/dev-server.mjs "$1" ;;
+  build) exec node scripts/build.mjs ;;
   test) test ;;
   test:full) test 1 ;;
   deploy) deploy ;;

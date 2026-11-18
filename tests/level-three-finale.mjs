@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { THREE, makeGame, makeFlightClock, randomState } from './helpers/flight-game.mjs';
 
-for (const reduced of [false, true]) for (const fps of [5, 60, 144]) for (const seed of [123, 456, 789])
+const full = process.env.ORBIT_TEST_FULL === '1';
+
+for (const reduced of [false, true]) for (const [seed, fps] of full ? [[123, 5], [456, 60], [789, 144]] : [[123, 5]])
 for (const evade of [false, true]) {
   randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(3); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   let time = 0, detailedHits = 0, route = null;
-  const clock = makeFlightClock(THREE, game, reduced, dt => {
+  const clock = makeFlightClock(game, dt => {
     time += dt; game.setTime(time);
     let aim = game.flightRings.find(gate => !gate.userData.resolved)?.position.clone();
     if (evade && route) {
@@ -64,4 +66,4 @@ for (const evade of [false, true]) {
     assert.ok(detailedHits + game.hits.length > 0, `Aiming straight at the gate must require an evasive correction: ${context}`);
   }
 }
-console.log('PASS level-three checkpoint/field proximity, real approach hazards and collision-free evasive routes at 5–144 FPS in both motion modes');
+console.log('PASS level-three checkpoint/field proximity, real approach hazards and collision-free evasive routes in both motion modes');

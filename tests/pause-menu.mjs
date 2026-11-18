@@ -1,12 +1,12 @@
+import { html, css, game as gameSource } from './helpers/app-source.mjs';
 // Run from the project root: node tests/pause-menu.mjs
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { t, setLanguage } from '../i18n.js';
+import { t, setLanguage } from '../src/presentation/i18n.js';
 setLanguage('de');
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const start = source.indexOf('      function togglePause()');
-const end = source.indexOf('      const fullscreenButton', start);
+
+const start = gameSource.indexOf('  function togglePause()');
+const end = gameSource.indexOf('  const fullscreenButton', start);
 assert.ok(start >= 0 && end > start);
 const document = Object.assign(new EventTarget(), { activeElement: null, querySelector: selector => elements.get(selector) });
 class Element extends EventTarget {
@@ -24,20 +24,20 @@ document.activeElement = body;
 const menu = elements.get('#pause-menu');
 const game = new Function('document', 'pauseMenu', 't', `
   let started = true, paused = false, roundEnded = false, celebrating = false, crashing = false;
-  let pointer = {id: 1}, spaceHeld = true, speed = 400, clockResets = 0;
+  let speed = 400, clockResets = 0;
   const resetSimulationClock = () => { clockResets++; };
   let touchResets = 0;
-  const touchControls = {reset() { touchResets++; }};
+  const controls = {reset() { touchResets++; }};
   const lastPointerPosition = {clientX: 300, clientY: 250};
   let audioResumes = 0, musicSyncs = 0, steered = null;
   const sound = {resumeAudio: () => { audioResumes++; return Promise.resolve(); }};
   const audioError = error => { throw error; };
   const syncMusic = () => musicSyncs++;
-  const steer = point => steered = point;
-  ${source.slice(start, end)}
+  const playerAim = {resume: () => steered = lastPointerPosition};
+  ${gameSource.slice(start, end)}
   return {
     togglePause,
-    state: () => ({paused, pointer, spaceHeld, audioResumes, musicSyncs, steered, speed, clockResets, touchResets}),
+    state: () => ({paused, audioResumes, musicSyncs, steered, speed, clockResets, touchResets}),
     mode: value => {
       started = value !== 'intro'; crashing = value === 'crash';
       roundEnded = value === 'defeat' || value === 'victory'; celebrating = value === 'victory';
@@ -58,8 +58,7 @@ assert.equal(game.state().paused, true);
 assert.equal(menu.open, true);
 assert.equal(document.activeElement, elements.get('#continue-flight'));
 assert.equal(elements.get('#pause').attributes['aria-pressed'], 'true');
-assert.equal(game.state().pointer, null);
-assert.equal(game.state().spaceHeld, false);
+assert.equal(game.state().touchResets, 1);
 assert.equal(game.state().speed, 0);
 assert.equal(game.state().clockResets, 1, 'Pause must discard the partial simulation frame');
 for (const type of ['keydown', 'keyup']) assert.equal(key(type, 'Space').defaultPrevented, true);
@@ -92,8 +91,8 @@ document.dispatchEvent(escape);
 assert.equal(escape.defaultPrevented, true);
 assert.equal(menu.open, false, 'Escape outside the pause dialog resumes gameplay');
 assert.equal(game.state().paused, false);
-assert.ok(source.includes('pauseMenu.show();'), 'Non-modal pause keeps HUD controls interactive');
-assert.match(source, /body:has\(#pause-menu\[open\]\) :is\(\.hud, #shield-hud, \.credits\) \{ z-index: 12;/);
+assert.ok(gameSource.includes('pauseMenu.show();'), 'Non-modal pause keeps HUD controls interactive');
+assert.match(css, /body:has\(#pause-menu\[open\]\) :is\(\.hud, #shield-hud, \.credits\) \{ z-index: 12;/);
 console.log('PASS non-modal pause, foreground HUD and Escape from inside/outside the menu; Space/repeat safety');
 
 for (const mode of ['intro', 'crash', 'defeat']) {
@@ -108,12 +107,12 @@ click('#continue-flight');
 assert.equal(menu.open, false);
 console.log('PASS intro/crash/defeat guards and celebration-flight pause');
 
-const hud = source.slice(source.indexOf('<div class="hud-actions"'), source.indexOf('</header>'));
+const hud = html.slice(html.indexOf('<div class="hud-actions"'), html.indexOf('</header>'));
 assert.ok(!hud.includes('id="restart"'));
-const menuMarkup = source.slice(source.indexOf('<dialog id="pause-menu"'), source.indexOf('<dialog id="round-end"'));
+const menuMarkup = html.slice(html.indexOf('<dialog id="pause-menu"'), html.indexOf('<dialog id="round-end"'));
 assert.ok(!menuMarkup.includes('id="restart"'));
 assert.ok(menuMarkup.includes('id="end-run"') && menuMarkup.includes('id="continue-flight"'));
-assert.ok(source.includes('<div class="brand"><span>ORBIT RUSH</span></div>'));
-assert.ok(!source.includes('FREE FLIGHT'));
-assert.ok(!source.includes('PAUSE · KLICK ZUM WEITERFLIEGEN'));
+assert.ok(html.includes('<div class="brand"><span>ORBIT RUSH</span></div>'));
+assert.ok(!html.includes('FREE FLIGHT'));
+assert.ok(!html.includes('PAUSE · KLICK ZUM WEITERFLIEGEN'));
 console.log('PASS pause offers only continue/end, Orbit Rush-only branding and no obsolete click-to-resume hint');

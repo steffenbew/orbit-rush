@@ -1,11 +1,10 @@
+import { html, css, game as gameSource } from './helpers/app-source.mjs';
 // Run from the project root: node tests/shield-hud.mjs
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const from = source.indexOf('      const shieldHud =');
-const to = source.indexOf('      const repairMarker =', from);
-assert.ok(from >= 0 && to > from);
+
+import { createShieldHud } from '../src/flight/shield-hud.js';
+
 function makeHud(reducedMotion = false) {
   const elements = new Map();
   const document = {hidden: false, querySelector(selector) {
@@ -18,25 +17,22 @@ function makeHud(reducedMotion = false) {
     }
     return elements.get(selector);
   }};
-  return new Function('document', 'reducedMotion', `
-    let shield = 100, paused = false, started = true;
-    ${source.slice(from, to)}
-    updateShield(false);
-    return {
-      change(value, animate = true) { shield = value; updateShield(animate); },
-      step(dt) { updateShieldAnimation(dt); renderShieldHud(); },
-      pause(value) { paused = value; renderShieldHud(); },
-      hide(value) { document.hidden = value; renderShieldHud(); },
-      state() { return {
-        value: document.querySelector('#shield-energy').value,
-        text: document.querySelector('#shield-value').textContent,
-        displayed: shieldDisplayed, fill: shieldFill.style.transform,
-        hit: shieldHud.classList.contains('hit'), healed: shieldHud.classList.contains('healed'),
-        low: shieldHud.classList.contains('low'), feedbackTime: shieldFeedbackTime,
-        animation: shieldHud.style.animationPlayState
-      }; }
-    };
-  `)(document, reducedMotion);
+  const hud = createShieldHud(document, reducedMotion, 100);
+  const panel = document.querySelector('#shield-hud'), fill = document.querySelector('#shield-fill');
+  let paused = false;
+  hud.set(100, false); hud.render(paused);
+  return {
+    change(value, animate = true) { hud.set(value, animate); hud.render(paused); },
+    step(dt) { hud.advance(dt, !paused); hud.render(paused); },
+    pause(value) { paused = value; hud.render(paused); },
+    hide(value) { document.hidden = value; hud.render(paused); },
+    state: () => ({
+      value: document.querySelector('#shield-energy').value, text: document.querySelector('#shield-value').textContent,
+      displayed: Number(fill.style.transform.slice(7, -1)) * 100, fill: fill.style.transform,
+      hit: panel.classList.contains('hit'), healed: panel.classList.contains('healed'), low: panel.classList.contains('low'),
+      animation: panel.style.animationPlayState
+    })
+  };
 }
 for (const reduced of [false, true]) {
   const hud = makeHud(reduced);
@@ -70,7 +66,6 @@ for (const reduced of [false, true]) {
   }
   hud.change(100, false); hud.change(100);
   assert.equal(hud.state().healed, false, 'No healing glow for a no-op at full shield');
-  assert.equal(hud.state().feedbackTime, 0);
 
   hud.change(20, false); hud.change(25);
   assert.equal(hud.state().low, true);
@@ -94,12 +89,12 @@ for (const reduced of [false, true]) {
   hud.change(0); hud.change(0, false);
   assert.equal(hud.state().displayed, 0, 'Crash snaps to actual shield even while gameplay is paused');
 }
-assert.ok(source.includes('<span id="shield-track" aria-hidden="true">'), 'Decorative bar does not duplicate the accessible progress');
-assert.ok(source.includes('        updateShieldAnimation(dt);'));
-assert.ok(source.includes('#shield-hud.hit, #shield-hud.healed { animation: none; opacity: 1; }'));
-for (const name of ['startCrash', 'finishRound', 'restartRound']) {
-  const start = source.indexOf(`      function ${name}(`);
-  const end = source.indexOf('\n      function ', start + 1);
-  assert.ok(source.slice(start, end).includes('updateShield(false);'), `${name} clears animation without a healing pulse`);
+assert.ok(html.includes('<span id="shield-track" aria-hidden="true">'), 'Decorative bar does not duplicate the accessible progress');
+assert.ok(gameSource.includes('    updateShieldAnimation(dt);'));
+assert.ok(css.includes('#shield-hud.hit, #shield-hud.healed { animation: none; opacity: 1; }'));
+for (const name of ['startCrash', 'enterRoundResult', 'restartRound']) {
+  const start = gameSource.indexOf(`  function ${name}(`);
+  const end = gameSource.indexOf('\n  function ', start + 1);
+  assert.ok(gameSource.slice(start, end).includes('updateShield(false);'), `${name} clears animation without a healing pulse`);
 }
 console.log('PASS shield fill easing, immediate accessible values, damage/heal glow, pause, reduced motion, rapid changes and clean resets');

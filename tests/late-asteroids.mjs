@@ -60,7 +60,7 @@ console.log('PASS two separated late remnants, size-aware durability, stationary
 for (const reduced of [false, true]) for (const fps of [5, 60, 144]) {
   const game = makeGame(reduced); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   let time = 0, hits = 0;
-  const clock = makeFlightClock(THREE, game, reduced, dt => {
+  const clock = makeFlightClock(game, dt => {
     time += dt; game.setTime(time);
     const next = game.flightRings.find(gate => !gate.userData.resolved);
     if (next) {

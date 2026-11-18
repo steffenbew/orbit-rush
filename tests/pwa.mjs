@@ -1,34 +1,49 @@
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { test } from 'node:test';
+import { join } from 'node:path';
+import { after, test } from 'node:test';
 import vm from 'node:vm';
-import * as legacyTouch from './fixtures/touch-controls-v5.js';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
-const html = read('index.html');
-const manifest = JSON.parse(read('manifest.webmanifest'));
+// Exercise the actual static builds; never write into the developer's dist/.
+const directory = mkdtempSync(join(tmpdir(), 'orbit release '));
+after(() => rmSync(directory, { recursive: true, force: true }));
+mkdirSync(join(directory, 'scripts'));
+symlinkSync(new URL('node_modules/', root), join(directory, 'node_modules'), 'dir');
+for (const file of ['src', 'assets', 'public', 'scripts/build.mjs', 'sw.js', '.htaccess', 'index.html']) {
+  cpSync(new URL(file, root), join(directory, file), { recursive: true });
+}
 const developmentSource = read('sw.js');
-const prepareScript = fileURLToPath(new URL('scripts/prepare-pwa.py', root));
-const preparedSource = execFileSync('python3', [prepareScript], { encoding: 'utf8' });
-const release = JSON.parse(preparedSource.match(/^const RELEASE = (.+);$/m)[1]);
 const integrity = body => 'sha256-' + createHash('sha256').update(body).digest('base64');
-const files = JSON.parse(developmentSource.match(/const FILES = (\[[\s\S]*?\]);/)[1]);
-const bodies = new Map(files.map(file => [file, readFileSync(new URL(file, root))]));
-const responseFor = (scope, request, overrides = {}) => {
+function build() {
+  execFileSync(process.execPath, [join(directory, 'scripts/build.mjs')]);
+  const dist = join(directory, 'dist');
+  const script = readFileSync(join(dist, 'sw.js'), 'utf8');
+  const release = JSON.parse(script.match(/^const RELEASE = (.+);$/m)[1]);
+  const bodies = new Map(Object.keys(release.integrity).map(path => [path, readFileSync(join(dist, path))]));
+  const html = bodies.get('index.html').toString();
+  const [, entry] = html.match(/<script type="module"[^>]*src="\.\/([^"]+)"/);
+  const [, css] = html.match(/<link rel="stylesheet"[^>]*href="\.\/([^"]+)"/);
+  return { script, release, bodies, entry, css };
+}
+const first = build();
+const finderFiles = ['.DS_Store', 'icons/.DS_Store'];
+for (const path of finderFiles) writeFileSync(join(directory, 'public', path), 'local Finder metadata');
+const repeat = build();
+writeFileSync(join(directory, 'src/presentation/game.css'), '\n:root { --orbit-css-update: 1; }\n', { flag: 'a' });
+const second = build();
+const { script: preparedSource, release, bodies } = first;
+const html = bodies.get('index.html').toString();
+const manifest = JSON.parse(bodies.get('manifest.webmanifest'));
+const music = [...bodies.keys()].find(path => /^assets\/orbit-arcade-.*\.mp3$/.test(path));
+function responseFor(scope, request, overrides = {}, files = bodies) {
   const path = new URL(request.url).pathname.slice(new URL(scope).pathname.length) || 'index.html';
-  const body = Object.hasOwn(overrides, path) ? overrides[path] : bodies.get(path);
+  const body = Object.hasOwn(overrides, path) ? overrides[path] : files.get(path);
   return body === undefined ? new Response('missing', { status: 404 }) : new Response(body);
-};
-function nextRelease(overrides) {
-  const next = { id: 'next-release', integrity: { ...release.integrity } };
-  for (const [file, body] of Object.entries(overrides)) next.integrity[file] = integrity(body);
-  return preparedSource.replace(/^const RELEASE = .+;$/m, `const RELEASE = ${JSON.stringify(next)};`);
 }
 
 function worker({ scope = 'https://example.test/games/orbit-rush/', script = preparedSource, stores = new Map() } = {}) {
@@ -46,7 +61,8 @@ function worker({ scope = 'https://example.test/games/orbit-rush/', script = pre
         async addAll(requests) {
           // Model the browser's atomic Cache.addAll and fetch integrity checks.
           const responses = await Promise.all(requests.map(async request => {
-            assert.equal(request.cache, 'reload');
+            const hashed = /^assets\/[^/]+-[\w-]{8}\.[^/]+$/.test(request.url.slice(scope.length));
+            assert.equal(request.cache, hashed ? 'force-cache' : 'reload');
             const response = await network(request);
             if (!response.ok) throw new TypeError(`Precache HTTP ${response.status}`);
             if (request.integrity && request.integrity !== integrity(Buffer.from(await response.clone().arrayBuffer()))) {
@@ -116,14 +132,14 @@ test('install metadata uses only Orbit Rush and local, correctly sized PNG icons
   assert.match(html, /rel="manifest" href="\.\/manifest.webmanifest"/);
   assert.match(html, /name="apple-mobile-web-app-title" content="Orbit Rush"/);
   assert.match(html, /name="apple-mobile-web-app-capable" content="yes"/);
-  assert.match(html, /src="\.\/pwa.js" defer/);
+  assert.match(first.entry, /^assets\/.*\.js$/);
   for (const size of ['192x192', '512x512']) {
     assert.ok(manifest.icons.some(icon => icon.sizes === size && icon.purpose === 'any'));
   }
   assert.ok(manifest.icons.some(icon => icon.sizes === '512x512' && icon.purpose === 'maskable'));
   const appleIcon = html.match(/rel="apple-touch-icon" sizes="([^"]+)" href="([^"]+)"/);
   for (const icon of [...manifest.icons, { sizes: appleIcon[1], src: appleIcon[2] }]) {
-    const png = readFileSync(new URL(icon.src, root));
+    const png = bodies.get(icon.src.replace(/^\.\//, ''));
     assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     assert.equal(`${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`, icon.sizes);
   }
@@ -144,7 +160,8 @@ test('registration is secure-context-only and failure never breaks gameplay', as
     URL, setTimeout, clearTimeout,
     console: { warn(...args) { warning = args; } }
   };
-  vm.runInNewContext(read('pwa.js'), context);
+  const registrar = read('src/platform/pwa.js');
+  vm.runInNewContext(registrar, context);
   assert.equal(registration, undefined, 'Wait for page load');
   await load();
   assert.equal(registration.path, './sw.js');
@@ -152,25 +169,24 @@ test('registration is secure-context-only and failure never breaks gameplay', as
   assert.match(warning[0], /offline setup failed/);
   load = undefined;
   context.window.isSecureContext = false;
-  vm.runInNewContext(read('pwa.js'), context);
+  vm.runInNewContext(registrar, context);
   assert.equal(load, undefined);
   context.window.isSecureContext = true;
   context.navigator = {};
-  vm.runInNewContext(read('pwa.js'), context);
+  vm.runInNewContext(registrar, context);
   assert.equal(load, undefined);
 });
 
-test('release contains every module, sound and install icon with verified offline bytes', async () => {
+test('emitted gameplay chunks, sounds, licenses and icons are available offline', async () => {
   const sw = worker();
-  const paths = sw.files.map(url => url.slice(sw.scope.length));
-  const imports = [...html.matchAll(/(?:from\s+|import\()['"](\.\/[^'"]+)['"]/g)]
-    .map(match => match[1].slice(2).split('?')[0]);
-  for (const file of [...imports, 'pwa.js', 'index.html', 'manifest.webmanifest',
-    ...manifest.icons.map(icon => icon.src), 'assets/icons/apple-touch-icon.png',
-    ...readdirSync(new URL('assets/audio/', root)).map(file => `assets/audio/${file}`)]) {
-    assert.ok(paths.includes(file), `Offline asset missing: ${file}`);
-    assert.equal(release.integrity[file], integrity(bodies.get(file)));
+  const paths = [...bodies.keys()];
+  assert.ok(paths.includes(first.entry) && paths.includes(first.css));
+  for (const file of readdirSync(new URL('assets/audio/', root)).filter(name => name !== '.DS_Store')) {
+    const [name, extension] = file.split('.');
+    assert.ok(paths.some(path => path.startsWith('assets/' + name + '-') && path.endsWith('.' + extension)), file);
   }
+  for (const file of [...manifest.icons.map(icon => icon.src), 'icons/apple-touch-icon.png',
+    ...readdirSync(new URL('public/licenses/', root)).filter(name => name !== '.DS_Store').map(name => 'licenses/' + name)]) assert.ok(paths.includes(file), file);
   await sw.lifecycle('install');
   assert.equal(sw.stores.get(sw.name).size, sw.files.length);
   sw.setNetwork(() => { throw new TypeError('offline'); });
@@ -182,86 +198,96 @@ test('release contains every module, sound and install icon with verified offlin
 test('an interrupted upgrade preserves the complete active release online and offline', async () => {
   const old = worker();
   await old.lifecycle('install');
-  const changes = { 'index.html': '<title>Next release</title>', 'touch-controls.js': 'export function nextControls() {}' };
-  const next = worker({ script: nextRelease(changes), stores: old.stores });
-  next.setNetwork(request => request.url.endsWith('touch-controls.js')
-    ? new Response('unavailable', { status: 503 }) : responseFor(next.scope, request, changes));
+  const next = worker({ script: second.script, stores: old.stores });
+  next.setNetwork(request => request.url.endsWith(second.css)
+    ? new Response('unavailable', { status: 503 }) : responseFor(next.scope, request, {}, second.bodies));
   await assert.rejects(next.lifecycle('install'), /503/);
-  assert.equal(old.stores.has(next.name), false, 'Remove the failed staging cache, not the active snapshot');
+  assert.equal(old.stores.has(next.name), false);
   assert.equal(old.stores.get(old.name).size, old.files.length);
-  old.setNetwork(request => responseFor(old.scope, request, changes));
-  assert.equal(await (await old.request('./')).text(), html, 'Online navigation still gets the previous matching HTML');
   old.setNetwork(() => { throw new TypeError('offline'); });
   assert.equal(await (await old.request('./')).text(), html);
-  assert.equal(await (await old.request('touch-controls.js?v=8')).text(), bodies.get('touch-controls.js').toString());
+  assert.equal(await (await old.request(first.css)).text(), bodies.get(first.css).toString());
   assert.equal(next.skippedWaiting, false);
   assert.equal(next.claimed, false);
 });
 
-test('HTTP 200 with stale bytes also rejects the release instead of mixing an upload', async () => {
-  const old = worker();
-  await old.lifecycle('install');
-  const next = worker({ script: nextRelease({ 'touch-controls.js': 'new module' }), stores: old.stores });
-  // The default server returns current/old bytes despite the new integrity hash.
+test('HTTP 200 with stale bytes rejects the release instead of mixing an upload', async () => {
+  const old = worker(); await old.lifecycle('install');
+  const next = worker({ script: second.script, stores: old.stores });
+  next.setNetwork(request => responseFor(next.scope, request, { 'index.html': html }, second.bodies));
   await assert.rejects(next.lifecycle('install'), /Integrity mismatch/);
   assert.deepEqual(await old.caches.keys(), [old.name]);
   assert.equal(await (await old.request('./')).text(), html);
 });
 
-test('a complete update waits, then switches HTML and modules together on activation', async () => {
-  const old = worker();
-  await old.lifecycle('install');
-  const changes = { 'index.html': '<title>Next release</title>', 'touch-controls.js': 'new module' };
-  const next = worker({ script: nextRelease(changes), stores: old.stores });
-  next.setNetwork(request => responseFor(next.scope, request, changes));
-  await next.lifecycle('install');
-  assert.equal(next.skippedWaiting, false, 'Installation alone never forces a running game onto a different worker');
-  assert.equal(await (await old.request('./')).text(), html);
-  assert.equal(await (await old.request('touch-controls.js?v=8')).text(), bodies.get('touch-controls.js').toString());
-  await next.lifecycle('activate');
-  assert.equal(next.claimed, false, 'Do not take over an uncontrolled page that loaded older HTML');
-  assert.deepEqual(await next.caches.keys(), [next.name]);
-  next.setNetwork(() => { throw new TypeError('offline'); });
-  assert.equal(await (await next.request('./')).text(), changes['index.html']);
-  assert.equal(await (await next.request('touch-controls.js?v=next')).text(), changes['touch-controls.js']);
+test('a corrupt immutable response rejects the update even with HTTP cache reuse', async () => {
+  const old = worker(); await old.lifecycle('install');
+  const next = worker({ script: second.script, stores: old.stores });
+  next.setNetwork(request => responseFor(next.scope, request, { [music]: 'incorrect cached bytes' }, second.bodies));
+  await assert.rejects(next.lifecycle('install'), /Integrity mismatch/);
+  assert.deepEqual(await old.caches.keys(), [old.name]);
 });
 
-test('migration from the original network-first worker tolerates its cached legacy module', async () => {
+test('a complete update waits, then switches HTML and modules together on activation', async () => {
+  const old = worker(); await old.lifecycle('install');
+  const next = worker({ script: second.script, stores: old.stores });
+  next.setNetwork(request => responseFor(next.scope, request, {}, second.bodies));
+  await next.lifecycle('install');
+  assert.equal(next.skippedWaiting, false);
+  assert.equal(await (await old.request('./')).text(), html);
+  await next.lifecycle('activate');
+  assert.equal(next.claimed, false);
+  assert.deepEqual(await next.caches.keys(), [next.name]);
+  next.setNetwork(() => { throw new TypeError('offline'); });
+  assert.equal(await (await next.request('./')).text(), second.bodies.get('index.html').toString());
+  const path = second.css;
+  assert.equal(await (await next.request(path)).text(), second.bodies.get(path).toString());
+});
+
+test('legacy clients never resolve the new entry or controls from their old root-module cache', async () => {
   const old = worker({ script: read('tests/fixtures/sw-v1.js') });
   const legacyModule = read('tests/fixtures/touch-controls-v5.js');
-  old.setNetwork(request => responseFor(old.scope, request, { 'index.html': 'previous HTML', 'touch-controls.js': legacyModule }));
+  // Existing deployments keep the historical root modules (deploy never deletes).
+  const previous = Object.fromEntries(['audio', 'i18n', 'pwa', 'render-diagnostics'].map(name => [name + '.js', 'legacy ' + name]));
+  for (const path of old.files.map(url => url.slice(old.scope.length))) {
+    if (path.startsWith('assets/')) previous[path] = 'legacy fixture bytes';
+  }
+  previous['touch-controls.js'] = legacyModule;
+  previous['index.html'] = 'previous HTML';
+  old.setNetwork(request => responseFor(old.scope, request, previous));
   await old.lifecycle('install');
-  // v1 cannot be changed in place: it may return new HTML and cached old JS once.
   old.setNetwork(request => request.url.includes('touch-controls.js')
     ? new Response('unavailable', { status: 503 }) : responseFor(old.scope, request));
   assert.equal(await (await old.request('./')).text(), html);
   assert.equal(await (await old.request('touch-controls.js?v=8')).text(), legacyModule);
-  const importedNames = html.match(/import \{ ([^}]+) \} from '\.\/touch-controls\.js/)[1].split(',').map(name => name.trim());
-  for (const name of importedNames) assert.equal(typeof legacyTouch[name], 'function', `Legacy module must still provide ${name}`);
-  assert.ok(html.includes('function bindTouchButtons('), 'New helper travels with the HTML, not the cached legacy module');
+  for (const file of [first.entry, first.css, music]) {
+    assert.equal(old.request(file), undefined, 'The legacy worker passes new URLs through');
+  }
   const next = worker({ stores: old.stores });
-  next.setNetwork(request => request.url.includes('touch-controls.js')
+  next.setNetwork(request => request.url.endsWith(first.entry)
     ? new Response('unavailable', { status: 503 }) : responseFor(next.scope, request));
   await assert.rejects(next.lifecycle('install'), /503/);
-  old.setNetwork(() => { throw new TypeError('offline'); });
-  assert.equal(await (await old.request('./')).text(), html);
-  assert.equal(await (await old.request('touch-controls.js?v=8')).text(), legacyModule);
   assert.equal(old.stores.has(old.name), true);
+  next.setNetwork(request => responseFor(next.scope, request));
+  await next.lifecycle('install');
+  await next.lifecycle('activate');
+  next.setNetwork(() => { throw new TypeError('offline'); });
+  assert.equal(await (await next.request(first.entry)).text(), bodies.get(first.entry).toString());
 });
 
 test('an evicted file never falls back to a potentially incompatible network module', async () => {
   const sw = worker();
   await sw.lifecycle('install');
-  sw.stores.get(sw.name).delete(sw.scope + 'touch-controls.js');
+  sw.stores.get(sw.name).delete(sw.scope + first.entry);
   sw.setNetwork(() => { throw new Error('Must not fetch individual replacement files'); });
-  assert.equal((await sw.request('touch-controls.js?v=8')).type, 'error');
+  assert.equal((await sw.request(first.entry)).type, 'error');
 });
 
 test('only known local GETs are served and production cleanup is scope-specific', async () => {
   const sw = worker();
   for (const path of ['missing.html', '../index.html', 'https://other.test/audio.js', 'sw.js']) assert.equal(sw.request(path), undefined);
-  assert.equal(sw.request('audio.js', { method: 'POST' }), undefined);
-  assert.equal(sw.request('audio.js', { headers: { range: 'bytes=0-99' } }), undefined);
+  assert.equal(sw.request(music, { method: 'POST' }), undefined);
+  assert.equal(sw.request(music, { headers: { range: 'bytes=0-99' } }), undefined);
   await sw.lifecycle('install');
   await sw.caches.open(sw.prefix + 'v1');
   await sw.caches.open('another-app');
@@ -281,7 +307,7 @@ test('the source worker keeps local development fresh and removes only its own o
   assert.equal(sw.claimed, true);
   assert.deepEqual(await sw.caches.keys(), ['another-app']);
   assert.equal(sw.request('./'), undefined);
-  assert.equal(sw.request('touch-controls.js?v=8'), undefined);
+  assert.equal(sw.request('src/platform/touch-controls.js?v=8'), undefined);
 });
 
 function gameClient(sw, id, ready = true) {
@@ -310,11 +336,16 @@ test('a verified update switches only when every game window has saved and locke
   assert.notEqual(home.messages[0].id, home.messages.at(-1).id, 'Retries cannot unlock an unrelated attempt');
 });
 
-test('old or unresponsive windows defer activation without hanging the other windows', async () => {
+test('old or unresponsive windows defer activation without hanging the other windows', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const sw = worker(); await sw.lifecycle('install');
   const home = gameClient(sw, 'home'), old = gameClient(sw, 'old', null);
   sw.setClients([home, old]);
-  await sw.message({ type: 'orbit:check-update' });
+  const pending = sw.message({ type: 'orbit:check-update' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(old.messages.at(-1).type, 'orbit:prepare-update');
+  t.mock.timers.tick(1000);
+  await pending;
   assert.equal(sw.skippedWaiting, false);
   assert.equal(home.messages.at(-1).type, 'orbit:cancel-update');
   sw.setClients([home]);
@@ -340,33 +371,31 @@ test('new windows veto an in-flight update check, closed windows and other app s
   }
 });
 
-test('deployment fingerprints change with assets or worker code, and publish the worker last', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'orbit-pwa-release-'));
-  try {
-    for (const file of [...files, 'sw.js', 'scripts/prepare-pwa.py']) {
-      const target = join(directory, file);
-      mkdirSync(dirname(target), { recursive: true });
-      copyFileSync(new URL(file, root), target);
-    }
-    const generate = () => execFileSync('python3', [join(directory, 'scripts/prepare-pwa.py')], { encoding: 'utf8' });
-    assert.equal(generate(), preparedSource, 'Identical bytes produce identical releases');
-    writeFileSync(join(directory, 'i18n.js'), 'changed translations');
-    const changed = generate();
-    assert.notEqual(changed, preparedSource);
-    const changedRelease = JSON.parse(changed.match(/^const RELEASE = (.+);$/m)[1]);
-    assert.notEqual(changedRelease.id, release.id);
-    assert.equal(changedRelease.integrity['i18n.js'], integrity('changed translations'));
-    writeFileSync(join(directory, 'sw.js'), developmentSource + '\n// strategy changed\n');
-    assert.notEqual(generate(), changed, 'Worker code changes also create a new snapshot');
-    rmSync(join(directory, 'i18n.js'));
-    const failed = spawnSync('python3', [join(directory, 'scripts/prepare-pwa.py')], { encoding: 'utf8' });
-    assert.equal(failed.status, 1);
-    assert.equal(failed.stdout, '', 'A missing file cannot produce a partially prepared worker');
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+test('Finder metadata stays out of dist and the offline integrity manifest', () => {
+  for (const path of finderFiles) {
+    assert.equal(existsSync(join(directory, 'dist', path)), false, path);
+    assert.equal(Object.hasOwn(repeat.release.integrity, path), false, path);
+  }
+});
+
+test('build is reproducible, self-contained and detects changes to assets and worker code', () => {
+  assert.equal(first.script, repeat.script);
+  assert.notEqual(first.release.id, second.release.id);
+  assert.notEqual(first.css, second.css);
+  assert.match(second.bodies.get(second.css).toString(), /--orbit-css-update/);
+  assert.ok(music && second.bodies.has(music), 'Unchanged audio keeps its immutable URL');
+  const engine = [...first.bodies.keys()].filter(path => path.startsWith('assets/three.module-'));
+  assert.ok(engine.length && engine.every(path => second.bodies.has(path)), 'Unchanged engine keeps its URLs');
+  assert.deepEqual(readdirSync(join(directory, 'dist')).sort(), ['.htaccess', 'CREDITS.md', 'assets', 'icons', 'index.html', 'licenses', 'manifest.webmanifest', 'sw.js']);
+  assert.ok(!second.bodies.has(first.css), 'A fresh build does not precache obsolete chunks');
+  for (const [path, bytes] of second.bodies) assert.equal(second.release.integrity[path], integrity(bytes));
+  writeFileSync(join(directory, 'sw.js'), developmentSource + '\n// strategy changed\n');
+  assert.notEqual(build().release.id, second.release.id);
   const deploy = read('scripts/deploy.sh');
-  const prepare = deploy.indexOf('python3 scripts/prepare-pwa.py');
-  const upload = deploy.indexOf('rsync -rtvz');
-  const entry = deploy.indexOf('index.html "$host:$target/"');
-  const workerUpload = deploy.indexOf('"$temporary/sw.js" "$host:$target/sw.js"');
-  assert.ok(prepare > 0 && upload > prepare && entry > upload && workerUpload > entry);
+  const stages = ['node scripts/build.mjs', 'cd dist', 'upload assets .htaccess', 'upload icons licenses manifest.webmanifest', 'upload index.html', 'upload sw.js'];
+  let previous = -1;
+  for (const stage of stages) {
+    assert.ok(deploy.indexOf(stage) > previous, stage);
+    previous = deploy.indexOf(stage);
+  }
 });

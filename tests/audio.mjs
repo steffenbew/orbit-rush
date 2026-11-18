@@ -3,11 +3,10 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
-const source = readFileSync(new URL('audio.js', root), 'utf8');
-const page = readFileSync(new URL('index.html', root), 'utf8');
-const modulePath = page.match(/import\('(\.\/audio\.js\?[^']+)'\)/)[1];
-const moduleUrl = new URL(modulePath, 'https://example.com/orbit/index.html');
-assert.ok(moduleUrl.searchParams.get('v'), 'The deployed audio module has a version');
+const source = readFileSync(new URL('src/presentation/audio.js', root), 'utf8');
+const page = readFileSync(new URL('src/main.js', root), 'utf8');
+const modulePath = page.match(/import\('(\.\/presentation\/audio\.js)'\)/)[1];
+const moduleUrl = new URL(modulePath, 'https://example.com/games/orbit/src/main.js');
 
 const requests = [], played = [];
 let ok = true;
@@ -40,15 +39,13 @@ assert.deepEqual(readdirSync(new URL('assets/audio/', root)).filter(file => /\.(
 for (const file of audioFiles) {
   assert.ok(existsSync(new URL(`assets/audio/${file}`, root)), `Local audio exists: ${file}`);
   assert.equal(await audio.decode(file), decoded);
-  assert.equal(requests.at(-1).pathname, `/orbit/assets/audio/${file}`, 'Works under a hosted subdirectory');
-  assert.equal(requests.at(-1).search, moduleUrl.search, 'Every audio request shares the module version');
+  assert.equal(requests.at(-1).pathname, `/games/orbit/assets/audio/${file}`, 'Works under a hosted subdirectory');
 }
-const nextUrl = new URL(moduleUrl);
-nextUrl.searchParams.set('v', 'next-release');
+const nextUrl = new URL(moduleUrl.href.replace('/games/orbit/', '/preview/'));
 const next = makeAudio(nextUrl);
 next.setup(context);
 await next.decode('checkpoint-pass.wav');
-assert.equal(requests.at(-1).searchParams.get('v'), 'next-release', 'Bumping the import refreshes audio URLs');
+assert.equal(requests.at(-1).pathname, '/preview/assets/audio/checkpoint-pass.wav');
 ok = false;
 await assert.rejects(audio.decode('missing.wav'), /Audio file unavailable: missing.wav \(404\)/);
 

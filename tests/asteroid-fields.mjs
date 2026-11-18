@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { THREE, makeGame, makeFlightClock, randomState } from './helpers/flight-game.mjs';
 
+const full = process.env.ORBIT_TEST_FULL === '1';
+
 const layout = game => game.fieldGroups.map(group => ({position: group.position.toArray(), passage: group.passage.toArray(),
   coreRadius: group.coreRadius, blocking: group.blocking, axis: group.axis, shape: group.shape, angle: group.angle, diffuse: group.diffuse,
   tunnel: group.tunnel && {center: group.tunnel.center.toArray(), direction: group.tunnel.direction.toArray(), radius: group.tunnel.radius},
   pockets: group.pockets.map(pocket => ({center: pocket.center.toArray(), spread: pocket.spread.toArray(),
     weight: pocket.weight, sizePower: pocket.sizePower, sizeScale: pocket.sizeScale}))}));
-for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 8, 9, 11, 12, 17, 20, 100]) for (const seed of [123, 456, 789]) {
+for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 8, 9, 11, 12, 17, 20, 100] : [1, 2, 9]) for (const seed of full ? [123, 456, 789] : [123]) {
   randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.camera.updateMatrixWorld();
   for (const event of game.getAsteroidEncounters().filter(event => event.kind === 'field')) {
@@ -123,7 +125,7 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 8, 9, 1
 }
 console.log('PASS debris volumes, contrasting settled sizes, separated bodies, clear channels/checkpoints and fixed retry layouts');
 
-for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9, 20]) {
+for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 7, 8, 9, 20] : [2, 4]) {
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
   const landmark = game.fieldBoulder;
   if (level === 1 || level === 3 || level % 4 === 0) { assert.equal(landmark, null, 'No extra opening boulders in boss fights, the tutorial or the corridor-first level'); continue; }
@@ -146,16 +148,11 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
 console.log('PASS occasional larger gap boulders, stable retries, stationary motion and clear boss/checkpoint sections');
 
 // Follow the authored channel using real steering. No firing, teleporting or damage immunity.
-// Fast: every level/motion mode at 60 FPS, then vary FPS and seeds independently
-// on settled (2), vertical (9) and late/boss (20) layouts. Full retains the entire matrix.
-const full = process.env.ORBIT_TEST_FULL === '1';
+// All movement and collision queries here run inside the fixed-step callback. Replaying
+// the same layout at three display rates repeats those ticks; simulation-timing tests batching.
+const seedsAndFps = full ? [[12, 5], [34, 60], [56, 144]] : [[12, 5]];
 let traversals = 0;
-for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 7, 8, 9, 11, 17, 20]) for (const seed of [12, 34, 56]) for (const fps of [5, 60, 144]) {
-  const baseline = seed === 12 && fps === 60;
-  const representative = [2, 9, 20].includes(level);
-  const frameRateEdge = representative && seed === 12;
-  const seedVariation = representative && fps === 60;
-  if (!full && !baseline && !frameRateEdge && !seedVariation) continue;
+for (const reduced of [false, true]) for (const level of full ? [1, 2, 5, 6, 7, 8, 9, 11, 17, 20] : [2, 9]) for (const [seed, fps] of seedsAndFps) {
   traversals++;
   randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
@@ -166,7 +163,7 @@ for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 7, 8, 9, 1
   const landmark = game.fieldBoulder;
   if (landmark) rocks.push(landmark.rock);
   let time = 0, hits = 0, checkingGap = false;
-  const clock = makeFlightClock(THREE, game, reduced, dt => {
+  const clock = makeFlightClock(game, dt => {
     if (game.encounterIndex !== 0 && !checkingGap) return;
     time += dt; game.setTime(time);
     // Anticipate bends instead of overshooting each waypoint and demanding a cleared swath around that mistake.
@@ -207,8 +204,7 @@ for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 7, 8, 9, 1
   assert.equal(game.hits.length, 0, `Navigate instanced debris without shooting: level=${level}, reduced=${reduced}, seed=${seed}, fps=${fps}`);
   assert.ok(!game.sounds.includes('checkpointMiss'));
 }
-assert.equal(traversals, full ? 180 : 44);
-console.log(`PASS ${traversals} non-shooting traversals through the complete cloud, real inertia and safe phase handoffs at 5–144 FPS`);
+console.log(`PASS ${traversals} non-shooting traversals through the complete cloud, real inertia and safe phase handoffs`);
 
 for (const reduced of [false, true]) {
   const game = makeGame(reduced); game.setupLevelFleet(); game.updateAsteroidShower(0);

@@ -1,12 +1,11 @@
 // Fixed encounter pacing and increasingly three-dimensional checkpoint navigation.
 import assert from 'node:assert/strict';
-import { t } from '../i18n.js';
-import { THREE, makeGame, makeFlightClock, randomState, section } from './helpers/flight-game.mjs';
+import { t } from '../src/presentation/i18n.js';
+import { THREE, makeGame, makeFlightClock, randomState } from './helpers/flight-game.mjs';
 
-const planFor = new Function('level', 'reducedMotion', `
-  ${section('      function getAsteroidEncounters()', '      function flightDistanceAt(')}
-  return getAsteroidEncounters();
-`);
+const full = process.env.ORBIT_TEST_FULL === '1';
+
+import { getAsteroidEncounters as planFor } from '../src/course/encounter-plan.js';
 for (const reduced of [false, true]) for (let level = 1; level <= 100; level++) {
   const plan = planFor(level, reduced);
   assert.deepEqual(planFor(level, reduced), plan, 'No reroll of timing, type, strength, direction or bends');
@@ -44,7 +43,7 @@ for (const reduced of [false, true]) for (let level = 1; level <= 100; level++) 
 }
 console.log('PASS fields before showers, late level-two corridor, level-three corridor/shower/field finale, first-boss bookends and repeatable plans');
 
-for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9, 12, 40, 100]) {
+for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 7, 8, 9, 12, 40, 100] : [1, 2, 3, 7]) {
   randomState.seed = 123; // Each scenario is independent of how many random rocks earlier cases created.
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet();
   const gates = game.flightRings, positions = gates.map(gate => gate.position.toArray());
@@ -89,12 +88,12 @@ for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9
 console.log('PASS lateral-to-vertical checkpoint progression, turn clearance, stable retries, straight tutorial, corridor exclusion and finish margin');
 
 // Follow the authored schedules too, not only the generic corridor geometry fixtures.
-for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 40, 100]) for (const fps of ([2, 3].includes(level) ? [5, 60, 144] : [60]))
-for (const seed of (level === 3 ? [123, 456, 789] : [123])) {
+for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 7, 8, 40, 100] : [2, 3]) for (const fps of (full && [2, 3].includes(level) ? [5, 60, 144] : [60]))
+for (const seed of (full && level === 3 ? [123, 456, 789] : [123])) {
   randomState.seed = seed;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   let time = 0;
-  const clock = makeFlightClock(THREE, game, reduced, dt => {
+  const clock = makeFlightClock(game, dt => {
     time += dt; game.setTime(time);
     const next = game.flightRings.find(gate => !gate.userData.resolved);
     if (next) {
@@ -123,7 +122,7 @@ for (const seed of (level === 3 ? [123, 456, 789] : [123])) {
 }
 console.log('PASS actual scheduled checkpoints reachable with real steering, including the early corridor and uncapped late speeds');
 
-for (const reduced of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 9, 10, 40, 100]) {
+for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 7, 8, 9, 10, 40, 100] : [3, 5]) {
   randomState.seed = 123;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.camera.updateMatrixWorld();
   const events = game.getAsteroidEncounters(), transitions = [], warningTimes = [];

@@ -1,6 +1,10 @@
 // Mixed encounters and non-explosive asteroid contact physics.
 import assert from 'node:assert/strict';
+import { createPlayerCollision } from '../src/flight/player-collision.js';
+import { resolveRockImpact, rockHitsShip } from '../src/course/asteroid-impacts.js';
 import {THREE, makeGame, randomState} from './helpers/flight-game.mjs';
+
+const full = process.env.ORBIT_TEST_FULL === '1';
 
 const orientations = [], positions = [], fractions = [], styles = new Set();
 for (const reduced of [false, true]) for (const level of [1, 2, 4, 5, 6, 7, 9, 12, 20]) {
@@ -34,6 +38,23 @@ assert.ok(positions.some(p => p.y < -10) && positions.some(p => p.y > 10));
 assert.ok(Math.max(...fractions) - Math.min(...fractions) > .12 && fractions.every(f => Math.abs(f - .5) > .001), 'Arrival depth varies rather than always using the midpoint');
 console.log('PASS delayed introduction, random 3D orientations, off-center/depth variation, stable retries and simultaneous showers from level six');
 
+// The ship travels north while the rock travels east; neither endpoint touches the other path.
+{
+  const { crossesHull } = createPlayerCollision(new THREE.Vector3());
+  const ship = new THREE.Object3D(), rock = new THREE.Object3D();
+  const triangle = new THREE.Triangle(new THREE.Vector3(0, -5, -5), new THREE.Vector3(0, 5, -5), new THREE.Vector3(0, -5, 5));
+  const bounds = new THREE.Box3().setFromPoints([triangle.a, triangle.b, triangle.c]);
+  ship.userData = { type: {radius: 8}, previousPosition: new THREE.Vector3(0, -40, 0),
+    collisionBox: bounds, collisionParts: [{bounds, triangles: [triangle]}] };
+  ship.position.set(0, 40, 0);
+  rock.userData = { type: {radius: 1}, previousPosition: new THREE.Vector3(-40, 0, -2) };
+  rock.position.set(40, 0, -2);
+  assert.equal(rockHitsShip(rock, ship, crossesHull), true, 'The moving hull and rock meet midway through the tick');
+
+  rock.userData.previousPosition.z = rock.position.z = 1.5;
+  assert.equal(rockHitsShip(rock, ship, crossesHull), false, 'Inside the bounding box but just outside the triangle edge');
+}
+
 function pair(reduced = false, sizeA = 1.3, sizeB = 3.5, speed = 100) {
   const game = makeGame(reduced); game.setLevel(2); game.setupLevelFleet();
   game.ships.forEach(ship => ship.visible = false);
@@ -64,16 +85,19 @@ for (const state of ['setPaused', 'setRoundEnded', 'setCrashing']) {
   assert.equal(game.collideAsteroids(), 0); assert.equal(a.userData.courseVelocity.x, 100);
 }
 {
-  const {game, a, b} = pair(false, .35, .35, 100);
-  a.userData.previousPosition.set(-100, 0, -600); a.position.set(100, 0, -600);
-  assert.equal(game.collideAsteroids(), 1, 'Swept contact catches an entire crossed rock between frames');
-  assert.ok(a.position.x < b.position.x, 'Resolve the contact on the original side rather than letting bodies tunnel');
-}
-{
-  const {game, a, b} = pair();
-  a.userData.courseVelocity.set(0, 0, 0); a.position.copy(a.userData.previousPosition).add(new THREE.Vector3(10, 20, 100));
-  b.position.copy(b.userData.previousPosition).add(new THREE.Vector3(10, 20, 100));
-  assert.equal(game.collideAsteroids(), 0, 'Shared player travel must not impart collision energy to anchored rocks');
+  // No game clock, scene, pool or field needed for the pairwise sweep.
+  const rock = x => {
+    const body = new THREE.Object3D(); body.position.x = x; body.scale.setScalar(.35);
+    body.userData = { type: {radius: 20}, previousPosition: body.position.clone(), courseVelocity: new THREE.Vector3() };
+    return body;
+  };
+  const a = rock(-100), b = rock(0);
+  a.position.x = 100; a.userData.courseVelocity.x = 100;
+  assert.equal(resolveRockImpact(a, b).closing, 100, 'A sweep catches a rock crossed completely between frames');
+  assert.ok(a.position.x < b.position.x, 'Resolve on the original side rather than tunneling');
+  a.userData.courseVelocity.set(0, 0, 0); b.userData.courseVelocity.set(0, 0, 0);
+  for (const body of [a,b]) { body.userData.previousPosition.copy(body.position); body.position.z += 100; }
+  assert.equal(resolveRockImpact(a, b), null, 'Shared world travel cannot impart collision energy');
 }
 {
   const {game, a} = pair(false, 3.5);
@@ -83,23 +107,21 @@ for (const state of ['setPaused', 'setRoundEnded', 'setCrashing']) {
   assert.equal(game.fractureImpactAsteroid(a, new THREE.Vector3(1, 0, 0)), true);
   assert.equal(game.showerPool.filter(rock => rock.visible && rock.userData.impactFragment).length, 12);
 }
-let fractures = 0;
-for (let seed = 1; seed <= 40; seed++) {
-  const {game, a, b} = pair(false, 1.3, 3.5, 350); randomState.seed = seed * 871;
+// The seeded collision roll lands on either side of the fracture threshold.
+for (const [seed, splits] of [[871, false], [22646, true]]) {
+  const {game, a, b} = pair(false, 1.3, 3.5, 350); randomState.seed = seed;
   const volume = a.scale.x ** 3 + b.scale.x ** 3;
   game.collideAsteroids();
   const visible = game.showerPool.filter(rock => rock.visible);
-  assert.ok(visible.length >= 2 && visible.length <= 3);
+  assert.equal(visible.length, splits ? 3 : 2);
   assert.ok(Math.abs(visible.reduce((sum, rock) => sum + rock.scale.x ** 3, 0) - volume) < 1e-7);
   assert.deepEqual(game.explosions, []); assert.deepEqual(game.sounds, []);
-  if (visible.length === 3) {
-    fractures++;
+  if (splits) {
     const pieces = visible.filter(rock => rock.userData.impactFragment);
     assert.equal(pieces.length, 2); assert.ok(pieces.every(rock => rock.scale.x < 1.3 && rock.userData.health > 0));
     assert.equal(game.fractureImpactAsteroid(pieces[0], new THREE.Vector3(1, 0, 0)), false, 'No immediate chain fragmentation');
   }
 }
-assert.ok(fractures > 0 && fractures < 30, 'Hard contacts sometimes fracture, rather than always splitting or exploding');
 console.log('PASS momentum transfer, rebound, swept contacts, lifecycle guards and occasional volume-conserving fracture without explosions');
 
 for (const reduced of [false, true]) {
@@ -111,13 +133,13 @@ for (const reduced of [false, true]) {
   parent.userData.courseVelocity.set(150, 0, 0); game.activeAsteroids.push(parent);
   assert.ok(game.collideAsteroidsWithField() > 0);
   assert.ok(game.showerRocks.some(rock => rock.destroyed));
-  const fragment = game.particles.find(p => p.kind === 'rock');
+  const fragment = game.particles[0];
   assert.ok(fragment && Math.hypot(fragment.vx, fragment.vy, fragment.vz) > 0);
   assert.equal(fragment.object.geometry, game.grit.geometry, 'Detach the actual visible fragment, not a different proxy shape');
   assert.equal(fragment.worldFactor, .85); assert.equal(fragment.object.userData.collisionParts.length, 1);
   assert.deepEqual(game.explosions, []); assert.deepEqual(game.sounds, []);
 }
-for (const reduced of [false, true]) for (const level of [6, 8, 11]) for (const fps of [5, 60, 144]) {
+for (const reduced of [false, true]) for (const level of full ? [6, 8, 11] : [6]) for (const fps of full ? [5, 60, 144] : [5]) {
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
   let contacts = 0;
   for (let frame = 1; frame <= 9 * fps; frame++) {
@@ -133,4 +155,4 @@ for (const reduced of [false, true]) for (const level of [6, 8, 11]) for (const 
   assert.ok(game.showerPool.filter(rock => rock.visible && rock.userData.impactFragment).length <= 12);
   assert.ok(game.particles.length <= 96); assert.deepEqual(game.explosions, []);
 }
-console.log('PASS moving showers disturb real fields and instanced rubble without explosions, with bounded fragmentation and finite state at 5–144 FPS');
+console.log('PASS moving showers disturb real fields and instanced rubble without explosions, with bounded fragmentation and finite state');

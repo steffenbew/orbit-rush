@@ -1,15 +1,12 @@
+import { html, css, game as gameSource, sourceSection } from './helpers/app-source.mjs';
 // Run from the project root: node tests/hud-layout.mjs
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { t, setLanguage } from '../i18n.js';
+import { createRoundClock } from '../src/presentation/round-clock.js';
+import { t, setLanguage } from '../src/presentation/i18n.js';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const section = (start, end) => {
-  const from = source.indexOf(start), to = source.indexOf(end, from);
-  assert.ok(from >= 0 && to > from, `Missing section: ${start}`);
-  return source.slice(from, to);
-};
-const hud = section('  <header class="hud">', '  </header>');
+
+const section = (start, end) => sourceSection(gameSource, start, end);
+const hud = sourceSection(html, '  <header class="hud">', '  </header>');
 assert.doesNotMatch(hud, /id="flight-boundary-notice"/, 'The barrier retains visual feedback without a text label');
 assert.match(hud, /id="collision-alert"[^>]*data-i18n="collisionWarning"[^>]*hidden[^>]*role="status"/, 'The shared collision warning starts hidden and remains accessible/localized');
 assert.match(hud, /id="control-hints"[^>]*aria-atomic="true"/);
@@ -18,27 +15,27 @@ assert.match(hud, /id="time-left"[^>]*role="timer"/);
 assert.match(hud, /id="end-countdown"[^>]*role="timer"/);
 console.log('PASS accessible tutorial/feedback announcements and countdown timer');
 
-const overview = section('    <div id="flight-overview">', '    <aside id="control-hints"');
+const overview = sourceSection(html, '    <div id="flight-overview">', '    <aside id="control-hints"');
 assert.ok(overview.includes('id="flight-notices"') && overview.includes('id="end-countdown"'));
 assert.doesNotMatch(overview, /id="(?:feedback|collision-alert|control-hints|capital-hud)"/, 'Routine status and countdown stay separate from action/danger/tutorial/boss overlays');
-assert.doesNotMatch(source, /repair-notice|repairNoticeUntil/, 'Repairs use shared action feedback, not a second notification');
-assert.doesNotMatch(source, /translate: 0 30px/, 'No arbitrary downward offsets for countdown or corridor notices');
-const countdownStyle = section('    #end-countdown {', '    #countdown-number {');
+assert.doesNotMatch([html, css, gameSource].join('\n'), /repair-notice|repairNoticeUntil/, 'Repairs use shared action feedback, not a second notification');
+assert.doesNotMatch(css, /translate: 0 30px/, 'No arbitrary downward offsets for countdown or corridor notices');
+const countdownStyle = sourceSection(css, '#end-countdown {', '#countdown-number {');
 assert.doesNotMatch(countdownStyle, /position: fixed|translate/, 'Countdown stays in its reserved layout row, not an independent floating overlay');
-assert.ok(source.includes('.hud:has(#control-hints:not([hidden])) #action-feedback { display: none; }'), 'Tutorial takes precedence even when feedback has inline visibility');
-assert.doesNotMatch(source, /flight-state|flightState|flightStatus|finalSprint/, 'The speed-triggered hyperspeed notice is removed entirely');
-assert.match(source, /#impact-label \{[^}]*width: min\(720px,[^}]*text-align: center/, 'Long crash labels have a bounded, centered layout');
-assert.ok(source.includes('body:has(#impact-label:not([hidden]))'), 'Crash presentation clears competing gameplay overlays');
+assert.ok(css.includes('.hud:has(#control-hints:not([hidden])) #action-feedback { display: none; }'), 'Tutorial takes precedence even when feedback has inline visibility');
+assert.doesNotMatch([html, css, gameSource].join('\n'), /flight-state|flightState|flightStatus|finalSprint/, 'The speed-triggered hyperspeed notice is removed entirely');
+assert.match(css, /#impact-label \{[^}]*width: min\(720px,[^}]*text-align: center/, 'Long crash labels have a bounded, centered layout');
+assert.ok(css.includes('body:has(#impact-label:not([hidden]))'), 'Crash presentation clears competing gameplay overlays');
 console.log('PASS separate HUD zones, shared repairs and bounded crash labels');
 
-const desktopNotices = section('    @media (orientation: landscape) and (min-width: 901px) and (min-height: 601px) {', '    @keyframes action-reward');
+const desktopNotices = sourceSection(css, '@media (min-width: 901px) and (min-height: 601px) {', '@keyframes action-reward');
 assert.match(desktopNotices, /body:not\(\.touch-device\) #flight-overview:has\(:is\(#shower-warning, #end-countdown\):not\(\[hidden\]\)\) \{ top: auto; bottom: calc\(50dvh \+ 160px\)/, 'Only active urgent desktop notices move above the crosshair and feedback lane');
 assert.match(desktopNotices, /min\(720px, calc\(100vw - 2 \* var\(--hud-clearance\)\)\)/, 'Large localized warnings retain symmetric side-panel clearance');
 assert.match(desktopNotices, /body:not\(\.touch-device\) #shower-warning \{[^}]*font-size: clamp\(24px, 2vw, 28px\)/, 'Desktop encounter warnings are prominent without changing touch layouts');
 assert.match(desktopNotices, /body:not\(\.touch-device\) #end-countdown \{[^}]*font-size: clamp\(80px, 9dvh, 96px\)/, 'Desktop countdown is roughly twice its previous size');
 console.log('PASS desktop-only urgent notice placement and larger warning/countdown sizes');
 
-const touchNotices = section('    /* Touch notices share', '    @keyframes action-reward');
+const touchNotices = sourceSection(css, '/* Touch notices share', '@keyframes action-reward');
 assert.match(touchNotices, /body\.touch-device #flight-overview:has\(:is\(#shower-warning, #end-countdown\):not\(\[hidden\]\)\) \{ top: auto;/, 'Only urgent notices move on touch devices');
 assert.match(touchNotices, /grid-template-columns: minmax\(0, 1fr\)/, 'Urgent notices override the short portrait two-column layout');
 assert.match(touchNotices, /#flight-notices:not\(:has\(#shower-warning:not\(\[hidden\]\)\)\) \{ display: none; \}/, 'Countdown has no empty status row above it');
@@ -51,7 +48,7 @@ assert.match(touchNotices, /#end-countdown \{ flex-direction: row;[^}]*font-size
 console.log('PASS touch urgent notice hierarchy, portrait panel clearance and compact short-screen countdowns');
 
 // Execute the actual resize handling: toolbar changes must change width, never the centerline.
-const clearanceCode = section('    function updateHudClearance()', '    let getRenderState =');
+const clearanceCode = section('function updateHudClearance()', 'let getRenderState =');
 let geometry = {scoreRight: 232, actionsLeft: 704, scoreBottom: 136, actionsBottom: 60}, clearance, panelsBottom, onResize;
 const observed = [];
 const header = {style: {setProperty(name, value) {
@@ -97,14 +94,11 @@ for (const locale of ['en', 'de']) for (const [remaining, mode, expected] of [
       classList: {toggle(name, active) { this[name] = active; }}});
     return elements.get(id);
   }};
-  const ticks = new Function('document', 't', 'remaining', 'mode', `
-    const level = 1, roundDuration = 45, courseStartTime = 20, gameTime = courseStartTime + 45 - remaining;
-    const started = mode !== 'intro', paused = mode === 'pause', crashing = mode === 'crash';
-    const roundEnded = mode === 'end', celebrating = false, tutorialStage = mode === 'training' ? 0 : 3;
-    let ticks = 0; const sound = {playCountdownTick: () => ticks++};
-    ${section("      const clock = document.querySelector('#round-clock');", '      function startCrash(')}
-    updateClock(); updateClock(); return ticks;
-  `)(document, t, remaining, mode);
+  let ticks = 0;
+  const render = createRoundClock(document, 45, () => ticks++);
+  const state = { level: 1, training: mode === 'training', inFlight: ['play', 'pause', 'training'].includes(mode),
+    paused: mode === 'pause', celebrating: false };
+  render(45 - remaining, state); render(45 - remaining, state);
   const countdown = ['play', 'pause'].includes(mode) && remaining > 0 && remaining <= 5;
   const timer = elements.get('#time-left'), counter = elements.get('#end-countdown');
   assert.equal(timer.textContent, expected, `${locale}: ${mode} at ${remaining} seconds`);
@@ -114,6 +108,10 @@ for (const locale of ['en', 'de']) for (const [remaining, mode, expected] of [
     assert.equal(dots.filter(dot => dot.classList.spent).length, 5 - remaining, 'Dots fade one by one without disappearing from the layout');
     assert.equal(counter['aria-label'], t('countdown', {seconds: remaining}));
   }
+  const elapsed = state.training ? 0 : 45 - remaining;
+  assert.equal(elements.get('#level-progress')['aria-valuenow'], elapsed.toFixed(1));
+  assert.equal(elements.get('#level-progress')['aria-valuetext'], t('progress', {percent: Math.round(elapsed / 45 * 100)}));
+  assert.equal(elements.get('#level-progress-fill').style.transform, `scaleX(${elapsed / 45})`);
   assert.equal(timer['aria-label'], expected);
   assert.equal(ticks, countdown && mode !== 'pause' ? 1 : 0, 'One tick per second; none while inactive');
 }

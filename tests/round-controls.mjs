@@ -2,9 +2,9 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const start = source.indexOf('      // Space belongs to gameplay,');
-const end = source.indexOf('      const enemyBolts', start);
+const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const start = source.indexOf('  // Space belongs to gameplay,');
+const end = source.indexOf('  const capitalEncounter', start);
 assert.ok(start >= 0 && end > start);
 const button = new EventTarget();
 new Function('document', source.slice(start, end))({

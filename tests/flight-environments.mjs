@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { THREE, source, section, randomState, makeGame, makeFlightClock, assertShipInsideBoundary, moveRock } from './helpers/flight-game.mjs';
 
+const full = process.env.ORBIT_TEST_FULL === '1';
+
 // Reinforcements enter from far ahead, never as nearby diagonal ambushes.
 for (const reducedMotion of [false, true]) {
   const arrivals = makeGame(reducedMotion);
@@ -48,18 +50,18 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS distant forward arrivals, heading/translation, whole-model fades, hidden spawn glows and unchanged opening formation');
 
 for (const reducedMotion of [false, true]) {
-  for (const level of [1, 7]) for (const fps of [5, 60, 144]) for (const aspect of [390 / 844, 16 / 9]) {
+  for (const level of [1, 7]) for (const fps of full ? [5, 60, 144] : [5]) for (const aspect of [390 / 844, 16 / 9]) {
     // Compare the same traffic across frame rates, independent of earlier debris counts.
     randomState.seed = 12345;
     const flight = makeGame(reducedMotion);
-    flight.setLevel(level); flight.setPressure(1 - Math.exp(-(level - 1) / 4));
+    flight.setLevel(level);
     flight.flightMotion.set(0, 0, -flight.levelFlightSpeed(0));
     flight.camera.aspect = aspect; flight.camera.updateProjectionMatrix();
     const traffic = flight.ships.slice(0, 3);
     traffic.forEach(ship => flight.resetShip(ship));
     const entered = new Set(), seenAt = new Map();
     let time = 0;
-    const clock = makeFlightClock(THREE, flight, reducedMotion, dt => {
+    const clock = makeFlightClock(flight, dt => {
       time += dt; flight.setTime(time);
       clock.move(dt, time / 45);
       for (const ship of traffic) {
@@ -89,7 +91,7 @@ for (const reducedMotion of [false, true]) {
       `Distant arrivals must reach the playable area within a level (level=${level}, fps=${fps}, reduced=${reducedMotion}, aspect=${aspect})`);
   }
 }
-console.log('PASS mostly straight, gradual approaches within the level at 5–144 FPS, portrait/landscape and reduced motion');
+console.log('PASS mostly straight, gradual approaches within the level, portrait/landscape and reduced motion');
 
 
 for (const reducedMotion of [false, true]) {
@@ -195,7 +197,7 @@ console.log('PASS reinforcement breaks, existing-threat continuity, single arriv
 
 for (const reducedMotion of [false, true]) {
   const bends = makeGame(reducedMotion);
-  for (const level of [1, 20]) for (const shape of [1, 2]) for (const sign of [-1, 1]) {
+  for (const level of full ? [1, 20] : [20]) for (const shape of [1, 2]) for (const sign of [-1, 1]) {
     bends.setLevel(level); bends.setupLevelFleet();
     const field = bends.shower(true, 2, shape, sign);
     assert.equal(Math.abs(bends.corridorCenter(0)), 0, 'Keep a straight, readable entry');
@@ -244,7 +246,7 @@ console.log('PASS fixed arcing/offset corridors, coherent background geometry, f
 const passageTiers = new Set(), passageScales = new Set();
 let passageCount = 0, centerThreats = 0, scatteredObstacles = 0, oversizedWalls = 0, slalomGroups = 0;
 const laterLanes = new Set();
-for (const reducedMotion of [false, true]) for (const level of [1, 4, 5, 20]) for (const shape of [0, 1, 2]) for (const strength of [0, 1, 2]) {
+for (const reducedMotion of [false, true]) for (const level of full ? [1, 4, 5, 20] : [1, 5]) for (const shape of full ? [0, 1, 2] : [1]) for (const strength of [0, 1, 2]) {
   const hazards = makeGame(reducedMotion), speed = reducedMotion ? 40 : 400;
   hazards.flightMotion.set(0, 0, -speed);
   hazards.setLevel(level); hazards.setupLevelFleet();
@@ -460,7 +462,7 @@ for (const reducedMotion of [false, true]) for (const paused of [false, true]) {
 console.log('PASS coherent shower drift, subtle free-rock speed variation, individual tumbling, 5–144 FPS, reduced motion, pause and reuse');
 
 assert.match(source, /updateShipArrivals\(dt\);/, 'The simulation must pass elapsed time into shower movement');
-for (const reducedMotion of [false, true]) for (const corridor of [false, true]) for (const fps of [5, 30, 60, 144]) {
+for (const reducedMotion of [false, true]) for (const corridor of [false, true]) for (const fps of full ? [5, 30, 60, 144] : [5]) {
   const motion = makeGame(reducedMotion); motion.setupLevelFleet();
   motion.flightOrientation.set(.2, -.4, 0, 'YXZ');
   const field = motion.shower(corridor, 2, corridor ? 1 : 0);
@@ -498,12 +500,13 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   motion.setPaused(false); motion.setRoundEnded(true); motion.updateShipArrivals(2);
   assert.ok(field.origin.equals(before), 'Round end freezes the field as well as individual rocks');
 }
-console.log('PASS directional rain versus fixed corridor at 5–144 FPS, steering independence, corridor gaps, pause and round end');
+console.log('PASS directional rain versus fixed corridor, steering independence, corridor gaps, pause and round end');
 
 for (const reducedMotion of [false, true]) {
   const repairs = makeGame(reducedMotion); repairs.setupLevelFleet();
   repairs.ships.forEach(ship => { ship.visible = false; }); repairs.camera.updateMatrixWorld();
-  repairs.setShield(50); repairs.setRepairPending(true); repairs.setTime(9.99);
+  const scheduleRepair = () => { randomState.seed = 12345; repairs.resetRepairPickup(); };
+  repairs.setShield(50); scheduleRepair(); repairs.setTime(9.99);
   repairs.updateRepairPickup(0); assert.equal(repairs.repairPickup.visible, false);
   repairs.setTime(10); repairs.setPaused(true); repairs.updateRepairPickup(0);
   assert.equal(repairs.repairPickup.visible, false, 'Pause cannot spawn or collect a repair');
@@ -524,14 +527,14 @@ for (const reducedMotion of [false, true]) {
   assert.deepEqual(repairs.messages.at(-1), {message: '+25 SCHILD', negative: false}, 'Repairs use the same action feedback as checkpoints');
   assert.deepEqual(repairs.sounds, ['reward']); repairs.updateRepairPickup(0);
   assert.deepEqual(repairs.sounds, ['reward'], 'Collection must happen only once');
-  repairs.resetRepairPickup(); repairs.setRepairPending(true); repairs.setShield(100); repairs.worldStep.set(0, 0, 0);
+  scheduleRepair(); repairs.setShield(100); repairs.worldStep.set(0, 0, 0);
   repairs.updateRepairPickup(0); assert.equal(repairs.repairPickup.visible, false, 'Save the opportunity while shield is full');
   repairs.setShield(90); repairs.setTime(28); repairs.updateRepairPickup(0);
   repairs.repairPickup.position.set(0, 0, -60); repairs.worldStep.set(0, 0, 140); repairs.updateRepairPickup(1 / 60);
   assert.equal(repairs.shield, 100, 'The pickup still caps shield at 100');
   assert.deepEqual(repairs.messages.at(-1), {message: '+25 SCHILD', negative: false},
     'Collection feedback matches the +25 pickup label even when part of the repair exceeds the cap');
-  repairs.resetRepairPickup(); repairs.setRepairPending(true); repairs.setShield(50); repairs.worldStep.set(0, 0, 0);
+  scheduleRepair(); repairs.setShield(50); repairs.worldStep.set(0, 0, 0);
   repairs.updateRepairPickup(0); repairs.repairPickup.position.set(100, 0, 200); repairs.updateRepairPickup(0);
   assert.equal(repairs.repairPickup.visible, false); assert.equal(repairs.shield, 50, 'Missed pickups do not repair automatically');
   repairs.setTime(29); repairs.updateRepairPickup(0); assert.equal(repairs.repairPickup.visible, false, 'A missed pickup does not respawn');
@@ -551,14 +554,14 @@ console.log('PASS optional bounded shield repairs, swept collection, cap, pause/
 // Isolate scheduled crossings so ring/regular-fleet hits cannot hide a harmless threat schedule.
 const unattended = [], evasive = [];
 let totalCrossings = 0, totalDangerousCrossings = 0;
-for (const reducedMotion of [false, true]) for (const fps of [5, 60, 144]) for (let trial = 0; trial < 4; trial++) {
+for (const reducedMotion of [false, true]) for (const fps of full ? [5, 60, 144] : [5]) for (let trial = 0; trial < 4; trial++) {
   for (const dodge of [false, true]) {
     randomState.seed = 8000 + trial;
     const flight = makeGame(reducedMotion); flight.setupLevelFleet();
     flight.flightMotion.set(0, 0, -flight.levelFlightSpeed(0));
     let ticks = 0, hits = 0, shownCrossings = 0, dangerousCrossings = 0, dodgeAt = Infinity;
     const spawns = new Map();
-    const clock = makeFlightClock(THREE, flight, reducedMotion, dt => {
+    const clock = makeFlightClock(flight, dt => {
       const time = ticks * dt; flight.setTime(time);
       flight.updateCollisionHazard();
       for (const rock of flight.hazardPool) {
@@ -602,4 +605,4 @@ assert.ok(unattended.reduce((sum, hits) => sum + hits, 0) >= unattended.length,
   `Uncorrected flight must still meet real hazards despite the longer warning distance: ${unattended}`);
 assert.ok(evasive.reduce((sum, hits) => sum + hits, 0) < unattended.reduce((sum, hits) => sum + hits, 0) * .35,
   `Readable fixed trajectories must remain avoidable: straight=${unattended}, evasive=${evasive}`);
-console.log(`PASS full-level collision chance at 5–144 FPS: straight ${unattended.join('/')} hits; evasive ${evasive.join('/')}`);
+console.log(`PASS full-level collision chance: straight ${unattended.join('/')} hits; evasive ${evasive.join('/')}`);

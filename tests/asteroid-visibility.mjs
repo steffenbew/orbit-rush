@@ -1,44 +1,94 @@
 // Run from the project root: node tests/asteroid-visibility.mjs
 import { readFileSync } from 'node:fs';
+import { createFragments } from '../src/course/fragments.js';
+import { createExplosions } from '../src/presentation/explosions.js';
+import { createFleetVisuals } from '../src/fleet/visuals.js';
+import { makeGame as makeFlight } from './helpers/flight-game.mjs';
+import { createPlayerCollision } from '../src/flight/player-collision.js';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 };
-const math = Object.create(Math);
-math.random = () => .8; // Exercise solid fragments, not the alternate dust-only burst.
-const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reducedMotion', `
-  const scene = new THREE.Scene(), glow = new THREE.Texture();
-  const camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
-  const viewCamera = camera;
-  const worldStep = new THREE.Vector3(), particleView = new THREE.Vector3();
-  const ships = [];
-  const random = (a, b) => (a + b) / 2, pick = values => values[0];
-  let particles = [], paused = false, crashing = false, crashDrifting = false, roundEnded = false, gameTime = 0;
+const makeGame = (reducedMotion = false) => {
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
+  const { crossesPlayer } = createPlayerCollision(camera.position);
+  const hasPassedCamera = new Function('THREE', 'viewCamera', `
+    ${section('  const passedBox =', '  const fragments =')}
+    return hasPassedCamera;
+  `)(THREE, camera);
+  const viewFrustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
+  const fragments = createFragments({ scene, reducedMotion, viewFrustum, hasPassedCamera, crossesPlayer,
+    random: (a,b) => (a+b)/2, pick: values => values[0] });
   const hits = [];
-  const collideWith = object => { object.userData.collisionHandled = true; hits.push(object); };
-  ${section('      const inverseRotation =', '      const mouseAim =')}
-  ${section('      const asteroidFragmentShapes =', '      const symbolTextures =')}
-  ${section('      function shatterAsteroid(', '      function applyExplosionShockwave(')}
-  ${section('      function recordVisibleObjects()', '      function renderFrame()')}
+  let paused = false, gameTime = 0;
+  const render = () => fragments.recordVisible(gameTime);
   return {
-    scene, camera, hasPassedCamera, shatterAsteroid, hits, render: recordVisibleObjects,
-    get particles() { return particles; },
+    scene, camera, hasPassedCamera, approaching: fragments.approaching, shatterAsteroid: fragments.shatter, hits, render, particles: fragments.rocks,
     setPaused: value => { paused = value; },
-    step: (dt, render = true) => {
+    step(dt, draw = true) {
       if (!paused) gameTime += dt;
       camera.updateMatrixWorld();
       viewFrustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-      ${section('        const fragmentHits = [];', '      }\n      function recordVisibleObjects()')}
-      if (render) recordVisibleObjects();
+      for (const object of fragments.update(dt, new THREE.Vector3(), !paused, !paused)) {
+        object.userData.collisionHandled = true; hits.push(object);
+      }
+      if (draw) render();
     }
   };
-`)(THREE, math, reducedMotion);
+};
+
+// Test the fleet's render-time sighting rules independently of simulation ticks.
+for (const reducedMotion of [false, true]) {
+  const camera = new THREE.PerspectiveCamera(90, 1, .03, 14000);
+  const frustum = new THREE.Frustum().setFromProjectionMatrix(camera.projectionMatrix);
+  const { recordVisibleFleet } = createFleetVisuals(camera, reducedMotion);
+  const rock = new THREE.Object3D(), bounds = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
+  const data = rock.userData = {type: {asteroid: true}, arrivalOpacity: 1, hull: {opacity: 1},
+    collisionBox: bounds, collisionParts: [{bounds}], lastVisibleTime: -Infinity};
+  const range = reducedMotion ? 500 : 2800;
+  rock.position.z = -range;
+  recordVisibleFleet([rock], frustum, 1);
+  assert.equal(data.lastVisibleTime, -Infinity, 'At the fade-distance cutoff the rock has not been seen');
+  rock.position.z += 1; data.hull.opacity = .24;
+  recordVisibleFleet([rock], frustum, 2);
+  assert.equal(data.lastVisibleTime, -Infinity);
+  data.hull.opacity = .25; data.arrivalOpacity = .24;
+  recordVisibleFleet([rock], frustum, 3);
+  assert.equal(data.lastVisibleTime, -Infinity);
+  data.arrivalOpacity = .25;
+  recordVisibleFleet([rock], frustum, 4);
+  assert.equal(data.lastVisibleTime, 4);
+
+  // The ship's combined bounds straddle the screen, but neither part is on screen.
+  const left = bounds.clone().translate(new THREE.Vector3(-5000, 0, 0));
+  const right = bounds.clone().translate(new THREE.Vector3(5000, 0, 0));
+  data.collisionBox = left.clone().union(right); data.collisionParts = [{bounds: left}, {bounds: right}];
+  recordVisibleFleet([rock], frustum, 5);
+  assert.equal(data.lastVisibleTime, 4, 'Empty space between hull parts cannot refresh a sighting');
+}
+
+for (const drawn of [false, true]) {
+  const flight = makeFlight();
+  flight.ships.forEach(ship => { ship.visible = false; });
+  const rock = flight.ships.find(ship => ship.userData.type.asteroid);
+  flight.resetShip(rock, true); rock.scale.setScalar(.15);
+  rock.position.set(13, 0, -60); rock.userData.courseAge = 1; rock.userData.hull.opacity = 1;
+  rock.userData.courseVelocity.set(0, 0, 320);
+  if (drawn) {
+    flight.recordVisibleObjects();
+    flight.setTime(1); flight.camera.rotation.y = Math.PI / 2; flight.recordVisibleObjects();
+    assert.equal(rock.userData.lastVisibleTime, 0, 'Turning away must not erase the earlier sighting');
+  }
+  // The same rock crosses the right wing in 15 fixed steps without another render.
+  for (let i = 1; i <= 15; i++) { flight.setTime(1 + i / 60); flight.updateFleet(1 / 60); }
+  assert.equal(flight.hits.includes(rock), drawn, 'Only a previously rendered fleet rock may hit the wing');
+}
 
 const game = makeGame();
 const hull = new THREE.Object3D();
@@ -107,11 +157,14 @@ for (const reducedMotion of [false, true]) {
   fragments.step(0);
   assert.equal(fragments.particles.length, 0, 'Off-screen expiry must free the fragment budget');
 
-  const dust = new THREE.Sprite(new THREE.SpriteMaterial());
-  dust.position.set(0, 0, -100); fragments.scene.add(dust);
-  fragments.particles.push({ object: dust, kind: 'dust', age: 0, life: 1, baseSize: 1, vx: 0, vy: 0, vz: 0, spin: 0 });
-  fragments.step(.5); assert.ok(dust.material.opacity < .5, 'Dust and other transient effects should still fade');
-  fragments.step(.6); assert.equal(fragments.particles.length, 0);
+  const fx = createExplosions({ scene: fragments.scene, camera: fragments.camera, glow: new THREE.Texture(), reducedMotion,
+    random: (a,b) => (a+b)/2, pick: values => values[0] });
+  fx.dust(asteroid);
+  const dust = fx.particles[0].object;
+  fx.update(.5, new THREE.Vector3(), fragments.camera, true);
+  assert.ok(dust.material.opacity < .5, 'Cosmetic dust fades while solid fragments stay opaque');
+  fx.update(.8, new THREE.Vector3(), fragments.camera, true);
+  assert.equal(fx.particles.length, 0);
 }
 console.log('PASS opaque visible fragments beyond expiry, pause, collisions, safe cleanup, bounded budget and unchanged dust fades');
 
@@ -126,7 +179,10 @@ freshRock.scale.setScalar(1); freshRock.position.set(0, 0, -2);
 for (let tick = 0; tick < 15; tick++) unseen.step(1 / 60, false);
 assert.equal(unseen.hits.length, 0, 'Catch-up ticks must not damage the player with a never-rendered fragment');
 assert.equal(freshRock.userData.lastVisibleTime, -Infinity);
-unseen.render(); unseen.step(1 / 60, false);
+assert.equal(unseen.approaching(new THREE.Vector3()), false, 'Unseen fragments also suppress warnings');
+unseen.render();
+assert.equal(unseen.approaching(new THREE.Vector3()), true, 'A rendered fragment on the hull warns before it deals damage');
+unseen.step(1 / 60, false);
 assert.ok(unseen.hits.includes(freshRock), 'The same fragment becomes a real hazard after it has been shown');
 console.log('PASS render-only visibility: no unseen fragment hits during a catch-up frame');
 

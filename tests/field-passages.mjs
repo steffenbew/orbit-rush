@@ -2,8 +2,11 @@
 import assert from 'node:assert/strict';
 import { THREE, makeGame, randomState } from './helpers/flight-game.mjs';
 
+const full = process.env.ORBIT_TEST_FULL === '1';
+// Uncut, transverse, lengthwise and oblique passages with both signs on each axis.
+const levels = full ? [1, 2, 5, 6, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 59] : [2, 5, 23, 59];
 const directions = [], variants = new Set();
-for (const reduced of [false, true]) for (const level of [1, 2, 5, 6, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 59]) {
+for (const reduced of [false, true]) for (const level of levels) {
   // Keep each layout independent of random draws consumed by earlier speed/mode cases.
   randomState.seed = 12345;
   const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet();

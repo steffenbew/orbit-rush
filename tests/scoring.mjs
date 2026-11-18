@@ -1,22 +1,21 @@
 // Run from the project root: node tests/scoring.mjs
-import { readFileSync } from 'node:fs';
+import { css, game as source } from './helpers/app-source.mjs';
 import assert from 'node:assert/strict';
-import { t, setLanguage } from '../i18n.js';
+import { t, setLanguage } from '../src/presentation/i18n.js';
+import { killReward } from '../src/run/scoring.js';
+import { shipTypes as types } from '../src/fleet/models.js';
 setLanguage('en');
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const typesSource = source.match(/const shipTypes = (\[[\s\S]*?\n      \]);/)[1];
-const types = new Function(`return ${typesSource}`)();
-const from = source.indexOf('      function award(ship)');
-const to = source.indexOf('      updateScore();\n      const sound', from);
+const from = source.indexOf('  function award(ship)');
+const to = source.indexOf('  updateScore();\n  const sound', from);
 assert.ok(from >= 0 && to > from);
 const awardCode = source.slice(from, to);
-const feedbackCode = source.slice(source.indexOf('      let feedbackUntil ='), source.indexOf('      const shockwaves ='));
+const feedbackCode = source.slice(source.indexOf('  let feedbackUntil ='), source.indexOf('  function updateScore()'));
 const expireCode = source.match(/if \(gameTime >= feedbackUntil\)[^\n]*/)[0];
 function makeGame(storageBlocked = false) {
-  return new Function('storageBlocked', 't', `
-    let score = 0, best = 0, kills = 0, combo = 0, gameTime = 0, lastKill = -Infinity, roundEnded = false;
-    const comboWindows = [0, 2.5, 1.8, 1.2, .8, .8], sounds = [], saved = [];
+  return new Function('killReward', 'storageBlocked', 't', `
+    let score = 0, best = 0, kills = 0, lastReward = null, gameTime = 0, roundEnded = false;
+    const sounds = [], saved = [];
     const classes = new Set(), feedbackValue = {textContent: ''}, feedbackDetail = {textContent: ''};
     const feedback = {classList: {contains: key => classes.has(key), add: key => classes.add(key), remove: key => classes.delete(key),
       toggle: (key, value) => value ? classes.add(key) : classes.delete(key)}, offsetWidth: 0};
@@ -29,45 +28,37 @@ function makeGame(storageBlocked = false) {
       checkpoint: (passed, restored = 0) => showFeedback(passed
         ? (restored > 0 ? t('repaired', {amount: restored}) : t('shieldFull')) + ' · ' + t('ringPassed') : t('ringMissed'), !passed),
       expire: () => { ${expireCode} },
-      state: () => ({score, best, kills, combo, lastKill, value: feedbackValue.textContent, detail: feedbackDetail.textContent,
+      state: () => ({score, best, kills, lastReward, value: feedbackValue.textContent, detail: feedbackDetail.textContent,
         feedback: [feedbackValue.textContent, feedbackDetail.textContent].filter(Boolean).join(' · '), negative: classes.has('negative'),
         active: classes.has('pop'), until: feedbackUntil, sounds, saved}) };
-  `)(storageBlocked, t);
+  `)(killReward, storageBlocked, t);
 }
 const target = (type, tier = 0) => ({userData: {type, asteroidTier: tier, health: 0}});
 const rock = types.find(type => type.asteroid);
 for (const tier of [1, 2, 3]) {
-  const game = makeGame();
-  game.award(target(rock, tier));
-  assert.equal(game.state().score, tier * 100, 'Asteroid rewards follow size/toughness, not a flat rate');
-  assert.equal(game.state().best, tier * 100);
-  assert.equal(game.state().kills, 1);
-  assert.ok(game.state().feedback.startsWith('+' + tier * 100));
+  assert.equal(killReward(rock, tier, 0).points, tier * 100);
 }
 for (const [index, health, points] of [[0, 3, 400], [1, 4, 600], [2, 5, 900], [4, 60, 10000]]) {
-  const game = makeGame();
   assert.equal(types[index].health, health);
-  game.award(target(types[index]));
-  assert.equal(game.state().score, points, 'Harder ship classes must pay larger rewards');
+  assert.equal(killReward(types[index], 0, 0).points, points, 'Harder ship classes must pay larger rewards');
   if (index < 3) assert.ok(points > rock.points * 3, 'Fighting mobile ships should beat farming even the largest rock');
 }
 assert.equal(types[4].health / 3, 20, 'The boss now needs twenty power-laser hits instead of ten');
 console.log('PASS size-based asteroid rewards, escalating ship rewards and 60-HP/10,000-point Leviathan');
 
+for (const [combo, window] of [[1, 2.5], [2, 1.8], [3, 1.2], [4, .8], [5, .8]]) {
+  const previous = { combo, time: 0 };
+  const active = killReward(rock, 2, window - .001, previous);
+  assert.equal(active.combo, Math.min(5, combo + 1));
+  assert.equal(active.points, 200 * active.combo);
+  assert.equal(killReward(rock, 2, window, previous).combo, 1, 'The window excludes its exact endpoint');
+}
 const game = makeGame();
-const sequence = [[target(rock, 1), 100], [target(rock, 2), 200], [target(rock, 3), 300],
-  [target(types[0]), 400], [target(types[1]), 600], [target(types[4]), 10000]];
-let expected = 0;
-sequence.forEach(([ship, base], index) => {
-  game.time(index * .1); game.award(ship);
-  const combo = Math.min(index + 1, 5);
-  expected += base * combo;
-  assert.equal(game.state().score, expected);
-  assert.equal(game.state().combo, combo);
-});
-game.time(10); game.award(target(types[2]));
-assert.equal(game.state().combo, 1, 'Existing combo expiry remains unchanged');
-assert.equal(game.state().score, expected + 900);
+game.award(target(rock, 2)); game.time(1); game.award(target(types[0]));
+assert.equal(game.state().score, 200 + 2 * 400);
+assert.equal(game.state().kills, 2);
+assert.equal(game.state().feedback, '+800 · COMBO ×2');
+assert.deepEqual(game.state().sounds, ['reward']);
 assert.equal(game.state().best, game.state().score);
 assert.deepEqual(game.state().saved.at(-1), ['sternflug-highscore', String(game.state().score)]);
 const before = game.state(); game.end(); game.award(target(types[4]));
@@ -97,7 +88,7 @@ penalties.time(10); penalties.penalty(10); penalties.expire();
 assert.equal(penalties.state().feedback, '−10 SHIELD');
 assert.equal(penalties.state().negative, true); assert.equal(penalties.state().active, true);
 assert.equal(penalties.state().score, 0); assert.equal(penalties.state().kills, 0);
-assert.equal(penalties.state().combo, 0); assert.equal(penalties.state().lastKill, -Infinity);
+assert.equal(penalties.state().lastReward, null);
 penalties.time(11); penalties.expire(); assert.equal(penalties.state().active, true, 'Penalty lifetime is independent of the last kill');
 penalties.time(11.21); penalties.expire(); assert.equal(penalties.state().active, false);
 penalties.penalty(30); penalties.award(target(types[0]));
@@ -105,7 +96,7 @@ assert.equal(penalties.state().negative, false, 'A later reward restores the pos
 assert.equal(penalties.state().score, 400);
 assert.ok(penalties.state().feedback.startsWith('+400'));
 setLanguage('de'); penalties.penalty(12); assert.equal(penalties.state().feedback, '−12 SCHILD'); setLanguage('en');
-assert.ok(source.includes('#feedback.negative { color: #ff7b86;'));
+assert.ok(css.includes('#feedback.negative { color: #ff7b86;'));
 assert.ok(source.includes("!feedback.classList.contains('negative') ? 'hidden' : 'visible'"), 'Danger warnings must not hide penalty feedback');
 console.log('PASS localized red penalty feedback, independent lifetime, unchanged score/combo, visible during danger and positive-color restoration');
 

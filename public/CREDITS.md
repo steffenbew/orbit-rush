@@ -6,7 +6,7 @@ All assets are served locally. Audio source and license links are also available
 
 ### Kenney — Sci-Fi Sounds (1.0)
 
-[Source](https://opengameart.org/content/sci-fi-sounds) · [Original archive](https://opengameart.org/sites/default/files/sci-fi_sounds.zip) · [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) · [Bundled notice](assets/audio/KENNEY-LICENSE.txt)
+[Source](https://opengameart.org/content/sci-fi-sounds) · [Original archive](https://opengameart.org/sites/default/files/sci-fi_sounds.zip) · [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) · [Bundled notice](licenses/KENNEY-LICENSE.txt)
 
 | File in `assets/audio/` | Source in the pack's `Audio/` directory | Changes |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ All assets are served locally. Audio source and license links are also available
 
 ## Music
 
-**Juhani Junkala (SubspaceAudio)** — *Retro Game Music Pack · Level 1*, from [5 Action Chiptunes by Juhani Junkala](https://opengameart.org/content/5-chiptunes-action). [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) · [Bundled notice](assets/audio/MUSIC-LICENSE.txt).
+**Juhani Junkala (SubspaceAudio)** — *Retro Game Music Pack · Level 1*, from [5 Action Chiptunes by Juhani Junkala](https://opengameart.org/content/5-chiptunes-action). [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) · [Bundled notice](licenses/MUSIC-LICENSE.txt).
 
 `assets/audio/orbit-arcade.mp3` was made from `Juhani Junkala [Retro Game Music Pack] Level 1.wav`: low-pass filtered at 11 kHz, loudness-normalized and converted to MP3.
 
@@ -44,5 +44,5 @@ NASA's observations of [DART's ejecta cone and filaments](https://science.nasa.g
 
 ## Icons and rendering
 
-- [Phosphor Icons](https://phosphoricons.com/), [`@phosphor-icons/core` 2.1.1](https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz), Regular. The HUD uses locally embedded SVG paths; the rocket also appears in the favicon and [app icons](assets/icons/). [MIT license](assets/vendor/PHOSPHOR-LICENSE.txt).
-- [Three.js](https://threejs.org/) 0.170.0, distributed unmodified via jsDelivr and bundled as [`assets/vendor/three.module.js`](assets/vendor/three.module.js). [MIT license](assets/vendor/THREE-LICENSE.txt).
+- [Phosphor Icons](https://phosphoricons.com/), [`@phosphor-icons/core` 2.1.1](https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz), Regular. The HUD uses locally embedded SVG paths; the rocket also appears in the favicon and [app icons](icons/icon-512.png). [MIT license](licenses/PHOSPHOR-LICENSE.txt).
+- [Three.js](https://threejs.org/) 0.170.0, vendored from [jsDelivr](https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js) and bundled for production. [MIT license](licenses/THREE-LICENSE.txt).

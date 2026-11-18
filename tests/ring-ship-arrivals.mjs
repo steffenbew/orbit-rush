@@ -2,11 +2,13 @@
 import assert from 'node:assert/strict';
 import { makeGame } from './helpers/flight-game.mjs';
 
+const full = process.env.ORBIT_TEST_FULL === '1';
+
 // A busy encounter can delay route traffic until the corridor is already under or behind the player.
-for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (const shape of [0, 1, 2]) {
-  for (const progress of [-.01, 0, .02, .5, .99, 1, 1.01]) {
+for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (const shape of full ? [0, 1, 2] : [2]) {
+  for (const progress of full ? [-.01, 0, .02, .5, .99, 1, 1.01] : [0, .5, 1]) {
     const game = makeGame(reducedMotion);
-    game.setLevel(level); game.setPressure(1 - Math.exp(-(level - 1) / 4)); game.setupLevelFleet();
+    game.setLevel(level); game.setupLevelFleet();
     const field = game.ringCourse(true, shape), depth = field.length * progress;
     game.setTime(30);
     game.courseWorldOffset.set(120, -30, game.camera.position.z - field.origin.z + depth);
@@ -75,7 +77,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
     });
   }
 }
-console.log('PASS late route traffic before/at/inside/after all corridor shapes, normal/reduced motion, model reuse and finite forward paths');
+console.log('PASS late route traffic at corridor entry, inside and after the passage, normal/reduced motion, model reuse and finite forward paths');
 
 const finished = makeGame(); finished.setupLevelFleet(); finished.ringCourse(true);
 finished.flightRings.forEach(gate => { gate.userData.resolved = true; gate.visible = false; });

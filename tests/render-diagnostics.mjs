@@ -1,8 +1,8 @@
 // Run from the project root: node tests/render-diagnostics.mjs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRenderDiagnostics } from '../render-diagnostics.js';
-import { t, setLanguage } from '../i18n.js';
+import { createRenderDiagnostics } from '../src/platform/render-diagnostics.js';
+import { t, setLanguage } from '../src/presentation/i18n.js';
 
 class Element extends EventTarget {
   value = '';
@@ -92,24 +92,24 @@ try {
   assert.equal(lost.root.open, true);
 
   // Verify the real shutdown code, not just the popup's onFailure callback.
-  const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  const shutdownFrom = source.lastIndexOf('      stopRendering = () => {');
-  const shutdownTo = source.indexOf('      resetSimulationClock();', shutdownFrom);
+  const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const shutdownFrom = source.lastIndexOf('  stopRendering = () => {');
+  const shutdownTo = source.indexOf('  resetSimulationClock();', shutdownFrom);
   assert.ok(shutdownFrom > 0 && shutdownTo > shutdownFrom);
   const calls = [], deferred = [];
   const shutdown = new Function('calls', 'deferred', `
-    let stopRendering, paused = false, speed = 500, pointer = {}, spaceHeld = true;
+    let stopRendering, paused = false, speed = 500;
     const queueMicrotask = fn => deferred.push(fn);
     const renderer = {setAnimationLoop: value => calls.push(['loop', value])};
-    const touchControls = {reset: () => calls.push(['touch'])};
+    const controls = {reset: () => calls.push(['controls'])};
     const sound = {suspendAudio: async () => calls.push(['audio'])};
     ${source.slice(shutdownFrom, shutdownTo)}
     stopRendering();
-    return {paused, speed, pointer, spaceHeld};
+    return {paused, speed};
   `)(calls, deferred);
-  assert.deepEqual(shutdown, {paused: true, speed: 0, pointer: null, spaceHeld: false});
+  assert.deepEqual(shutdown, {paused: true, speed: 0});
   assert.ok(calls.some(([name]) => name === 'audio'));
-  assert.ok(calls.some(([name]) => name === 'touch'));
+  assert.ok(calls.some(([name]) => name === 'controls'));
   assert.equal(deferred.length, 1, 'Cancel the next animation frame after Three.js schedules it');
   deferred[0]();
   assert.deepEqual(calls.at(-1), ['loop', null]);

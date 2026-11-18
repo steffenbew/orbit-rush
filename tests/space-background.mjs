@@ -1,37 +1,27 @@
 // Run from the project root: node tests/space-background.mjs
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createPlanet } from '../planet.js';
+import { createSpaceBackground } from '../src/presentation/space-background.js';
+import * as THREE from '../assets/vendor/three.module.js';
 
-const root = new URL('../', import.meta.url);
-const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
-const background = source.slice(source.indexOf('      // One world-aligned sky:'),
-  source.indexOf('      // Three original silhouettes:'));
-assert.ok(background.includes('function updateSpaceBackground()'));
-
-const makeSky = (reducedMotion = false) => {
+function makeSky(reducedMotion = false) {
   let seed = 14767;
-  const math = Object.create(Math);
-  math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-  return new Function('THREE', 'Math', 'reducedMotion', 'createPlanet', `
+  const sample = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
   const worldStep = new THREE.Vector3();
-  let level = 1, started = false, paused = true, crashDrifting = false;
-  const random = (a, b) => a + Math.random() * (b - a);
-  const pick = items => items[0];
-  // CanvasTexture only needs a canvas reference for these geometry-only tests.
-  const document = { createElement: () => ({ getContext: () => ({
+  let level = 1, started = false, paused = true;
+  globalThis.document = { createElement: () => ({ getContext: () => ({
     createRadialGradient: () => ({ addColorStop() {} }), fillRect() {}
   }) }) };
-  ${background}
-  return { scene, camera, distantSky, galaxy, planet, stars, starPositions, starGeometry,
-    flightDust, dustPositions, dustGeometry, dustColors, dustSizes,
-    middleStars, middlePositions, middleGeometry, middleParallax, worldStep, updateSpaceBackground,
+  const sky = createSpaceBackground(scene, camera, reducedMotion, sample);
+  const starGeometry = sky.stars.geometry, middleGeometry = sky.middleStars.geometry, dustGeometry = sky.flightDust.geometry;
+  return { ...sky, scene, camera, worldStep, starGeometry, middleGeometry, dustGeometry,
+    starPositions: starGeometry.attributes.position.array, middlePositions: middleGeometry.attributes.position.array,
+    dustPositions: dustGeometry.attributes.position.array, dustColors: dustGeometry.attributes.color.array,
+    dustSizes: dustGeometry.attributes.starSize.array,
+    updateSpaceBackground: () => sky.updateSpaceBackground(worldStep, level, started, paused, false),
     setLevel: value => level = value, setStarted: value => started = value, setPaused: value => paused = value };
-`)(THREE, math, reducedMotion, createPlanet);
-};
+}
 
 const visibility = distance => THREE.MathUtils.smoothstep(distance, 3000, 4000)
   * (1 - THREE.MathUtils.smoothstep(distance, 6000, 6500));

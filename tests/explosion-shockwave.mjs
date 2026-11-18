@@ -1,56 +1,41 @@
 // Run from the project root: node tests/explosion-shockwave.mjs
+import { activeFlightSource } from './helpers/app-source.mjs';
+import * as physics from '../src/flight/physics.js';
+import { createCrashMotion } from '../src/flight/crash-motion.js';
+import { createExplosions } from '../src/presentation/explosions.js';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
-const start = source.indexOf('      function applyExplosionShockwave(');
-const end = source.indexOf("      window.addEventListener('keydown'", start);
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
+const start = source.indexOf('  function applyExplosionShockwave(');
+const end = source.indexOf('  function resize()', start);
 assert.ok(start >= 0 && end > start);
-const waveStart = source.indexOf('        for (let i = shockwaves.length - 1; i >= 0; i--) {');
-const waveEnd = source.indexOf('        const fragmentHits = [];', waveStart);
-const particleEnd = source.indexOf('      }\n      function recordVisibleObjects()', waveEnd);
-assert.ok(waveStart >= 0 && waveEnd > waveStart && particleEnd > waveEnd);
-const momentumStart = source.indexOf('        // Particles receive the full world step');
-const momentumEnd = source.indexOf('        flash = reducedMotion', momentumStart);
-assert.ok(momentumStart >= 0 && momentumEnd > momentumStart);
 const math = Object.create(Math);
-math.random = () => .5; // Normal-sized destruction, not the rare spectacular variant.
-const makeGame = (reducedMotion = false) => new Function('THREE', 'Math', 'reducedMotion', `
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
-  const viewCamera = camera;
-  const flightVelocity = new THREE.Vector2(), shockwaves = [];
-  const worldStep = new THREE.Vector3(), particleView = new THREE.Vector3();
-  let particles = [];
-  const glow = new THREE.Texture();
-  ${source.slice(source.indexOf('      const shockGeometry ='), source.indexOf('      function updateScore()'))}
-  const debrisGeometry = new THREE.TetrahedronGeometry(1, 0);
-  const pick = values => values[0], random = (a, b) => (a + b) / 2;
-  let started = true, paused = false, roundEnded = false, crashing = false, crashDrifting = false;
-  let speed = 400, shake = 0, flash = 0, shield = 100, score = 123;
-  ${source.slice(start, end)}
-  return {
-    scene, camera, flightVelocity, applyExplosionShockwave, explode, shockwaves,
-    get particles() { return particles; },
-    inheritCrashMotion: flightMotion => {
-      const firstParticle = 0;
-      ${source.slice(momentumStart, momentumEnd)}
-    },
-    tick: (dt, movement) => {
-      if (movement) worldStep.copy(movement);
-      else worldStep.set(0, 0, paused ? 0 : dt * 100);
-      camera.updateMatrixWorld();
-      ${source.slice(waveStart, particleEnd)}
-    },
-    state: () => ({shake, flash, shield, score, speed, velocity: flightVelocity.toArray()}),
-    reset: () => { shake = flash = 0; flightVelocity.set(0, 0); },
-    setMode: mode => {
-      started = mode !== 'intro'; paused = mode === 'paused';
-      roundEnded = mode === 'result'; crashing = crashDrifting = mode === 'crash';
+math.random = () => .5;
+const makeGame = (reducedMotion = false) => {
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), flightVelocity = new THREE.Vector2();
+  const pilot = new Function('physics', 'camera', 'flightVelocity', 'reducedMotion', `
+    let started = true, paused = false, roundEnded = false, crashing = false, speed = 400, shake = 0, flash = 0;
+    ${activeFlightSource}
+    ${source.slice(start, end)}
+    return { applyExplosionShockwave, state: () => ({shake, flash, speed, shield:100, score:123, velocity:flightVelocity.toArray()}),
+      reset: () => { shake = flash = 0; flightVelocity.set(0, 0); },
+      setMode(mode) { started = mode !== 'intro'; paused = mode === 'paused'; roundEnded = mode === 'result'; crashing = mode === 'crash'; }
+    };
+  `)(physics, camera, flightVelocity, reducedMotion);
+  const fx = createExplosions({ scene, camera, glow: new THREE.Texture(), reducedMotion, pick: values => values[0],
+    random: (a, b) => a === 0 && b === 1 ? math.random() : (a + b) / 2, onBlast: pilot.applyExplosionShockwave });
+  let paused = false;
+  return { ...pilot, scene, camera, flightVelocity, explode: fx.explode, crashBurst: fx.crashBurst,
+    get particles() { return fx.particles; }, shockwaves: fx.shockwaves,
+    setMode(mode) { paused = mode === 'paused'; pilot.setMode(mode); },
+    tick(dt, movement = new THREE.Vector3(0, 0, paused ? 0 : dt * 100)) {
+      camera.updateMatrixWorld(); fx.update(dt, movement, camera, !paused);
     }
   };
-`)(THREE, math, reducedMotion);
+};
 
 const direction = new THREE.Vector3(.6, 0, -.8);
 const game = makeGame();
@@ -74,14 +59,18 @@ for (const distance of [25, 150, 400, 650, 700, 3000]) {
 }
 console.log('PASS smooth distance falloff, silent distant blasts and no direct damage or score changes');
 
-game.reset();
-game.camera.position.set(100, 50, 20);
-game.applyExplosionShockwave(new THREE.Vector3(70, 10, 20), 1);
-assert.ok(game.flightVelocity.x > 0 && game.flightVelocity.y > 0);
-const translated = game.state();
-game.reset(); game.camera.position.set(0, 0, 0);
-game.applyExplosionShockwave(new THREE.Vector3(-30, -40, 0), 1);
-assert.deepEqual(game.state(), translated, 'Distance and push must be relative to the camera');
+// Halfway to the 700-unit cutoff: a unit blast has quarter strength and adds to existing drift.
+for (const reducedMotion of [false, true]) {
+  const playerPosition = new THREE.Vector3(100, 50, 20), drift = new THREE.Vector2(8, -3);
+  const flight = {playerPosition, speed: 400, drift, reducedMotion};
+  const origin = playerPosition.clone().add(new THREE.Vector3(210, -280, 0));
+  assert.equal(physics.applyBlastImpulse(origin, 1, flight), .25);
+  const impulse = 35 * (reducedMotion ? .12 : 1);
+  assert.ok(drift.distanceTo(new THREE.Vector2(8 - .6 * impulse, -3 + .8 * impulse)) < 1e-9);
+  const before = drift.clone();
+  assert.equal(physics.applyBlastImpulse(playerPosition.clone().addScalar(700), 1, flight), 0);
+  assert.ok(drift.equals(before), 'An out-of-range blast leaves existing drift intact');
+}
 game.reset(); game.applyExplosionShockwave(game.camera.position, 1);
 assert.ok(Object.values(game.state()).flat().every(Number.isFinite), 'Coincident blast must not produce NaNs');
 assert.equal(game.state().shake, 2.2, 'A centered close explosion must still deliver a strong camera kick');
@@ -163,22 +152,21 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS brief moving-cockpit crash blast, expanding fireball, soft static reduced-motion version, no extra damage and timely cleanup');
 
 // Drive real particle movement/cleanup with the same coast-down as the crash flight.
-const makeDrift = new Function('THREE', 'initialSpeed', `
-  let speed = initialSpeed;
-  const crashDrifting = true, document = {hidden: false}, crashCoastSpeed = Math.min(120, speed * .08);
-  const flightVelocity = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
-  const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3(), flightTilt = new THREE.Vector3();
-  const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ'), crashSpin = new THREE.Vector3();
-  const crashRotation = new THREE.Quaternion(), crashRotationStep = new THREE.Quaternion();
-  ${source.slice(source.indexOf('      function updateCrashFlight('), source.indexOf('      function finishRound('))}
-  return dt => { updateCrashFlight(dt); return flightMotion.clone().multiplyScalar(-dt); };
-`);
+function makeDrift(speed) {
+  const flightMotion = new THREE.Vector3();
+  const drift = createCrashMotion({ reducedMotion: false, flightMotion, flightVelocity: new THREE.Vector2(),
+    flightViewOffset: new THREE.Vector2(), flightDirection: new THREE.Vector3(),
+    flightTilt: new THREE.Vector3(), flightOrientation: new THREE.Euler(0, 0, 0, 'YXZ') });
+  drift.begin(speed, new THREE.Vector3(3, -1, -22));
+  return dt => { speed = drift.advance(dt, speed); return flightMotion.clone().multiplyScalar(-dt); };
+}
 for (const speed of [800, 1500, 2500, 5000]) {
-  const crash = makeGame(), drift = makeDrift(THREE, speed);
-  crash.setMode('crash'); crash.explode(new THREE.Vector3(0, 0, -22), 120, true);
+  const crash = makeGame(), drift = makeDrift(speed);
+  crash.setMode('crash'); crash.crashBurst(new THREE.Vector3(0, 0, -22), new THREE.Vector3(0, 0, -speed));
   const fragments = crash.particles.filter(p => p.kind === 'debris');
-  fragments.forEach((p, i) => { p.vx = (i - 3) * 4; p.vy = (i - 3) * 2; p.vz = (i - 3) * 12; });
-  crash.inheritCrashMotion(new THREE.Vector3(0, 0, -speed));
+  assert.ok(fragments.every(p => Math.abs(p.vz + speed) <= 230), 'Only the small ejection speed differs from inherited flight velocity');
+  // Remove random ejection spread to isolate inherited momentum from the coast-down.
+  fragments.forEach(p => { p.vx = p.vy = 0; p.vz = -speed; });
   for (let step = 0; step < 36; step++) crash.tick(1 / 60, drift(1 / 60));
   assert.ok(fragments.every(p => crash.particles.includes(p)),
     'At ' + speed + ' units/s the fragments survive the opening blast instead of crossing the cleanup plane');
@@ -237,8 +225,8 @@ const accident = makeGame(); accident.explode(close, 65, false, false, 2.5, fals
 assert.equal(accident.state().flash, 0); assert.equal(accident.shockwaves[0].size, fullCapital.shockwaves[0].size);
 console.log('PASS reduced-motion boss finale, unchanged feedback limits and no environmental screen flash');
 
-const hitStart = source.indexOf('          if (hit) {');
-const hitEnd = source.indexOf('          // Long-range capital retreats', hitStart);
+const hitStart = source.indexOf('  function hitShipWithLaser(');
+const hitEnd = source.indexOf('  function updateFlightEffects(', hitStart);
 assert.ok(hitStart >= 0 && hitEnd > hitStart);
 const applyLaserHit = new Function('hit', 'rocket', `
   let hitMarker = 0;
@@ -247,6 +235,7 @@ const applyLaserHit = new Function('hit', 'rocket', `
   const playSound = (...args) => sounds.push(args), updateShipHitFlash = () => {};
   const shatterAsteroid = ship => shatters.push(ship), queueShip = ship => {ship.visible = false;};
   ${source.slice(hitStart, hitEnd)}
+  hitShipWithLaser(hit, true, rocket.damage, rocket.object.position);
   return {effects, awards, sounds, shatters};
 `);
 const capitalTarget = {position: distant, scale: {x: 6}, visible: true, userData: {health: 30, type: {capital: true}}};

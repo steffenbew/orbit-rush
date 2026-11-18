@@ -1,31 +1,36 @@
 // Run from the project root: node tests/intro-fleet.mjs
 import { readFileSync } from 'node:fs';
+import { newRun } from '../src/run/progression.js';
+import { createShipModels, shipTypes } from '../src/fleet/models.js';
+import { createFleetSpawn } from '../src/fleet/spawn.js';
+import { createIntro } from '../src/presentation/intro.js';
+import { initialFleetTypes } from '../src/fleet/roster.js';
+import { createFleetVisuals, setShipOpacity } from '../src/fleet/visuals.js';
+import * as physics from '../src/flight/physics.js';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 };
-const introStep = section('        if (!started) {', '        if (crashing && !document.hidden)');
 for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]]) {
   for (const reducedMotion of [false, true]) {
-    const intro = new Function('THREE', 'innerWidth', 'innerHeight', 'reducedMotion', `
+    const intro = new Function('createIntro', 'createFleetSpawn', 'initialFleetTypes', 'createFleetVisuals', 'setShipOpacity', 'newRun', 'physics', 'createShipModels', 'shipTypes', 'THREE', 'innerWidth', 'innerHeight', 'reducedMotion', `
       const scene = new THREE.Scene(), glow = new THREE.Texture();
       const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .03, 14000);
       const random = (a, b) => (a + b) / 2;
-      ${section('      function levelFlightSpeed(', '      function getAsteroidEncounters(')}
-      ${section('      const dark =', "      const canvas = document.querySelector('#effects');")}
+      const document = {hidden: false, querySelector: () => ({disabled: true})};
+      const matchMedia = () => ({matches: false});
+      ${section('  const { createModel,', "  const canvas = document.querySelector('#effects');")}
       // Boot must not read flight state before it is initialized.
       const flightMotion = new THREE.Vector3();
-      const document = {hidden: false}, started = false;
-      const updateIntroOrbit = () => {};
-      return { ships, introFormation, camera, updateIntroShips,
-        step: dt => { ${introStep} }, hide: () => { document.hidden = true; } };
-    `)(THREE, width, height, reducedMotion);
+      return { ships, camera, step: dt => intro.update(dt, innerWidth, innerHeight, document.hidden),
+        hide: () => { document.hidden = true; }, resume: () => { document.hidden = false; } };
+    `)(createIntro, createFleetSpawn, initialFleetTypes, createFleetVisuals, setShipOpacity, newRun, physics, createShipModels, shipTypes, THREE, width, height, reducedMotion);
     const visible = intro.ships.filter(ship => ship.visible);
     assert.equal(visible.length, 4, 'Show all four ship classes on the home screen');
     assert.equal(new Set(visible.map(ship => ship.userData.type)).size, 4);
@@ -46,8 +51,10 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
     assert.equal(boss.userData.fireCooldown, 2.8, 'The preview must not run boss attacks');
     intro.hide(); const hiddenPosition = boss.position.clone(); intro.step(2);
     assert.ok(boss.position.equals(hiddenPosition), 'Hidden tabs freeze the preview');
+    intro.resume();
+    let elapsed = 0;
     for (const time of [0, 10, 30, 60, 120]) {
-      intro.updateIntroShips(time);
+      intro.step(time - elapsed); elapsed = time;
       intro.camera.updateMatrixWorld(true);
       const projectedAreas = visible.map(ship => {
         ship.updateMatrixWorld(true);
@@ -78,5 +85,5 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
 console.log('PASS four-class home-screen fleet, boss visibility, boot safety, responsive placement and no intro attacks');
 console.log('PASS full gameplay scales, projected size hierarchy, reduced-motion and hidden-tab preview freezes');
 assert.match(source, /scene\.fog = new THREE\.FogExp2\('#030711', \.0003\)/);
-assert.match(section('      async function startGame(', "      document.querySelector('#start').addEventListener"), /scene\.fog\.density = \.00065;/,
+assert.match(section('  async function startGame(', "  document.querySelector('#start').addEventListener"), /scene\.fog\.density = \.00065;/,
   'The clearer menu fog must not change gameplay visibility');

@@ -1,4 +1,4 @@
-import * as THREE from './assets/vendor/three.module.js';
+import * as THREE from '../../assets/vendor/three.module.js';
 
 // Stylized gas giant, authored for this scene (not a scale model of Saturn).
 // Bands and ring grooves are procedural: no external texture downloads.

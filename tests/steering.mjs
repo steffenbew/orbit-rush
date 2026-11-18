@@ -1,27 +1,20 @@
 // Run from the project root: node tests/steering.mjs
-import { readFileSync } from 'node:fs';
+import { css, game as source } from './helpers/app-source.mjs';
+import { createPlayerAim, createPlayerControls } from '../src/platform/player-controls.js';
+import { createPlayerFlight } from '../src/flight/physics.js';
 import assert from 'node:assert/strict';
 
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
 const section = (start, end) => {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 };
-const flightCode = section('        if (!paused) {\n          // Aircraft steering:', '        worldStep.copy(flightMotion)');
-const makeFlight = reducedMotion => new Function('THREE', 'reducedMotion', `
-  const target = new THREE.Vector2(), flightVelocity = new THREE.Vector2(), flightTurn = new THREE.Vector2(), flightViewOffset = new THREE.Vector2();
-  const flightMotion = new THREE.Vector3(), flightDirection = new THREE.Vector3();
-  const flightTilt = new THREE.Vector3(), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
-  const camera = new THREE.PerspectiveCamera(), playerHullRotation = new THREE.Quaternion();
-  let paused = false, speed = 400;
-  ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
-  return { target, flightVelocity, flightTurn, flightMotion, flightOrientation, camera, playerHullRotation,
-    setPaused: value => { paused = value; }, step: dt => { ${flightCode} }
-  };
-`)(THREE, reducedMotion);
+function makeFlight(reducedMotion) {
+  const flight = createPlayerFlight(reducedMotion);
+  return { ...flight, step: dt => flight.advance(dt, 400, 400) };
+}
 
 for (const reducedMotion of [false, true]) {
   const outcomes = [];
@@ -45,13 +38,7 @@ for (const reducedMotion of [false, true]) {
     assert.ok(Math.abs(flight.flightOrientation.y - settled) < .00001);
     assert.ok(flight.flightMotion.x > 90, 'Neutral controls keep travelling along the new heading');
     outcomes.push(flight.flightOrientation.y);
-    assert.ok(Math.abs(flight.camera.rotation.z) < .001, 'Wings level after the turn, without undoing yaw');
-    assert.ok(flight.playerHullRotation.equals(flight.camera.quaternion));
-    const velocity = flight.flightMotion.clone(), rotation = flight.camera.quaternion.clone();
-    flight.setPaused(true); flight.target.set(-1, -1); flight.step(1);
-    assert.ok(flight.flightMotion.equals(velocity)); assert.ok(flight.camera.quaternion.equals(rotation));
-    flight.camera.rotation.x += .05;
-    assert.ok(flight.playerHullRotation.equals(rotation), 'Cosmetic shake must not rotate the collision hull');
+    assert.ok(Math.abs(flight.flightTilt.z) < .001, 'Wings level after the turn, without undoing yaw');
 
     const response = makeFlight(reducedMotion), pitchRate = reducedMotion ? .325 : .65;
     response.target.set(1, 1);
@@ -75,15 +62,15 @@ for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) for (const input of 
   banked.step(1 / fps);
   const firstBank = THREE.MathUtils.clamp(-sign * input ** 2 * Math.PI / 2 * (1 - Math.exp(-1.2 / fps)),
     -50 * Math.PI / 180 / fps, 50 * Math.PI / 180 / fps);
-  assert.ok(Math.abs(banked.camera.rotation.z - firstBank) < 1e-10, 'Banking uses the slower inertia response');
+  assert.ok(Math.abs(banked.flightTilt.z - firstBank) < 1e-10, 'Banking uses the slower inertia response');
   for (let frame = 1; frame < fps * 24; frame++) banked.step(1 / fps);
   const expected = -sign * input ** 2 * Math.PI / 2;
-  assert.ok(Math.abs(banked.camera.rotation.z - expected) < 1e-6);
+  assert.ok(Math.abs(banked.flightTilt.z - expected) < 1e-6);
   assert.ok(Math.abs(banked.flightOrientation.y) <= Math.PI / 4);
   assert.ok(banked.flightMotion.z < 0);
   banked.target.set(0, 0);
   for (let frame = 0; frame < fps * 16; frame++) banked.step(1 / fps);
-  assert.ok(Math.abs(banked.camera.rotation.z) < .00002, 'Release smoothly levels the aircraft');
+  assert.ok(Math.abs(banked.flightTilt.z) < .00002, 'Release smoothly levels the aircraft');
 }
 // A full reversal must respect the same roll-speed cap, not snap through 180 degrees.
 for (const fps of [5, 60, 144]) {
@@ -92,12 +79,12 @@ for (const fps of [5, 60, 144]) {
   for (let frame = 0; frame < fps * 20; frame++) banked.step(1 / fps);
   banked.target.set(-1, 0);
   for (let frame = 0; frame < fps * 8; frame++) {
-    const previous = banked.camera.rotation.z;
+    const previous = banked.flightTilt.z;
     banked.step(1 / fps);
-    assert.ok(Math.abs(banked.camera.rotation.z - previous) <= 50 * Math.PI / 180 / fps + 1e-10);
-    if ((frame + 1) / fps <= 1.5) assert.ok(banked.camera.rotation.z < 0, 'Reversing a full bank takes time to reach level');
+    assert.ok(Math.abs(banked.flightTilt.z - previous) <= 50 * Math.PI / 180 / fps + 1e-10);
+    if ((frame + 1) / fps <= 1.5) assert.ok(banked.flightTilt.z < 0, 'Reversing a full bank takes time to reach level');
   }
-  assert.ok(banked.camera.rotation.z > 0, 'A sustained reversal eventually banks the other way');
+  assert.ok(banked.flightTilt.z > 0, 'A sustained reversal eventually banks the other way');
 }
 for (const sign of [-1, 1]) {
   const banked = makeFlight(true);
@@ -105,7 +92,7 @@ for (const sign of [-1, 1]) {
   banked.target.set(-sign, 0);
   banked.step(.1);
   const expected = banked.flightTurn.x / .9 * .1 * (1 - Math.exp(-.4));
-  assert.ok(Math.abs(banked.camera.rotation.z - expected) < 1e-10, 'Reduced-motion banking stays unchanged');
+  assert.ok(Math.abs(banked.flightTilt.z - expected) < 1e-10, 'Reduced-motion banking stays unchanged');
 }
 console.log('PASS curved ±90° input banking, gentle partial turns, smooth leveling and unchanged reduced motion');
 const yawLimit = Math.PI / 4, pitchLimit = Math.PI / 4;
@@ -136,35 +123,31 @@ soft.step(.1); center.step(.1);
 assert.ok(Math.abs(soft.flightTurn.x) < Math.abs(center.flightTurn.x) * .2, 'Outward input softens before hitting the limit');
 soft.flightVelocity.set(100, -50); soft.target.set(0, 0); soft.step(1);
 assert.ok(Math.abs(soft.flightVelocity.x - 100 * Math.exp(-2)) < 1e-8, 'Impact drift dissipates independently of the flight heading');
-console.log('PASS responsive aircraft inertia, persistent heading, matching soft ±45° yaw/pitch limits, forward-only flight, impulse decay and pause at 5–144 FPS');
+console.log('PASS responsive aircraft inertia, persistent heading, matching soft ±45° yaw/pitch limits, forward-only flight, impulse decay at 5–144 FPS');
 
 class Element extends EventTarget {
   closest() { return null; }
-  setPointerCapture() {}
+  setPointerCapture(id) { this.capture = id; }
+  hasPointerCapture(id) { return this.capture === id; }
+  releasePointerCapture() { this.capture = null; }
+  querySelector() { return new Element(); }
 }
-const canvas = new Element(), hud = new Element(), page = new Element(), window = new EventTarget();
-let modal = false;
-const document = new EventTarget();
+const canvas = new Element(), hud = new Element(), page = new Element();
+const window = globalThis.window = new EventTarget(), document = globalThis.document = new EventTarget();
+let modal = false, mode = 'playing', paused = false, shots = 0, drawings = 0, views = 0;
 document.documentElement = page;
 document.querySelector = () => modal ? hud : null;
-const input = new Function('THREE', 'window', 'document', 'canvas', `
-  const innerWidth = 1000, innerHeight = 800;
-  const mouseAim = new THREE.Vector2(), target = new THREE.Vector2(), reticle = {style: {}};
-  let steeringInput = null;
-  const cameraMode = 'clear';
-  let started = true, paused = false, crashing = false, roundEnded = false, celebrating = false;
-  let lastPointerPosition = null, pointer = null, spaceHeld = false, shots = 0, drawings = 0;
-  const fireRocket = () => shots++, sprayEmojis = () => drawings++;
-  const togglePause = () => { paused = !paused; };
-  ${section('      function steer(event)', '      async function endRun()')}
-  return { target, mouseAim, reticle,
-    state: () => ({lastPointerPosition, pointer, shots, drawings, paused}),
-    mode: name => {
-      started = name !== 'intro'; paused = name === 'pause'; crashing = name === 'crash';
-      roundEnded = name === 'defeat' || name === 'victory'; celebrating = name === 'victory';
-    }
-  };
-`)(THREE, window, document, canvas);
+const target = new THREE.Vector2(), mouseAim = new THREE.Vector2();
+const aim = createPlayerAim({target, mouseAim, reticle: {style: {}}, headingPoint: new THREE.Vector3(),
+  getCameraMode: () => 'clear', viewport: {innerWidth: 1000, innerHeight: 800}});
+const controls = createPlayerControls({
+  canvas, touchRoot: new Element(), touchMode: false, aim,
+  mode: () => paused ? 'inactive' : mode === 'playing' ? 'flight' : mode === 'victory' ? 'victory' : 'inactive',
+  onFire: () => mode === 'victory' ? drawings++ : shots++,
+  onPause: () => { paused = !paused; }, onView: () => views++, wakeAudio() {}
+});
+const input = {target, state: () => ({shots, drawings, paused, pointer: controls.pointer}),
+  mode(name) { mode = name; paused = name === 'pause'; }};
 function pointerEvent(receiver, type, target = canvas, overrides = {}) {
   const event = new Event(type, {cancelable: true});
   Object.defineProperty(event, 'target', {value: target});
@@ -184,7 +167,7 @@ for (const type of ['contextmenu', 'auxclick', 'dblclick', 'dragstart', 'selects
   assert.equal(pointerEvent(document, type, reportField).defaultPrevented, false, `${type} remains available for diagnostic report copying`);
 }
 assert.equal(pointerEvent(document, 'click', hud).defaultPrevented, false, 'Normal taps/clicks still activate UI controls');
-assert.match(source, /body > :not\(#audio-credits, #render-diagnostics\), body > :not\(#audio-credits, #render-diagnostics\) \* \{[^}]*touch-action: none;[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*-webkit-touch-callout: none;[^}]*-webkit-user-drag: none;/, 'Native touch suppression covers all game UI from first paint, excluding credits');
+assert.match(css, /body > :not\(#audio-credits, #render-diagnostics\), body > :not\(#audio-credits, #render-diagnostics\) \* \{[^}]*touch-action: none;[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*-webkit-touch-callout: none;[^}]*-webkit-user-drag: none;/, 'Native touch suppression covers all game UI from first paint, excluding credits');
 pointerEvent(window, 'pointermove');
 assert.ok(Math.abs(input.target.x - .8) < 1e-8);
 pointerEvent(canvas, 'pointerleave', canvas);
@@ -204,7 +187,9 @@ assert.equal(input.target.length(), 0, 'Leaving the actual page with a mouse sti
 for (const mode of ['intro', 'pause', 'crash', 'defeat']) {
   input.mode(mode); pointerEvent(window, 'pointermove', hud, {clientX: 100, clientY: 100});
   assert.equal(input.target.length(), 0, mode + ' must not accept active steering');
-  assert.deepEqual(input.state().lastPointerPosition, {clientX: 100, clientY: 100}, 'Keep the pointer location for the next start/resume');
+  aim.resume();
+  assert.deepEqual(target.toArray(), [-.8, .75], 'Remember the pointer for resume');
+  aim.neutral();
 }
 input.mode('playing'); modal = true; pointerEvent(window, 'pointermove', hud);
 assert.equal(input.target.length(), 0, 'Modal dialogs must block gameplay steering'); modal = false;
@@ -234,12 +219,27 @@ pointerEvent(canvas, 'pointerup', canvas, {pointerType: 'touch'});
 assert.equal(input.state().pointer, null);
 console.log('PASS continuous HUD steering, page exit, inactive/modal guards, no accidental shots, touch/capture and blur safety');
 
+input.mode('playing');
+const key = (code, options = {}, type = 'keydown') => pointerEvent(window, type, hud, {code, key: code === 'KeyV' ? 'v' : '', ...options});
+key('KeyV');
+for (const flag of ['repeat', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey']) key('KeyV', { [flag]: true });
+modal = true; key('KeyV'); modal = false;
+assert.equal(views, 1, 'Only an unmodified V during gameplay changes view');
+pointerEvent(canvas, 'pointerdown'); key('Space');
+assert.ok(controls.normalHeld && controls.heavyHeld);
+controls.reset({ keepPointer: true });
+assert.ok(controls.normalHeld && !controls.heavyHeld, 'Victory keeps dragging, not weapon keys');
+key('Space'); controls.reset();
+assert.ok(!controls.normalHeld && !controls.heavyHeld && canvas.capture === null, 'Retry releases both weapons and canvas capture');
+key('Space'); key('Space', {}, 'keyup'); assert.equal(controls.heavyHeld, false);
+pointerEvent(canvas, 'pointerdown'); key('Space'); window.dispatchEvent(new Event('blur'));
+assert.ok(paused && !controls.normalHeld && !controls.heavyHeld, 'Blur pauses without carrying held fire into resume');
+
 const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.resolve(), frame = queueMicrotask) =>
-  new Function('THREE', 'fullscreenPreferred', 'enterFullscreen', 'requestAnimationFrame', `
-  let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true, lastPointerPosition = null;
+  new Function('createPlayerAim', 'THREE', 'fullscreenPreferred', 'enterFullscreen', 'requestAnimationFrame', `
+  let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true;
   const mouseAim = new THREE.Vector2(.7, -.6), target = new THREE.Vector2(.7, -.6), reticle = {style: {}};
-  let steeringInput = null;
-  const cameraMode = 'clear';
+  const cameraMode = 'clear', headingPoint = new THREE.Vector3();
   const camera = new THREE.PerspectiveCamera(), scene = {fog: {}}, reducedMotion = false;
   const elements = new Map(), calls = [], timers = new Map(), errors = [];
   let timerId = 0;
@@ -255,15 +255,17 @@ const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.r
     }
   };
   const languagePicker = document.querySelector('#language'), audioNotice = document.querySelector('#audio-notice');
+  const intro = {hide() {}};
   let finishAudio = () => {}, lessons = 0;
   const sound = {initAudio: () => { calls.push('audio'); return new Promise(resolve => { finishAudio = resolve; }); }};
   const t = key => key, localTestLevel = () => null, setupLevelFleet = () => {}, beginFlightTutorial = () => { lessons++; };
   const resetSimulationClock = () => {}, syncMusic = () => {}, playSound = () => {};
   const audioError = error => { errors.push(error.message); audioNotice.hidden = false; };
-  ${section('      function steer(event)', '      // Suppress accidental secondary clicks')}
-  ${section('      async function startGame(', "      document.querySelector('#start').addEventListener")}
+  const playerAim = createPlayerAim({ target, mouseAim, reticle, headingPoint, getCameraMode: () => cameraMode,
+    viewport: {get innerWidth() { return innerWidth; }, get innerHeight() { return innerHeight; }} });
+  ${section('  async function startGame(', "  document.querySelector('#start').addEventListener")}
   return {
-    start: startGame, loadAudio: () => finishAudio(), remember: value => { lastPointerPosition = value; },
+    start: startGame, loadAudio: () => finishAudio(), remember: value => { if (value) playerAim.remember(value); },
     expireAudio: () => { for (const timer of timers.values()) timer.callback(); },
     state: () => ({started, paused, lessons, soundEnabled, calls, errors, timerDelays: [...timers.values()].map(timer => timer.delay),
       aim: mouseAim.toArray(), turn: target.toArray(), reticle: reticle.style,
@@ -271,7 +273,7 @@ const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.r
       languageDisabled: languagePicker.disabled, label: document.querySelector('#start-label').textContent,
       silentDisabled: document.querySelector('#silent-start').disabled, noticeHidden: audioNotice.hidden})
   };
-`)(THREE, fullscreenPreferred, enterFullscreen, frame);
+`)(createPlayerAim, THREE, fullscreenPreferred, enterFullscreen, frame);
 for (const withSound of [false, true]) {
   let completeFullscreen;
   const frames = [];
@@ -344,7 +346,5 @@ for (const retryWithSound of [false, true]) {
   assert.equal(start.state().lessons, 1);
 }
 console.log('PASS audio unlock before fullscreen, bounded startup, timeout recovery and no late game start');
-assert.ok(source.includes('const introAsteroids = new THREE.Group();'), 'Home-screen orbit uses decorative asteroids instead of an SVG track');
-assert.ok(!source.includes('updateIntroCheckpoint'));
-assert.match(source, /#intro \.intro-card \{ position: relative; z-index: 1; \}/);
+assert.match(css, /#intro \.intro-card \{ position: relative; z-index: 1; \}/);
 console.log('PASS restored home layout with neutral mouse/keyboard/silent starts, including fullscreen resize and audio-loading pointer movement');

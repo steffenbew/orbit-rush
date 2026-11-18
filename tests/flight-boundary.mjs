@@ -1,25 +1,29 @@
 // Run from the project root: node tests/flight-boundary.mjs
 import { readFileSync } from 'node:fs';
+import { hitFlashStrength } from '../src/flight/shield-damage.js';
+import { createShieldHud } from '../src/flight/shield-hud.js';
+import { createFlightBoundary } from '../src/course/boundary.js';
+import { activeFlightSource } from './helpers/app-source.mjs';
+import * as physics from '../src/flight/physics.js';
 import assert from 'node:assert/strict';
-import { t, setLanguage } from '../i18n.js';
+import { t, setLanguage } from '../src/presentation/i18n.js';
 setLanguage('en');
 const root = new URL('../', import.meta.url);
 const THREE = await import(new URL('assets/vendor/three.module.js', root));
-const source = readFileSync(new URL('index.html', root), 'utf8');
+const source = readFileSync(new URL('src/main.js', root), 'utf8');
 function section(start, end) {
   const from = source.indexOf(start), to = source.indexOf(end, from);
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 }
-const makeGame = reducedMotion => new Function('THREE', 't', 'reducedMotion', `
+const makeGame = reducedMotion => new Function('hitFlashStrength', 'createShieldHud', 'createFlightBoundary', 'physics', 'THREE', 't', 'reducedMotion', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, 16 / 9, .03, 14000);
-  const courseWorldOffset = new THREE.Vector3(), flightMotion = new THREE.Vector3(), worldStep = new THREE.Vector3();
-  const flightDirection = new THREE.Vector3(0, 0, -1), flightTilt = new THREE.Vector3();
-  const flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ'), playerHullRotation = new THREE.Quaternion();
-  const flightVelocity = new THREE.Vector2(), flightTurn = new THREE.Vector2(), flightViewOffset = new THREE.Vector2(), target = new THREE.Vector2();
-  const playerHullRadius = 26, roundDuration = 45, simulationStep = 1 / 60, level = 1;
-  let started = true, paused = false, roundEnded = false, crashing = false, crashDrifting = false, celebrating = false;
-  let shield = 100, shieldHitTime = 0, shieldHitStrength = 1, gameTime = 0, levelPressure = 0, difficulty = 0, speed = 0, hitMarker = 0, shake = 0;
+  const courseWorldOffset = new THREE.Vector3(), worldStep = new THREE.Vector3();
+  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const { target, flightMotion, flightDirection, flightViewOffset, flightTurn, flightVelocity, flightOrientation, flightTilt } = playerFlight;
+  const playerHullRadius = 26, roundDuration = 45, level = 1;
+  let started = true, paused = false, roundEnded = false, crashing = false, crashDrifting = false;
+  let shield = 100, shieldHitTime = 0, shieldHitStrength = 1, gameTime = 0, difficulty = 0, speed = 0, shake = 0;
   const sounds = [], crashes = [], messages = [], elements = new Map();
   const document = {querySelector(selector) {
     if (!elements.has(selector)) {
@@ -35,37 +39,37 @@ const makeGame = reducedMotion => new Function('THREE', 't', 'reducedMotion', `
   const playSound = name => sounds.push({name, time: gameTime});
   const showFeedback = (message, negative) => messages.push({message, negative});
   const startCrash = object => { crashes.push(object); crashing = true; paused = true; object.visible = false; worldStep.set(0, 0, 0); };
-  ${section('      function levelFlightSpeed(', '      const courseWorldOffset =')}
-  ${section('      function advanceFlightHeading(', '      function forecastFlightPosition(')}
-  ${section('      const shieldHud =', '      const repairMarker =')}
-  ${section('      const flightBoundaryRadii =', '      function collideWith(')}
+  ${activeFlightSource}
+  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, reducedMotion, progress);
+  ${section('  const shieldHud =', '  const repairMarker =')}
+  ${section('  const boundary =', '  function collideWith(')}
   resetFlightBoundary();
   function step(dt, steering = false) {
     if (!paused && !crashing && !roundEnded && started) { gameTime += dt; difficulty = Math.min(1, gameTime / roundDuration); }
-    if (steering) {
-      ${section('        const easing = 1 - Math.exp(-3 * dt);', '        worldStep.copy(flightMotion)')}
+    if (steering && isFlightActive()) {
+      speed = playerFlight.advance(dt, speed, levelFlightSpeed(difficulty));
+      camera.rotation.set(flightTilt.x, flightTilt.y, flightTilt.z, 'YXZ');
     }
-    ${section('        worldStep.copy(flightMotion)', '        if (crashDrifting) camera.rotation')}
+    ${section('    worldStep.copy(flightMotion)', '    if (crashDrifting) camera.rotation')}
     updateFlightBoundary(dt);
   }
   return {
     scene, camera, sounds, crashes, messages, target, flightMotion, flightOrientation, flightTurn, flightVelocity, flightViewOffset, courseWorldOffset, worldStep,
-    boundary: flightBoundary, radii: flightBoundaryRadii, normal: flightBoundaryNormal,
-    uniforms: flightBoundaryMaterial.uniforms, reset: resetFlightBoundary, renderFeedback: renderFlightBoundaryFeedback,
-    state: () => ({shield, shieldHitTime, time: gameTime, shake, speed, impactAt: flightBoundaryImpactAt, hud: document.querySelector('#shield-value').textContent}),
+    boundary: flightBoundary, radii: boundary.radii, normal: boundary.normal,
+    uniforms: flightBoundary.material.uniforms, reset: resetFlightBoundary, renderFeedback: renderFlightBoundaryFeedback,
+    state: () => ({shield, shieldHitTime, shieldHitStrength, time: gameTime, shake, speed, hud: document.querySelector('#shield-value').textContent}),
     configure(options) {
       if ('started' in options) started = options.started;
       if ('paused' in options) paused = options.paused;
       if ('ended' in options) roundEnded = options.ended;
       if ('crashing' in options) crashing = options.crashing;
-      if ('pressure' in options) levelPressure = options.pressure;
       if ('shield' in options) shield = options.shield;
       if ('speed' in options) speed = options.speed;
     },
     place(x, y, z = 0) { courseWorldOffset.set(-x, -y, -z); },
     step: dt => step(dt), fly: dt => step(dt, true)
   };
-`)(THREE, t, reducedMotion);
+`)(hitFlashStrength, createShieldHud, createFlightBoundary, physics, THREE, t, reducedMotion);
 
 function radius(game) {
   const position = game.courseWorldOffset.clone().negate();
@@ -88,6 +92,8 @@ for (const reducedMotion of [false, true]) {
       assert.equal(game.sounds.length, 1);
       assert.equal(game.sounds[0].name, outward >= threshold ? 'shieldHard' : 'shieldGlance');
       assert.equal(game.state().shield, 90, 'Sound intensity does not change damage');
+      assert.equal(game.state().shieldHitStrength, .76);
+      assert.equal(game.state().shieldHitTime, .55);
     }
   }
 }
@@ -155,8 +161,8 @@ for (const reducedMotion of [false, true]) {
   game.step(.3); assert.equal(game.boundary.visible, false, 'All wavefronts expire in about 1.1 seconds');
   assert.equal(game.crashes.length, 0);
   const geometry = game.boundary.geometry, material = game.boundary.material, count = game.scene.children.length;
-  for (const pressure of [0, .5, 1]) {
-    game.configure({pressure}); game.reset();
+  for (let reset = 0; reset < 3; reset++) {
+    game.reset();
     assert.equal(game.boundary.geometry, geometry); assert.equal(game.boundary.material, material);
     assert.equal(game.scene.children.length, count);
     assert.equal(game.boundary.visible, false); assert.equal(uniforms.strength.value, 0);
@@ -291,10 +297,10 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS per-impact damage, cooldown, no continuous drain, smooth camera recovery, pause and single life loss');
 
 // Exercise actual flight/steering and boundary resolution at the production 60 Hz simulation rate.
-for (const reducedMotion of [false, true]) for (const pressure of [0, .5, 1]) {
+for (const reducedMotion of [false, true]) {
   let reference;
   for (const fps of [5, 30, 60, 144]) {
-    const game = makeGame(reducedMotion); game.configure({pressure}); game.target.set(1, .6);
+    const game = makeGame(reducedMotion); game.target.set(1, .6);
     let remainder = 0;
     for (let frame = 0; frame < fps * 30; frame++) {
       remainder += 1 / fps;
@@ -318,10 +324,11 @@ for (const inactive of [{started: false}, {ended: true}, {crashing: true}]) {
   assert.ok(game.courseWorldOffset.equals(offset)); assert.ok(game.flightMotion.equals(velocity));
   assert.equal(game.boundary.visible, false);
 }
-assert.ok(source.includes('        resetFlightBoundary();'));
-assert.ok(source.includes('        updateFlightBoundary(dt);'));
-assert.ok(source.includes('        renderFlightBoundaryFeedback();'));
-const constrain = source.indexOf('        constrainFlightToBoundary();');
+assert.ok(source.includes('    resetFlightBoundary();'));
+assert.ok(source.includes('    updateFlightBoundary(dt);'));
+assert.ok(source.includes('    renderFlightBoundaryFeedback();'));
+const constrain = source.indexOf('    constrainFlightToBoundary();');
 assert.ok(constrain < source.indexOf('courseWorldOffset.addScaledVector(worldStep, .85)', constrain));
-assert.ok(constrain < source.indexOf('ship.position.addScaledVector(worldStep, .85)', constrain));
+const tick = section('  function updateSimulation(dt)', '  function advanceRoundTimers');
+assert.ok(tick.indexOf('movePlayerAndCamera(dt);') < tick.indexOf('updateFleet(dt);'));
 console.log('PASS sustained steering containment, identical 5–144 FPS results, high-level speeds and intro/results/crash isolation');

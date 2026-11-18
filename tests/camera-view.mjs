@@ -1,3 +1,5 @@
+import { createPlayerAim } from '../src/platform/player-controls.js';
+import { createFlightView, flightPointerDistance, cameraModeFromPreference, nextCameraMode, setMouseTurn, stickAimPixels } from '../src/flight/view.js';
 import assert from 'node:assert/strict';
 import { THREE, section } from './helpers/flight-game.mjs';
 
@@ -5,17 +7,11 @@ const camera = new THREE.PerspectiveCamera();
 camera.position.set(3, 2, -5);
 camera.rotation.set(.2, -.4, 1.3, 'YXZ');
 const ship = new THREE.Group();
-const view = new Function('camera', 'playerShip', 'THREE', `
-  const chaseCamera = camera.clone(), playerHullRotation = camera.quaternion.clone();
-  const crashing = false, target = { y: 0 };
-  let cameraMode, started, viewCamera, reducedMotion;
-  ${section('      const flightPointerDistance =', '      const roundDialog =')}
-  return (mode, inFlight, vertical = 0, dt = 0) => {
-    target.y = vertical;
-    cameraMode = mode; started = inFlight; reducedMotion = camera.fov === 70;
-    playerHullRotation.copy(camera.quaternion); updateCameraView(dt); return viewCamera;
-  };
-`)(camera, ship, THREE);
+const normalView = createFlightView(camera, ship, false), reducedView = createFlightView(camera, ship, true);
+function view(mode, inFlight, vertical = 0, dt = 0) {
+  const flightView = camera.fov === 70 ? reducedView : normalView;
+  return flightView.update({ chase: inFlight && mode === 'chase', crashing: false, playerHullRotation: camera.quaternion, vertical }, dt);
+}
 
 for (const aspect of [16 / 9, 390 / 844]) for (const fov of [70, 90]) {
   camera.aspect = aspect; camera.fov = fov; camera.updateProjectionMatrix();
@@ -70,21 +66,36 @@ for (const fov of [70, 90]) {
 }
 console.log('PASS visible nose-up/down pitch, reduced motion, leveling and unchanged aim');
 
+// An off-center projected nose must not cost steering range or stretch the stick circle.
+const heading = new THREE.Vector2(.5, -.25), stick = new THREE.Vector2(), mouseTurn = new THREE.Vector2();
+setMouseTurn(mouseTurn, heading, 'chase', heading);
+assert.deepEqual(mouseTurn.toArray(), [0, 0]);
+for (const x of [-1, 1]) for (const y of [-1, 1]) {
+  setMouseTurn(mouseTurn, new THREE.Vector2(x, y), 'chase', heading);
+  assert.deepEqual(mouseTurn.toArray(), [x, y]);
+}
+for (const mode of ['clear', 'canopy']) {
+  setMouseTurn(mouseTurn, heading, mode, heading);
+  assert.deepEqual(mouseTurn.toArray(), [.5, -.25], 'First-person mouse steering ignores the projected nose');
+  assert.deepEqual(stickAimPixels(stick, mode, heading, 800, 600), {x: 400, y: 300});
+}
+assert.deepEqual(stickAimPixels(stick, 'chase', heading, 800, 600), {x: 600, y: 375});
+assert.deepEqual(stickAimPixels(stick.set(0, 1), 'chase', heading, 800, 600), {x: 600, y: 225});
+
 // The heading marker is projected independently; only the steering origin follows it.
-const controls = new Function('THREE', 'camera', 'viewCamera', 'cameraMode', `
+const controls = new Function('createPlayerAim', 'flightPointerDistance', 'THREE', 'camera', 'viewCamera', 'cameraMode', `
   const innerWidth = 1200, innerHeight = 800, started = true, paused = false, crashing = false;
-  ${section('      const flightPointerDistance =', '      let visualPitch =')}
   const headingPoint = new THREE.Vector3(), flightDirection = new THREE.Vector3(0, 0, -1);
   const mouseAim = new THREE.Vector2(), target = new THREE.Vector2(), reticle = {style: {}};
-  let steeringInput = null;
-  ${section('      function steer(event)', '      // Suppress accidental secondary clicks')}
+  const playerAim = createPlayerAim({ target, mouseAim, reticle, headingPoint, getCameraMode: () => cameraMode, viewport: { innerWidth, innerHeight } });
+  ${section('  function updateFlightPointer()', '  async function endRun()')}
   updateFlightPointer();
   return { headingPoint, target, mouseAim, flightDirection, updateFlightPointer,
-    aim: (x, y) => steer({clientX: (1 + x) * 600, clientY: (1 - y) * 400}),
-    releaseStick: () => { steeringInput = 'stick'; target.set(0, 0); updateFlightPointer(); } };
-`);
+    aim: (x, y) => playerAim.mouse({clientX: (1 + x) * 600, clientY: (1 - y) * 400}),
+    releaseStick: () => { playerAim.stick(0, 0); updateFlightPointer(); } };
+`).bind(null, createPlayerAim);
 camera.updateMatrixWorld();
-const chaseControls = controls(THREE, camera, view('chase', true), 'chase');
+const chaseControls = controls(flightPointerDistance, THREE, camera, view('chase', true), 'chase');
 const { headingPoint: nose, target: turn } = chaseControls;
 assert.ok(Math.abs(nose.y + .1) < 1e-8, 'Straight flight is below screen center');
 chaseControls.aim(0, -.1);
@@ -103,38 +114,32 @@ chaseControls.updateFlightPointer();
 assert.notEqual(turn.x, before.x, 'A stationary pointer is relative to the current heading');
 chaseControls.releaseStick();
 assert.ok(chaseControls.mouseAim.distanceTo(new THREE.Vector2(nose.x, nose.y)) < 1e-9 && turn.length() === 0);
-const cockpitControls = controls(THREE, camera, camera, 'canopy');
+const cockpitControls = controls(flightPointerDistance, THREE, camera, camera, 'canopy');
 cockpitControls.aim(0, 0);
 assert.equal(cockpitControls.target.length(), 0, 'Cockpit retains centered steering');
 console.log('PASS independent nose marker and chase steering neutral, stationary pointer, joystick release and cockpit');
 
 const button = Object.assign(new EventTarget(), { dataset: {}, setAttribute(name, value) { this[name] = value; } });
 const body = { dataset: {} }, storage = new Map();
-let keydown, dialogOpen = false;
-const initialize = new Function('window', 'document', 'localStorage', 't', `
-  const started = true, paused = false, crashing = false, roundEnded = false;
-  ${section('      const cameraButton =', '      // Keep the original camera')}
-  ${section("      window.addEventListener('keydown', event => {", "      window.addEventListener('keyup'")}
+const initialize = new Function('cameraModeFromPreference', 'nextCameraMode', 'document', 'localStorage', 't', `
+  ${section('  const cameraButton =', '  // Keep the original camera')}
+  return toggleCameraView;
 `);
-const load = () => initialize({ addEventListener: (_, listener) => { keydown = listener; } },
-  { body, querySelector: selector => selector === '#camera-view' ? button : dialogOpen },
+const load = () => initialize(cameraModeFromPreference, nextCameraMode,
+  { body, querySelector: () => button },
   { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) }, key => key);
-load();
-const pressV = (options = {}) => keydown({ key: 'v', target: { closest: () => null }, preventDefault() {}, ...options });
+const toggle = load();
+assert.equal(body.dataset.camera, 'clear');
+assert.equal(button.title, 'chaseCameraAction');
+button.dispatchEvent(new Event('click'));
 assert.equal(body.dataset.camera, 'chase');
 assert.equal(button.title, 'canopyCameraAction');
-button.dispatchEvent(new Event('click'));
+toggle();
 assert.equal(body.dataset.camera, 'canopy');
 assert.equal(storage.get('orbit-rush-view'), 'canopy');
-for (const flag of ['repeat', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey']) {
-  pressV({ [flag]: true });
-  assert.equal(body.dataset.camera, 'canopy');
-}
-dialogOpen = true; pressV(); assert.equal(body.dataset.camera, 'canopy');
-dialogOpen = false; pressV(); assert.equal(body.dataset.camera, 'clear');
+toggle(); assert.equal(body.dataset.camera, 'clear');
 assert.equal(button['aria-label'], 'chaseCameraAction');
-pressV(); assert.equal(body.dataset.camera, 'chase');
-for (const [saved, expected] of [['canopy', 'canopy'], ['cockpit', 'clear'], ['unknown', 'chase']]) {
-  storage.set('orbit-rush-view', saved); load(); assert.equal(body.dataset.camera, expected);
-}
+storage.set('orbit-rush-view', 'canopy'); load(); assert.equal(body.dataset.camera, 'canopy');
+for (const saved of [null, undefined, 'cockpit', 'unknown', 'clear']) assert.equal(cameraModeFromPreference(saved), 'clear');
+for (const saved of ['chase', 'canopy']) assert.equal(cameraModeFromPreference(saved), saved);
 console.log('PASS toolbar and V cycle three views, announce the next action and restore saved preferences');

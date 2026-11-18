@@ -1,10 +1,11 @@
+import { roundOutcome } from '../src/run/progression.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../pwa.js', import.meta.url), 'utf8');
-const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/platform/pwa.js', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const section = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
 function page({ controlled = true, pending = true, blockedStorage = false, saved = null } = {}) {
   const listeners = () => ({ handlers: new Map(), addEventListener(type, fn) { this.handlers.set(type, fn); },
@@ -130,34 +131,30 @@ test('update discovery and foreground/online checks work without permanent idle 
 });
 
 function checkpointGame() {
-  return new Function(`
+  return new Function('roundOutcome', `
     let level = 1, score = 0, kills = 0, retries = 3, shield = 100, levelCheckpoint = {score: 0, kills: 0};
     let celebrating = false, tutorialCompleted = false, bestAtLevelStart = 0, soundEnabled = true, language = 'de';
-    let started = false, crashing = false, roundEnded = false, updateRestored = false, levelPressure = 0;
+    let started = false, crashing = false, roundEnded = false, updateRestored = false;
     const renderDiagnostics = {failed: false}, reducedMotion = false, calls = [], elements = new Map();
     const document = {body: {classList: {add() {}}}, querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, {disabled: false, hidden: false, setAttribute() {}});
       return elements.get(selector);
     }};
     const languagePicker = {querySelector: selector => document.querySelector(selector)};
-    const scene = {fog: {}}, camera = {updateProjectionMatrix() {}};
+    const intro = {hide() { calls.push('hide intro'); }}, scene = {fog: {}}, camera = {updateProjectionMatrix() {}};
     const setLanguage = value => { language = value; }, applyTranslations = () => {}, t = key => key;
     const setupLevelFleet = () => calls.push('fleet'), updateScore = () => calls.push('score');
-    const finishRound = reason => {
-      // The real finishRound uses this guard too: a restored death must not consume another life.
-      if (reason === 'collision' && !crashing) retries--;
-      calls.push(reason); roundEnded = true; crashing = false;
-    };
-    ${section('      function canApplyUpdate()', '      getRenderState =')}
+    const enterRoundResult = outcome => { calls.push(outcome); roundEnded = true; };
+    ${section('  function canApplyUpdate()', '  getRenderState =')}
     return {canApplyUpdate, captureUpdateCheckpoint, restoreUpdateCheckpoint, calls,
-      state: () => ({started, roundEnded, updateRestored, levelPressure, language}),
+      state: () => ({started, roundEnded, updateRestored, language}),
       mode(mode) {
         started = !['home', 'loading'].includes(mode); roundEnded = mode === 'results'; crashing = mode === 'crash';
         document.querySelector('#start').disabled = mode === 'loading';
         renderDiagnostics.failed = mode === 'failed';
       }
     };
-  `)();
+  `)(roundOutcome);
 }
 
 test('game safe points exclude startup, paused flights, crashes and render failures', () => {
@@ -166,11 +163,11 @@ test('game safe points exclude startup, paused flights, crashes and render failu
     game.mode(mode);
     assert.equal(game.canApplyUpdate(), ['home', 'results'].includes(mode), mode);
   }
-  for (const marker of ['async function startGame(withSound = true)', "function restartRound(mode = 'new')"]) {
+  for (const marker of ['async function startGame(withSound = true)', 'function restartRound()']) {
     const start = html.indexOf(marker);
     assert.match(html.slice(start, start + 150), /orbitUpdates\?\.locked/);
   }
-  assert.match(section('      function finishRound(', '      function restartRound('), /orbitUpdates\?\.check\(\)/);
+  assert.match(section('  function finishRound(', '  function restartRound('), /orbitUpdates\?\.check\(\)/);
 });
 
 test('victory, retry and game-over snapshots retain progress, shield, lives, settings and retry checkpoints', () => {
@@ -181,7 +178,7 @@ test('victory, retry and game-over snapshots retain progress, shield, lives, set
       bestAtLevelStart: 5000, soundEnabled: false, language: 'en'};
     game.restoreUpdateCheckpoint(saved);
     assert.deepEqual(game.captureUpdateCheckpoint(), saved);
-    assert.deepEqual(game.calls, ['fleet', celebrating ? 'time' : 'collision', 'score']);
+    assert.deepEqual(game.calls, ['hide intro', 'fleet', celebrating ? 'victory' : retries ? 'retry' : 'gameover', 'score']);
     assert.equal(game.state().started, true); assert.equal(game.state().roundEnded, true);
     assert.equal(game.state().updateRestored, true); assert.equal(game.canApplyUpdate(), true);
   }

@@ -1,6 +1,24 @@
 // Stationary fields, readable/flyable bends and the first boss's bounded combat phase.
 import assert from 'node:assert/strict';
 import { THREE, t, makeGame, makeFlightClock, moveRock } from './helpers/flight-game.mjs';
+import { createAsteroidEncounter } from '../src/course/asteroid-encounter.js';
+import { getAsteroidEncounters } from '../src/course/encounter-plan.js';
+
+// The tutorial can move the start before a single field or companion has been spawned.
+for (const level of [2, 3]) {
+  const encounter = createAsteroidEncounter({ scene: new THREE.Scene(), courseOrigin: new THREE.Vector3(),
+    roundDuration: 45, levelFlightSpeed: () => 400, flightDistanceAt: time => time * 340, showerWarning: {} });
+  const events = getAsteroidEncounters(level, false);
+  encounter.reset(level, events);
+  assert.equal(encounter.kind, events[0].kind);
+  const opening = encounter.layout.origin.z, corridor = encounter.corridorPlan.origin.z;
+  encounter.shiftStart(51, -1200);
+  assert.equal(encounter.layout.origin.z, opening - 1200);
+  assert.equal(encounter.corridorPlan.origin.z, corridor - 1200, 'Shift the corridor once, even when it is the opening');
+  assert.equal(encounter.timing.entry, 51 + events[0].entry);
+  assert.equal(encounter.mesh.visible, false);
+  assert.equal(encounter.pool.length, 0);
+}
 
 for (const reduced of [false, true]) {
   const game = makeGame(reduced); game.setLevel(2); game.setupLevelFleet(); game.camera.updateMatrixWorld();
@@ -100,7 +118,7 @@ for (const reduced of [false, true]) for (const level of [2, 3, 5, 7, 8]) {
   if (level <= 3) assert.equal(Math.abs(game.corridorCenter(plan.length * .5, plan)), 0);
   else assert.ok(Math.abs(game.corridorCenter(plan.length * .5, plan)) > plan.gap * .75);
   let time = 0, minimumClearance = Infinity, corridorFrames = 0;
-  const clock = makeFlightClock(THREE, game, reduced, dt => {
+  const clock = makeFlightClock(game, dt => {
     time += dt; game.setTime(time);
     const next = game.flightRings.find(gate => !gate.userData.resolved);
     const depth = plan.origin.z + game.courseWorldOffset.z - game.camera.position.z;

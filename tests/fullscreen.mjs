@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
-const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const start = source.indexOf('      const fullscreenButton');
-const end = source.indexOf("      document.addEventListener('visibilitychange'", start);
+const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const start = source.indexOf('  const fullscreenButton');
+const end = source.indexOf("  document.addEventListener('visibilitychange'", start);
 const setup = source.slice(start, end);
 function makeFullscreen(saved = null, blocked = false) {
   const attributes = {}, storage = new Map(saved === null ? [] : [['orbit-rush-fullscreen', saved]]);
