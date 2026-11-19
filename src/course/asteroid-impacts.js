@@ -49,11 +49,11 @@ export function resolveRockImpact(a, b) {
   return { closing, normal };
 }
 
-export function createAsteroidImpacts({ ships, encounter, fragments, reducedMotion, sample = Math.random }) {
+export function createAsteroidImpacts({ ships, encounter, fragments, sample = Math.random }) {
   const { origin: showerOrigin, previousOrigin: showerPreviousOrigin, debrisField, maxShowerGritSize } = encounter;
   function fracture(rock, normal, gameTime) {
-    const sizeScale = rock.userData.asteroidSizeScale, size = rock.scale.x;
-    if (size / sizeScale < 1.2 || gameTime < rock.userData.fractureAfter) return false;
+    const size = rock.scale.x;
+    if (size < 1.2 || gameTime < rock.userData.fractureAfter) return false;
     const pieceCount = ships.filter(ship => ship.visible && ship.userData.impactFragment).length;
     if (pieceCount + (rock.userData.impactFragment ? 1 : 2) > 12) return false;
     const child = encounter.eventAsteroid();
@@ -68,10 +68,9 @@ export function createAsteroidImpacts({ ships, encounter, fragments, reducedMoti
       piece.scale.setScalar(sizes[index]);
       piece.position.copy(position).addScaledVector(tangent, separation * weight);
       piece.userData.previousPosition.copy(piece.position);
-      piece.userData.courseVelocity.copy(velocity).addScaledVector(tangent, (reducedMotion ? 8 : 35) * weight);
-      piece.userData.asteroidSizeScale = sizeScale;
-      piece.userData.asteroidTier = Math.min(3, Math.ceil(sizes[index] / sizeScale));
-      piece.userData.health = piece.userData.maxHealth = Math.ceil(sizes[index] / sizeScale);
+      piece.userData.courseVelocity.copy(velocity).addScaledVector(tangent, 35 * weight);
+      piece.userData.asteroidTier = Math.min(3, Math.ceil(sizes[index]));
+      piece.userData.health = piece.userData.maxHealth = Math.ceil(sizes[index]);
       piece.userData.impactFragment = true; piece.userData.fractureAfter = gameTime + 1;
       piece.userData.courseAge = 1; piece.userData.hull.opacity = 1;
       piece.userData.lastVisibleTime = rock.userData.lastVisibleTime;
@@ -89,7 +88,7 @@ export function createAsteroidImpacts({ ships, encounter, fragments, reducedMoti
         const contact = resolveRockImpact(a, b);
         if (!contact) continue;
         contacts++;
-        if (contact.closing > (reducedMotion ? 24 : 180) && sample() < .22) {
+        if (contact.closing > 180 && sample() < .22) {
           const smaller = a.scale.x < b.scale.x ? a : b;
           fracture(smaller, contact.normal, gameTime);
         }

@@ -9,7 +9,7 @@ export const shipTypes = [
 ];
 
 // Reuse materials and geometry across the fleet. Models have no scene or flight state.
-export function createShipModels(glow, reducedMotion) {
+export function createShipModels(glow, { distanceFade = true } = {}) {
   // Three original silhouettes: swept interceptor, luminous saucer, armored carrier.
   const dark = new THREE.MeshStandardMaterial({ color: 0x131c30, metalness: .65, roughness: .45 });
   const silver = new THREE.MeshStandardMaterial({ color: 0x8795a8, metalness: .7, roughness: .3 });
@@ -29,15 +29,17 @@ export function createShipModels(glow, reducedMotion) {
   const sweptGeometry = new THREE.ExtrudeGeometry(sweptShape, { depth: .6, bevelEnabled: true, bevelSize: .2, bevelThickness: .15, bevelSegments: 1, steps: 1 });
   sweptGeometry.rotateX(Math.PI / 2);
   function fadeAsteroidShader(shader) {
+    if (!distanceFade) return;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       // Fog alone still draws an opaque dark silhouette over the stars.
-      diffuseColor.a *= 1.0 - smoothstep(${reducedMotion ? '400.0, 700.0' : '2600.0, 3600.0'}, length(vViewPosition));
+      diffuseColor.a *= 1.0 - smoothstep(2600.0, 3600.0, length(vViewPosition));
       if (diffuseColor.a < 0.003) discard;
     `);
   }
   function fadeShipShader(shader) {
+    if (!distanceFade) return;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      diffuseColor.a *= 1.0 - smoothstep(${reducedMotion ? '900.0, 1200.0' : '2600.0, 3600.0'}, length(vViewPosition));
+      diffuseColor.a *= 1.0 - smoothstep(2600.0, 3600.0, length(vViewPosition));
     `);
   }
   function asteroidShader(shader) {

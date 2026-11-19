@@ -13,6 +13,14 @@ Vite applies CSS edits without interrupting a flight. Changes to game modules or
 
 The server binds to loopback on port 8080, or picks a free port if 8080 is taken. To require a particular port, use `PORT=8082 ./run start`. Stop it with Ctrl+C or run `./run stop` in another terminal; this only stops the Node server for this checkout.
 
+## Model Studio
+
+Run `./run start` and click **Model Studio** below the language switch on the game’s home screen, or open `/studio/` on the printed server address. Open **On stage** to browse thumbnail previews. Only visible rows render, and browsing doesn’t move the stage camera. Click a model or press Enter to put it on stage. Use the arrows beside the model and level pickers to step through them without opening a menu. Drag to orbit, scroll to zoom, Shift-drag to pan, or **Reset view** to frame it again.
+
+Pick an encounter first. If it doesn’t occur on your current level, the studio switches to the nearest level that has it. Type an exact **Level** (1–1000), or use the arrows to skip levels without that encounter. The timing is shown below the field. Levels 5 and up share a schedule but have distinct layouts. Try level 2 for a straight corridor or level 5 for a bend. On level 4, select **Asteroid field** and use **Encounter timing** to preview either pass. **Reroll** changes the random debris, not the authored route. Edit the displayed source file and save: the studio rebuilds the same variation with your view intact.
+
+The catalog lives in [studio/catalog.js](studio/catalog.js) and uses the game's builders. The game and Studio use the same flight speed and encounter layouts regardless of device motion preferences. The studio isn't included in production builds.
+
 ## Play
 
 Complete the flight tutorial, then survive each 45-second level. Collisions drain your shield; passing checkpoints can restore it. A retry takes you back to the start of the level with its starting score and kills. After three lost lives, start a new run. The high score stays in your browser.
@@ -51,7 +59,6 @@ Start in the feature folder for **what changes**. For **when it runs**, read [`u
 | Menu fleet and orbiting asteroid belt | [presentation/intro.js](src/presentation/intro.js) frames the preview ships and animates the belt; `startGame` in `main.js` switches into play. | `intro-fleet`, `intro-orbit` |
 | Repair pickups | [course/repair-pickup.js](src/course/repair-pickup.js) places, moves and detects collection. `updateRepairPickup` in `main.js` applies the capped shield reward. | `repair-pickup`, `flight-environments` |
 | Round timer, progress bar and final countdown | [presentation/round-clock.js](src/presentation/round-clock.js) displays course time and plays countdown ticks. `advanceRoundTimers` in `main.js` advances the clock and ends the round. | `hud-layout`, `simulation-timing` |
-| `?test` FPS and frame time | [presentation/frame-stats.js](src/presentation/frame-stats.js) samples rendered frames, not simulation ticks. `main.js` resets the readout with the simulation clock. | `frame-stats`, `simulation-timing` |
 | Layout, translations, sound, sky | [index.html](index.html) and [presentation/](src/presentation): `game.css`, `i18n.js`, `audio.js`, `space-background.js`, `planet.js` | `hud-layout`, `i18n`, `audio`, `space-background` |
 | Mouse, keyboard and touch input | [platform/player-controls.js](src/platform/player-controls.js) remembers pointer position, captures active pointers and clears held fire. [platform/touch-ui.js](src/platform/touch-ui.js) handles menu buttons and mobile viewport anchoring. [flight/view.js](src/flight/view.js) supplies camera-relative aim math; `updateFiringInput` in `main.js` applies held fire on simulation ticks. | `steering`, `touch-controls`, `pause-menu`, `camera-view` |
 | Renderer failures and offline updates | [platform/](src/platform): `render-diagnostics.js`, `pwa.js` | `render-diagnostics`, `pwa-updates` |
@@ -75,7 +82,7 @@ Use the default suite while iterating. It runs every test file, including real s
 ./run test:full tests/asteroid-fields.mjs   # Full sweep for just one feature
 ```
 
-For a browser check, add `?test` to the URL to show rendered FPS and frame time. On loopback only, `?test&level=5` skips training and starts at the specified level (1–1000). Level 5 is useful for testing an asteroid field, shower and corridor; level 4 is the first Leviathan encounter. Check mouse and touch, portrait and landscape, and reduced motion when changing flight or HUD behavior.
+With `./run start`, use the **Level** field attached to the right of **Play**. It defaults to **1** and remembers your choice in this tab. Enter **1–1000** and press Play to start there without training. Finishing a level advances to the next; the field only sets the starting level. The Stats.js graph in the lower-left shows rendered FPS; click it to cycle panels. Neither tool is included in a production build or preview. Level 5 is useful for testing an asteroid field, shower and corridor; level 4 is the first Leviathan encounter. Check mouse and touch, and portrait and landscape when changing flight or HUD behavior.
 
 If rendering stops with a diagnostics dialog, **copy the report before reloading**. It includes the first error, browser and viewport information, game state and render statistics. Nothing is uploaded automatically.
 

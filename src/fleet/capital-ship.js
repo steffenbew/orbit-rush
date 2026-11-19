@@ -1,13 +1,28 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 import { setShipOpacity } from './visuals.js';
 
-// Own the boss's attack/retreat movement and its reusable volley resources.
-export function createCapitalEncounter({ scene, glow, camera, reducedMotion, flightMotion, flightDirection, traffic,
-  worldStep, pathHitsPlayer, onHit }) {
-  const enemyBolts = [];
+export function createEnemyBoltBuilder(glow) {
   const enemyBoltGeometry = new THREE.CylinderGeometry(.22, .22, 10, 8).rotateX(-Math.PI / 2);
   const enemyBoltCore = new THREE.MeshBasicMaterial({ color: 0xff3344, fog: false });
   const enemyBoltGlow = new THREE.SpriteMaterial({ map: glow, color: 0xff2244, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  return () => {
+    const object = new THREE.Group();
+    const core = new THREE.Mesh(enemyBoltGeometry, enemyBoltCore);
+    core.scale.set(2, 2, 3);
+    object.add(core);
+    const halo = new THREE.Sprite(enemyBoltGlow);
+    halo.position.z = 8;
+    halo.scale.set(9, 14, 1);
+    object.add(halo);
+    return object;
+  };
+}
+
+// Own the boss's attack/retreat movement and its reusable volley resources.
+export function createCapitalEncounter({ scene, glow, camera, flightMotion, flightDirection, traffic,
+  worldStep, pathHitsPlayer, onHit }) {
+  const enemyBolts = [];
+  const createBolt = createEnemyBoltBuilder(glow);
   function clearEnemyBolts() {
     for (const bolt of enemyBolts) scene.remove(bolt.object);
     enemyBolts.length = 0;
@@ -34,26 +49,26 @@ export function createCapitalEncounter({ scene, glow, camera, reducedMotion, fli
     data.courseAge += dt;
     const direction = data.cruiseDirection;
     const offset = ship.position.clone().sub(camera.position);
-    const motion = reducedMotion ? .25 : 1;
+
     const phase = data.courseAge;
     const forwardSpeed = Math.max(0, flightMotion.dot(direction) * .85);
     // Linger on attack runs so slower shots can arrive, then make a clear retreat.
     const retreat = Math.pow((1 + Math.cos(phase * .34)) * .5, 3);
-    const combatDepth = 2600 + (retreat * 1800 - 900) * motion;
+    const combatDepth = 2600 + (retreat * 1800 - 900);
     const closingSpeed = THREE.MathUtils.clamp((offset.dot(direction) - combatDepth) * .55,
-      -500 * motion, Math.max(reducedMotion ? 240 : 220, forwardSpeed * .96));
+      -500, Math.max(220, forwardSpeed * .96));
     const desired = direction.clone().multiplyScalar(forwardSpeed - closingSpeed);
-    const lane = Math.sin(phase * .28) * 280 * motion;
-    const height = -100 + Math.sin(phase * .2 + .8) * 100 * motion;
-    desired.addScaledVector(data.courseRight, THREE.MathUtils.clamp((lane - offset.dot(data.courseRight)) * .6, -150 * motion, 150 * motion))
-      .addScaledVector(data.courseUp, THREE.MathUtils.clamp((height - offset.dot(data.courseUp)) * .5, -100 * motion, 100 * motion));
+    const lane = Math.sin(phase * .28) * 280;
+    const height = -100 + Math.sin(phase * .2 + .8) * 100;
+    desired.addScaledVector(data.courseRight, THREE.MathUtils.clamp((lane - offset.dot(data.courseRight)) * .6, -150, 150))
+      .addScaledVector(data.courseUp, THREE.MathUtils.clamp((height - offset.dot(data.courseUp)) * .5, -100, 100));
     traffic.avoidAsteroids(ship, desired, .6);
     const previousForwardSpeed = data.courseVelocity.dot(direction);
     data.courseVelocity.lerp(desired, 1 - Math.exp(-1.1 * dt));
     traffic.updateEngineThrust(ship, previousForwardSpeed, dt);
     ship.quaternion.copy(data.baseRotation).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(
-      Math.sin(phase * .2) * .035 * motion, Math.sin(phase * .28) * .06 * motion,
-      -data.courseVelocity.dot(data.courseRight) / 1200 * motion)));
+      Math.sin(phase * .2) * .035, Math.sin(phase * .28) * .06,
+      -data.courseVelocity.dot(data.courseRight) / 1200)));
     const canFire = !resting && !ship.userData.collisionHandled && gameTime - ship.userData.lastVisibleTime <= .2
       && offset.length() > 1200 && offset.length() < 3800 && offset.clone().normalize().dot(flightDirection) > .45;
     if (canFire) ship.userData.fireCooldown -= dt;
@@ -66,14 +81,7 @@ export function createCapitalEncounter({ scene, glow, camera, reducedMotion, fli
     ship.userData.gunsCharging = false;
     ship.updateMatrixWorld(true);
     for (const muzzle of ship.userData.muzzles) {
-      const object = new THREE.Group();
-      const core = new THREE.Mesh(enemyBoltGeometry, enemyBoltCore);
-      core.scale.set(2, 2, 3);
-      object.add(core);
-      const halo = new THREE.Sprite(enemyBoltGlow);
-      halo.position.z = 8;
-      halo.scale.set(9, 14, 1);
-      object.add(halo);
+      const object = createBolt();
       muzzle.getWorldPosition(object.position);
       object.userData = { enemyBolt: true, collisionHandled: false };
       // Same world-space speed as the normal player laser, not a fixed slow flight time.

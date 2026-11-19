@@ -1,5 +1,5 @@
 // Keep the accessible value immediate; animate only the fill and its feedback.
-export function createShieldHud(document, reducedMotion, shield) {
+export function createShieldHud(document, shield) {
   const shieldHud = document.querySelector('#shield-hud');
   const shieldFill = document.querySelector('#shield-fill');
   let shieldDisplayed = shield, shieldFrom = shield, shieldTween = .25;
@@ -19,13 +19,12 @@ export function createShieldHud(document, reducedMotion, shield) {
       shieldFeedback = change > 0 ? 'healed' : 'hit';
       shieldFeedbackTime = .55;
     }
-    if (reducedMotion) shieldDisplayed = shield;
   }
   function advance(dt, active) {
     if (!active || document.hidden) return;
     shieldTween = Math.min(.25, shieldTween + dt);
     const progress = shieldTween / .25;
-    shieldDisplayed = reducedMotion ? shield : shieldFrom + (shield - shieldFrom) * (1 - (1 - progress) ** 3);
+    shieldDisplayed = shieldFrom + (shield - shieldFrom) * (1 - (1 - progress) ** 3);
     shieldFeedbackTime = Math.max(0, shieldFeedbackTime - dt);
   }
   function render(paused) {

@@ -28,7 +28,7 @@ const makeGame = (touchMode = false) => new Function('createFlightTutorial', 'cr
   const encounter = { shiftStart() {} };
   const firstCheckpointTime = 5;
   const courseOrigin = new THREE.Vector3();
-  const reducedMotion = false, innerWidth = 1000, innerHeight = 800;
+  const innerWidth = 1000, innerHeight = 800;
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), rockets = [], repair = {hide() {}};
   const flightMotion = new THREE.Vector3(0, 0, -334), flightOrientation = new THREE.Euler(0, 0, 0, 'YXZ');
   const courseWorldOffset = new THREE.Vector3(), worldStep = new THREE.Vector3(), mouseAim = new THREE.Vector2();
@@ -202,5 +202,4 @@ assert.ok(markup.includes('<use href="#i-cursor-click"/>'));
 assert.match(css, /#control-hints\.space-key #control-input \{[^}]*min-width: 170px/);
 assert.match(css, /#control-hints \{[^}]*pointer-events: none/);
 assert.ok(css.includes('#control-hints.go #control-input { display: none; }'), 'Hide the key graphic as well as its text during GO');
-assert.match(css, /prefers-reduced-motion: reduce\) \{ #control-hints \{ transition: none/);
 console.log('PASS missed-checkpoint retry without heading tracking, interrupted/completed retries, no early enemies, no timer expiry, accessible pointer hints');

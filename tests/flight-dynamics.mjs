@@ -4,17 +4,17 @@ import { THREE, section, randomState, makeGame, hazardInterval, makeFlightClock 
 
 const full = process.env.ORBIT_TEST_FULL === '1';
 
-const updateFov = new Function('camera', 'started', 'reducedMotion', 'speed', `
-  ${section('    camera.fov = started && !reducedMotion', '    danger = false;')}
+const updateFov = new Function('camera', 'started', 'speed', `
+  ${section('    camera.fov = started ? 90 : 70', '    danger = false;')}
 `);
-for (const started of [false, true]) for (const reduced of [false, true]) {
+for (const started of [false, true]) {
   const camera = new THREE.PerspectiveCamera(110);
   for (const speed of [0, 250, 500, 1000, 3000, 0]) {
-    updateFov(camera, started, reduced, speed);
-    assert.equal(camera.fov, started && !reduced ? 90 : 70, 'Acceleration and level resets cannot zoom the camera');
+    updateFov(camera, started, speed);
+    assert.equal(camera.fov, started ? 90 : 70, 'Acceleration and level resets cannot zoom the camera');
   }
 }
-console.log('PASS fixed gameplay FOV, unchanged menu/reduced-motion FOV and no speed-based zoom');
+console.log('PASS fixed gameplay FOV, unchanged menu FOV and no speed-based zoom');
 
 const game = makeGame();
 game.flightMotion.set(0, 0, -400);
@@ -64,8 +64,8 @@ assert.equal(game.queue.length, queuedBefore + 2);
 assert.ok(game.explosions.some(args => args[1] === 65));
 console.log('PASS asteroid avoidance, swept collisions, explosions and single recycling');
 
-for (const reducedMotion of [false, true]) {
-  const courses = makeGame(reducedMotion);
+{
+  const courses = makeGame();
   const rock = courses.ships[4];
   let left = 0, right = 0, stationary = 0, gentle = 0, diagonal = 0, up = 0, down = 0;
   const sampleCount = 300;
@@ -74,28 +74,28 @@ for (const reducedMotion of [false, true]) {
     courses.flightMotion.set(0, 0, -400).applyEuler(courses.flightOrientation);
     courses.resetShip(rock);
     const data = rock.userData;
-    assert.ok(reducedMotion ? data.spin.lengthSq() === 0 : data.spin.length() >= .04 - 1e-8 && data.spin.length() <= .6 + 1e-8,
-      'Loose rocks receive varied potential spin rates, disabled in reduced motion');
+    assert.ok(data.spin.length() >= .04 - 1e-8 && data.spin.length() <= .6 + 1e-8,
+      'Loose rocks receive varied potential spin rates');
     const velocity = data.courseVelocity.clone();
     const lateral = velocity.dot(data.courseRight);
     const vertical = velocity.dot(data.courseUp);
     const speed = courses.flightMotion.length() * .85;
-    const movement = reducedMotion ? .25 : 1;
+
     const time = rock.position.dot(data.cruiseDirection) / speed;
-    const crossingSpeed = Math.max(speed * .28 * movement,
-      Math.hypot(data.lane, data.height) * (reducedMotion ? 1.5 : 2.5) / time);
+    const crossingSpeed = Math.max(speed * .28,
+      Math.hypot(data.lane, data.height) * 2.5 / time);
     if (velocity.lengthSq() === 0) stationary++;
     else {
       if (lateral < 0) left++; else right++;
       if (vertical < 0) down++; else up++;
-      if (Math.abs(lateral) < speed * .1 * movement) {
+      if (Math.abs(lateral) < speed * .1) {
         gentle++;
-        assert.ok(Math.abs(lateral) >= speed * .01 * movement - 1e-8);
-        assert.ok(Math.abs(lateral) <= speed * .05 * movement + 1e-8);
-        assert.ok(Math.abs(vertical) <= speed * .02 * movement + 1e-8);
+        assert.ok(Math.abs(lateral) >= speed * .01 - 1e-8);
+        assert.ok(Math.abs(lateral) <= speed * .05 + 1e-8);
+        assert.ok(Math.abs(vertical) <= speed * .02 + 1e-8);
       } else {
         diagonal++;
-        assert.ok(Math.abs(lateral) >= speed * .1 * movement - 1e-8);
+        assert.ok(Math.abs(lateral) >= speed * .1 - 1e-8);
         assert.ok(Math.abs(lateral) <= crossingSpeed + 1e-8);
         assert.ok(Math.abs(vertical) <= crossingSpeed * .5 + 1e-8);
       }
@@ -124,11 +124,11 @@ for (const reducedMotion of [false, true]) {
   assert.ok(diagonal > sampleCount * .5 && diagonal < sampleCount * .8,
     `Close approaches should visibly cross rather than fly head-on, got ${diagonal}/${sampleCount}`);
 }
-console.log('PASS diagonal loose-rock passes, calm off-axis background rocks, fixed trajectories and reduced motion');
+console.log('PASS diagonal loose-rock passes, calm off-axis background rocks, fixed trajectories');
 
 // A nonzero velocity alone is not enough: an exact interception can still have constant screen bearing.
-for (const reducedMotion of [false, true]) for (const speed of reducedMotion ? [35, 55] : [180, 600, 1100]) {
-  const crossing = makeGame(reducedMotion); crossing.setLevel(3);
+for (const speed of [180, 600, 1100]) {
+  const crossing = makeGame(); crossing.setLevel(3);
   crossing.camera.position.set(20, -10, 5);
   crossing.flightOrientation.set(.2, -.4, 0, 'YXZ');
   crossing.camera.quaternion.setFromEuler(crossing.flightOrientation); crossing.camera.updateMatrixWorld();
@@ -145,7 +145,7 @@ for (const reducedMotion of [false, true]) for (const speed of reducedMotion ? [
     const end = rock.position.clone().addScaledVector(rock.userData.courseVelocity, time * .9)
       .addScaledVector(crossing.flightMotion, -.85 * time * .9).project(crossing.camera);
     assert.ok(start.x * end.x < 0, 'Crossings must travel from one side of the view to the other');
-    assert.ok(Math.abs(middle.x - start.x) > (reducedMotion ? .04 : .08),
+    assert.ok(Math.abs(middle.x - start.x) > .08,
       'The trajectory must visibly change screen bearing well before the close pass');
   }
 }
@@ -195,13 +195,13 @@ for (const corridor of [false, true]) {
 }
 console.log('PASS narrower/shorter fields, transparent arrivals, pause and spatial tail');
 
-for (const reducedMotion of [false, true]) {
-  const corridor = makeGame(reducedMotion);
+{
+  const corridor = makeGame();
   for (const level of full ? [1, 5, 15, 40] : [1]) {
     for (const strength of [0, 1, 2]) {
       corridor.setLevel(level); corridor.setupLevelFleet();
       const field = corridor.shower(true, strength);
-      const expectedGap = reducedMotion ? 34 - strength * 4 : 52 - strength * 7;
+      const expectedGap = 52 - strength * 7;
       assert.equal(field.gap, expectedGap, 'Passage difficulty is capped by strength, not narrowed indefinitely by level');
       assert.equal(field.width, 1800, 'Keep the core width fixed rather than scaling with the viewport');
       const walls = field.pool.filter(rock => rock.visible);
@@ -254,8 +254,8 @@ for (const reducedMotion of [false, true]) {
 }
 console.log('PASS uneven ring layers, progressively scattered side fringes, original narrow flight passage and bounded instance budget');
 
-for (const reducedMotion of [false, true]) {
-  const fading = makeGame(reducedMotion);
+{
+  const fading = makeGame();
   fading.setupLevelFleet();
   const field = fading.shower(true, 2);
   const rock = field.pool.find(item => item.visible);
@@ -268,8 +268,8 @@ for (const reducedMotion of [false, true]) {
   fading.fadeAsteroidShader(shader);
   const band = shader.fragmentShader.match(/1\.0 - smoothstep\((\d+)\.0, (\d+)\.0, length\(vViewPosition\)\)/);
   assert.ok(band);
-  assert.deepEqual(band.slice(1).map(Number), reducedMotion ? [400, 700] : [2600, 3600]);
-  for (const distance of [reducedMotion ? 350 : 650, 250, 100, 10, 0, -10]) {
+  assert.deepEqual(band.slice(1).map(Number), [2600, 3600]);
+  for (const distance of [650, 250, 100, 10, 0, -10]) {
     assert.equal(1 - THREE.MathUtils.smoothstep(Math.abs(distance), Number(band[1]), Number(band[2])), 1,
       'The real shader must stay fully opaque throughout close approaches and passes');
     rock.position.set(0, 0, -distance);
@@ -283,11 +283,11 @@ for (const reducedMotion of [false, true]) {
   fading.setTime(field.start + .15); fading.updateAsteroidShower();
   assert.ok(Math.abs(field.grit.material.opacity - .5) < .001);
 }
-for (const reducedMotion of [false, true]) {
-  const arrivals = makeGame(reducedMotion);
+{
+  const arrivals = makeGame();
   arrivals.setLevel(3);
   const rock = arrivals.ships[4], tiers = new Set();
-  for (const speed of reducedMotion ? [35, 55] : [180, 600, 1100]) {
+  for (const speed of [180, 600, 1100]) {
     arrivals.flightMotion.set(0, 0, -speed);
     for (let sample = 0; sample < 40; sample++) {
       arrivals.resetShip(rock);
@@ -295,7 +295,7 @@ for (const reducedMotion of [false, true]) {
       const minimum = arrivals.asteroidArrivalDistance(rock);
       assert.ok(rock.position.dot(rock.userData.cruiseDirection) >= minimum + speed * .85 * .3 - 1e-8);
       assert.equal(rock.userData.hull.opacity, 0);
-      const fadeBoundary = reducedMotion ? 700 : 3600;
+      const fadeBoundary = 3600;
       assert.ok(minimum - rock.userData.type.radius * rock.scale.x >= fadeBoundary + 200,
         'The whole hull of every size starts beyond the fully invisible distance boundary');
       for (let tick = 0; tick < 18; tick++) {
@@ -319,17 +319,17 @@ for (const reducedMotion of [false, true]) {
       const time = hazard.userData.approachTime;
       assert.ok(time >= 3 && Math.abs(time * 60 - Math.round(time * 60)) < 1e-8);
       assert.ok(time >= arrivals.asteroidArrivalDistance(hazard) / (-arrivals.flightMotion.z * .85),
-        'Even small/reduced-motion threats need a distant approach, not a fixed three-second near spawn');
+        'Even small threats need a distant approach, not a fixed three-second near spawn');
       const predicted = hazard.position.clone().addScaledVector(hazard.userData.courseVelocity, time);
       assert.ok(predicted.length() >= arrivals.asteroidArrivalDistance(hazard) - 1e-6,
         'Scheduled rocks also need a distant starting point');
       assert.ok(hazard.position.distanceTo(arrivals.camera.position) - hazard.userData.type.radius * hazard.scale.x
-        > (reducedMotion ? 700 : 3600), 'Actual scheduled hulls—not only their forecast pass points—start outside visibility');
+        > 3600, 'Actual scheduled hulls—not only their forecast pass points—start outside visibility');
       assert.equal(arrivals.nextHazardTime, 2 + hazardInterval, 'Longer approaches must not accelerate the reduced spawn cadence');
     }
   }
 }
-console.log('PASS distant 0.3-second blends for every regular/hazard size, including reduced motion');
+console.log('PASS distant 0.3-second blends for every regular/hazard size');
 
 const rockShader = { fragmentShader: THREE.ShaderLib.standard.fragmentShader };
 game.fadeAsteroidShader(rockShader);
@@ -343,16 +343,15 @@ assert.equal(gritShader.fragmentShader, rockShader.fragmentShader,
 console.log('PASS smooth arrivals and reuse, fully solid close passes, no near fade in shower rocks');
 
 for (const corridor of [false, true]) {
-  for (const speed of full ? [40, 200, 900] : [corridor ? 40 : 900]) {
-    const bounded = makeGame(speed === 40);
+  for (const speed of full ? [200, 900] : [corridor ? 200 : 900]) {
+    const bounded = makeGame();
     // Fast travel belongs to a fast level: field layout is now fixed before takeoff.
     if (speed === 900) bounded.setLevel(15);
     bounded.flightMotion.set(0, 0, -speed); bounded.camera.aspect = 32 / 9;
     bounded.setupLevelFleet();
     const field = bounded.shower(corridor, 2);
     const start = field.start, seenSpawns = new Map();
-    // Authored slow-mode corridors are visible earlier, but still leave four seconds to react.
-    const spawnClearance = speed === 40 ? speed * .85 * 4 : 3600;
+    const spawnClearance = 3600;
     let peak = 0;
     for (let frame = 0; frame < 90 * 60; frame++) {
       bounded.setTime(start + frame / 60);
@@ -538,14 +537,6 @@ game.worldStep.set(0, 0, 0); game.updateEnemyBolts(.06);
 assert.equal(game.enemyBolts.length, 0); assert.equal(game.hits.length, 1);
 console.log('PASS red laser speed, pause, non-homing trajectories and swept laser collisions');
 
-const reduced = makeGame(true);
-reduced.setLevel(4); reduced.setupLevelFleet();
-reduced.resetShip(reduced.capital); reduced.updateCapitalShip(reduced.capital, .05);
-assert.ok(reduced.capital.userData.courseVelocity.toArray().every(Number.isFinite));
-reduced.setupLevelFleet();
-assert.ok(reduced.ships.filter(item => item.userData.shower || item.userData.type.capital).every(item => !item.visible));
-assert.equal(reduced.enemyBolts.length, 0);
-console.log('PASS reduced-motion initialization and level reset');
 
 const cadence = makeGame();
 for (let level = 1; level <= 16; level++) {
@@ -580,7 +571,7 @@ for (let level = 1; level <= 16; level++) {
 assert.equal(cadence.ships.filter(ship => ship.userData.type.capital).length, 1);
 console.log('PASS boss only on levels 4/8/12/16, pause, single encounter, retry and model reuse');
 
-const threats = makeGame(false, false); threats.setupLevelFleet();
+const threats = makeGame(false); threats.setupLevelFleet();
 threats.flightMotion.set(0, 0, -threats.levelFlightSpeed(0));
 threats.setTime(1.99); threats.updateCollisionHazard();
 assert.equal(threats.hazardPool.length, 0);
@@ -646,8 +637,8 @@ assert.ok(hazard.visible);
 console.log('PASS unchanged crossing schedule, distant approaches, fixed courses, pause, reuse and reset');
 
 // The hazard starts travelling on the velocity already computed for this tick.
-for (const reducedMotion of [false, true]) {
-  const flight = makeGame(reducedMotion), dt = 1 / 60, steps = 180, elapsed = 7;
+{
+  const flight = makeGame(), dt = 1 / 60, steps = 180, elapsed = 7;
   flight.setLevel(3); flight.setTime(elapsed);
   flight.camera.position.set(2, -3, 10);
   flight.target.set(.35, -.25); flight.flightTurn.set(.12, -.08);
@@ -670,10 +661,10 @@ for (const reducedMotion of [false, true]) {
   assert.ok(actual.distanceTo(forecast) < 1e-8, 'Forecast matches the live path while accelerating, turning and shedding drift');
 }
 
-for (const reducedMotion of [false, true]) {
+{
   for (const fps of full ? [5, 30, 60, 144] : [5]) for (const level of full ? [1, 7, 15] : [7]) {
     for (const kick of [false, true]) for (const lane of ['hold', 'intercept', 'evade']) {
-      const flight = makeGame(reducedMotion, false), startTime = 2;
+      const flight = makeGame(false), startTime = 2;
       flight.setLevel(level); flight.setupLevelFleet();
       const speed = flight.levelFlightSpeed(startTime / 45);
       flight.flightOrientation.set(.12, -.38, 0, 'YXZ');
@@ -703,7 +694,7 @@ for (const reducedMotion of [false, true]) {
       });
       for (let frame = 0; frame < Math.ceil(fps * (rock.userData.approachTime + 1)); frame++) clock.frame(1 / fps);
       assert.equal(lane === 'hold' && kick ? pointHit : hit, lane === 'intercept',
-        `Aircraft crossing: ${fps} FPS, level=${level}, kick=${kick}, lane=${lane}, reduced=${reducedMotion}`);
+        `Aircraft crossing: ${fps} FPS, level=${level}, kick=${kick}, lane=${lane}`);
     }
   }
 }

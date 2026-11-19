@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { createShieldHud } from '../src/flight/shield-hud.js';
 
-function makeHud(reducedMotion = false) {
+function makeHud() {
   const elements = new Map();
   const document = {hidden: false, querySelector(selector) {
     if (!elements.has(selector)) {
@@ -17,7 +17,7 @@ function makeHud(reducedMotion = false) {
     }
     return elements.get(selector);
   }};
-  const hud = createShieldHud(document, reducedMotion, 100);
+  const hud = createShieldHud(document, 100);
   const panel = document.querySelector('#shield-hud'), fill = document.querySelector('#shield-fill');
   let paused = false;
   hud.set(100, false); hud.render(paused);
@@ -34,15 +34,15 @@ function makeHud(reducedMotion = false) {
     })
   };
 }
-for (const reduced of [false, true]) {
-  const hud = makeHud(reduced);
+{
+  const hud = makeHud();
   hud.change(60);
   assert.equal(hud.state().value, 60, 'Accessible progress updates immediately');
   assert.equal(hud.state().text, '60%');
-  assert.equal(hud.state().displayed, reduced ? 60 : 100);
+  assert.equal(hud.state().displayed, 100);
   assert.equal(hud.state().hit, true);
   hud.step(.1);
-  if (!reduced) assert.ok(hud.state().displayed > 60 && hud.state().displayed < 100);
+  assert.ok(hud.state().displayed > 60 && hud.state().displayed < 100);
   hud.pause(true);
   const paused = hud.state(); hud.step(2);
   assert.deepEqual(hud.state(), paused, 'Pause freezes fill, feedback and low-shield pulse');
@@ -78,7 +78,7 @@ for (const reduced of [false, true]) {
   hud.change(15); hud.step(.08);
   const interrupted = hud.state().displayed;
   hud.change(40);
-  assert.equal(hud.state().displayed, reduced ? 40 : interrupted, 'Rapid changes start from the currently drawn fill');
+  assert.equal(hud.state().displayed, interrupted, 'Rapid changes start from the currently drawn fill');
   assert.equal(hud.state().hit, false); assert.equal(hud.state().healed, true);
   hud.change(30);
   assert.equal(hud.state().hit, true); assert.equal(hud.state().healed, false, 'Newest event wins');
@@ -97,4 +97,4 @@ for (const name of ['startCrash', 'enterRoundResult', 'restartRound']) {
   const end = gameSource.indexOf('\n  function ', start + 1);
   assert.ok(gameSource.slice(start, end).includes('updateShield(false);'), `${name} clears animation without a healing pulse`);
 }
-console.log('PASS shield fill easing, immediate accessible values, damage/heal glow, pause, reduced motion, rapid changes and clean resets');
+console.log('PASS shield fill easing, immediate accessible values, damage/heal glow, pause, rapid changes and clean resets');

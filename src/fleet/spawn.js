@@ -1,7 +1,7 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 import { setShipOpacity } from './visuals.js';
 
-export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) {
+export function createFleetSpawn({ random, updateShipHitFlash }) {
   function setAsteroidCourse(rock, approachTime, flightSpeed) {
     const data = rock.userData;
     data.courseVelocity.set(0, 0, 0);
@@ -9,7 +9,7 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
     const course = random(0, 1);
     if (course < .25) return;
     const gentle = course < .8;
-    const speed = flightSpeed * .85 * (reducedMotion ? .25 : 1);
+    const speed = flightSpeed * .85;
     const side = random(0, 1) < .5 ? -1 : 1;
     const lateral = gentle ? random(.01, .05) : random(.12, .28);
     const vertical = gentle ? random(-.02, .02) : random(-.08, .08);
@@ -26,9 +26,9 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
     // Some fixed diagonal paths intersect the wings; others remain generous near-passes.
     // Neither aims at the camera center or changes course after release.
     const clearance = dangerous ? random(14, 20) : Math.max(data.type.radius * rock.scale.x + playerHullRadius + random(12, 24),
-      flightSpeed * .85 * approachTime * (reducedMotion ? .025 : .06));
-    const speed = Math.max(flightSpeed * .85 * random(.12, .28) * (reducedMotion ? .25 : 1),
-      clearance * (reducedMotion ? 1.5 : 2.5) / approachTime);
+      flightSpeed * .85 * approachTime * .06);
+    const speed = Math.max(flightSpeed * .85 * random(.12, .28),
+      clearance * 2.5 / approachTime);
     data.courseVelocity.copy(direction).multiplyScalar(speed);
     // Offset the start upstream so movement and the chosen crossing lane agree.
     rock.position.addScaledVector(direction, clearance - speed * approachTime);
@@ -37,7 +37,7 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
   }
   function asteroidArrivalDistance(rock) {
     // Every size starts beyond the shader's fully invisible boundary, including its hull.
-    return (reducedMotion ? 900 : 3800) + rock.userData.type.radius * rock.scale.x;
+    return 3800 + rock.userData.type.radius * rock.scale.x;
   }
   // A formation spawn (including the menu preview) needs no live pilot or boundary.
   function resetShip(ship, { level, openingSpeed, flight = null, formationSlot = ship.userData.slot, maxAsteroidTier = 3 }) {
@@ -52,7 +52,6 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
     if (data.arrivalOpacity < 1) setShipOpacity(ship, 1);
     const asteroidTier = data.type.asteroid ? Math.floor(random(1, Math.min(maxAsteroidTier, level) + 1)) : 0;
     data.asteroidTier = asteroidTier;
-    data.asteroidSizeScale = 1;
     data.impactFragment = false; data.fractureAfter = 0;
     ship.scale.setScalar(data.type.asteroid ? [.35, 1.3, 2.8][asteroidTier - 1] : data.type.scale);
     data.maxHealth = data.type.asteroid ? asteroidTier : data.type.health;
@@ -70,7 +69,7 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
     if (!initial) {
       depth = data.type.asteroid
         ? -Math.max(-depth, asteroidArrivalDistance(ship) + flightSpeed * .85 * .3)
-        : -Math.max(reducedMotion ? 1200 : 3800, flightSpeed * .85 * 5.5);
+        : -Math.max(3800, flightSpeed * .85 * 5.5);
     }
     ship.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius * .6, depth);
     // Later arrivals follow our current heading, not the original world axis.
@@ -79,7 +78,7 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
       ship.rotation.set(random(.12, .3), random(-.3, .3), random(-.25, .25));
       // Individual tumbling rates; applied only when the rock has noticeable drift.
       data.spin.set(random(-1, 1), random(-1, 1), random(-1, 1))
-        .normalize().multiplyScalar(reducedMotion ? 0 : random(.04, .6));
+        .normalize().multiplyScalar(random(.04, .6));
     } else {
       ship.rotation.set(data.type.capital ? .2 : 0, 0, 0);
     }
@@ -96,7 +95,7 @@ export function createFleetSpawn({ reducedMotion, random, updateShipHitFlash }) 
     data.height = Math.sin(angle) * radius * .6;
     data.cruiseRatio = random(.42, .78) * (data.type.name === 'TITAN CARRIER' ? .75 : 1);
     data.throttle = data.cruiseRatio;
-    data.passingSpeed = random(reducedMotion ? 2 : 25, reducedMotion ? 6 : 95);
+    data.passingSpeed = random(25, 95);
     data.throttleTime = random(3.5, 6.5);
     data.dodgeSkill = random(.65, 1.15);
     if (!data.type.asteroid) {

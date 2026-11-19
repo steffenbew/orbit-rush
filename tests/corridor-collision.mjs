@@ -17,11 +17,11 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
   return source.slice(from, to);
 };
-function makeGame(seed = 12345, reducedMotion = false) {
+function makeGame(seed = 12345) {
   const math = Object.create(Math);
   math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-  return new Function('collisionDamage', 'hitFlashStrength', 'createAsteroidEncounter', 'createPlayerProjectiles', 'playerLaserSpeed', 'createPlayerCollision', 'THREE', 'Math', 'reducedMotion', `
-    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(reducedMotion ? 70 : 90, 16 / 9, .03, 14000);
+  return new Function('collisionDamage', 'hitFlashStrength', 'createAsteroidEncounter', 'createPlayerProjectiles', 'playerLaserSpeed', 'createPlayerCollision', 'THREE', 'Math', `
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
     const flightMotion = new THREE.Vector3(0, 0, -400), flightVelocity = new THREE.Vector2();
     const random = (a, b) => a + Math.random() * (b - a);
     const shipTypes = [null, null, null, {asteroid: true}], fadeAsteroidShader = () => {};
@@ -90,7 +90,7 @@ function makeGame(seed = 12345, reducedMotion = false) {
         return updateShowerRockCollisions();
       }
     };
-  `)(collisionDamage, hitFlashStrength, createAsteroidEncounter, createPlayerProjectiles, playerLaserSpeed, createPlayerCollision, THREE, math, reducedMotion);
+  `)(collisionDamage, hitFlashStrength, createAsteroidEncounter, createPlayerProjectiles, playerLaserSpeed, createPlayerCollision, THREE, math);
 }
 
 const game = makeGame(); game.seed();
@@ -124,9 +124,9 @@ for (const strength of [0, 1, 2]) {
   assert.equal(free.scene.children.length, 1, 'Reuse the existing instanced mesh');
   free.rocks.forEach((record, index) => assert.equal(record.index, index));
 }
-for (const reducedMotion of [false, true]) for (const fps of full ? [5, 30, 60, 144] : [5]) for (const strength of full ? [0, 1, 2] : [0]) {
+for (const fps of full ? [5, 30, 60, 144] : [5]) for (const strength of full ? [0, 1, 2] : [0]) {
   for (const turn of [false, true]) for (const hit of [false, true]) {
-    const free = makeGame(7123 + strength, reducedMotion); free.seed(strength, 0, false);
+    const free = makeGame(7123 + strength); free.seed(strength, 0, false);
     const record = free.rocks[0];
     for (const other of free.rocks) if (other !== record) other.hit = true;
     if (turn) free.rotation.setFromEuler(new THREE.Euler(.3, -.6, .2));
@@ -197,8 +197,8 @@ fastStream.render();
 assert.equal(fastRock.seen, true, 'Visibility look-ahead includes stream speed so fast rendered rocks are registered before contact');
 console.log('PASS fast-stream visibility look-ahead for low-frame-rate collision eligibility');
 
-for (const reducedMotion of [false, true]) for (const turn of [false, true]) for (const corridor of [false, true]) {
-  const flight = makeGame(12345, reducedMotion); flight.seed(2, 0, corridor);
+for (const turn of [false, true]) for (const corridor of [false, true]) {
+  const flight = makeGame(12345); flight.seed(2, 0, corridor);
   const record = flight.rocks.find(rock => Math.abs(rock.position.x) < 200 && rock.position.z < -800 && rock.position.z > -2200);
   for (const other of flight.rocks) if (other !== record) other.hit = true; // Isolate one real instance.
   if (turn) flight.rotation.setFromEuler(new THREE.Euler(.2, -.5, .3));
@@ -230,7 +230,7 @@ for (const reducedMotion of [false, true]) for (const turn of [false, true]) for
   assert.equal(flight.hits.length, 1, 'The same instance must not damage repeatedly');
   flight.seed(); assert.ok(flight.rocks.every(rock => !rock.seen && !rock.hit));
   flight.seed(0, 0, false);
-  const count = reducedMotion ? 30 : 300;
+  const count = 300;
   assert.equal(flight.rocks.length, count);
   assert.equal(flight.indexed().length, count);
   assert.ok(flight.rocks.every(rock => !rock.hit && !rock.seen), 'Switching to a free shower rebuilds only its own collision records');
@@ -238,28 +238,23 @@ for (const reducedMotion of [false, true]) for (const turn of [false, true]) for
 }
 console.log('PASS actual shield loss on off-screen wing contacts, no unseen hits, pause, one hit per rock and reset');
 
-// Fly through actual seeded layers. Checking an idealized solid ceiling would miss the original bug.
-let wallRuns = 0, wallHits = 0, centeredHits = 0;
-const byStrength = [0, 0, 0];
-for (const strength of [0, 1, 2]) for (const shape of full ? [0, 1, 2] : [strength]) for (let sample = 0; sample < (full ? 4 : 1); sample++) {
+// Fly through the floor, center and ceiling of one real seeded corridor per strength and shape.
+for (const [strength, shape, seed] of [[0, 0, 600], [1, 1, 626], [2, 2, 652]]) {
   for (const side of [-1, 0, 1]) {
-    const flight = makeGame(600 + sample * 101 + shape * 19 + strength * 7); flight.seed(strength, shape);
-    flight.camera.position.set(-150 + sample * 100, flight.corridorCenter(1500), -1500);
+    const flight = makeGame(seed); flight.seed(strength, shape);
+    flight.camera.position.set(-150, flight.corridorCenter(1500), -1500);
     flight.camera.rotation.x = Math.atan2(side * 300, 400) * .75;
     flight.playerHullRotation.copy(flight.camera.quaternion);
     flight.flightMotion.set(0, side * 300, -400);
     flight.render();
     const step = flight.flightMotion.clone().multiplyScalar(-.85 / 60);
     for (let frame = 0; frame < 60; frame++) { flight.step(step); flight.render(); }
-    if (side === 0) centeredHits += flight.hits.length;
-    else { wallRuns++; if (flight.hits.length) { wallHits++; byStrength[strength]++; } }
+    if (side === 0) assert.equal(flight.hits.length, 0, `Seed ${seed}: centered passage must stay clear`);
+    else assert.ok(flight.hits.length > 0, `Seed ${seed}: crossing the ${side < 0 ? 'floor' : 'ceiling'} must damage the shield`);
     assert.ok(flight.hits.length <= 7, 'Stop damage once the shield is exhausted');
   }
 }
-assert.equal(centeredHits, 0, 'Centered passage must remain open in every corridor shape');
-assert.ok(wallHits >= wallRuns * .65, `Crossing the visible layers must usually hurt, not pass through decoration (${wallHits}/${wallRuns}; ${byStrength})`);
-assert.ok(byStrength.every(count => count >= wallRuns / 6), 'Both light and dense layers need real collision coverage');
-console.log(`PASS real corridor traversal: ${wallHits}/${wallRuns} wall crossings hit; centered runs stay clear (${byStrength.join('/')} by strength)`);
+console.log('PASS real corridor traversal: floor and ceiling crossings hit, centered paths stay clear');
 assert.ok(source.includes('danger = updateShowerRockCollisions() || danger;'), 'The gameplay loop must actually apply ring collisions and warnings');
 assert.ok(source.includes('recordVisibleObjects();\n    recordVisibleShowerRocks();'), 'Visibility must be recorded on rendered frames, not simulation ticks');
 

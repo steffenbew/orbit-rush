@@ -1,7 +1,21 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 import { createPlanet } from './planet.js';
 
-export function createSpaceBackground(scene, camera, reducedMotion, sample = Math.random) {
+export function createGlowTexture() {
+  const glowCanvas = document.createElement('canvas');
+  glowCanvas.width = glowCanvas.height = 64;
+  const glowContext = glowCanvas.getContext('2d');
+  const gradient = glowContext.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, '#fff');
+  gradient.addColorStop(.15, '#ffffffef');
+  gradient.addColorStop(.4, '#ffffff40');
+  gradient.addColorStop(1, '#ffffff00');
+  glowContext.fillStyle = gradient;
+  glowContext.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(glowCanvas);
+}
+
+export function createSpaceBackground(scene, camera, sample = Math.random) {
   const random = (a, b) => a + sample() * (b - a);
   const pick = items => items[Math.floor(sample() * items.length)];
   // One world-aligned sky: calm nebulae, with a trace of travel in the far stars.
@@ -70,17 +84,7 @@ export function createSpaceBackground(scene, camera, reducedMotion, sample = Mat
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
   starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
   starGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 6500);
-  const glowCanvas = document.createElement('canvas');
-  glowCanvas.width = glowCanvas.height = 64;
-  const glowContext = glowCanvas.getContext('2d');
-  const gradient = glowContext.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gradient.addColorStop(0, '#fff');
-  gradient.addColorStop(.15, '#ffffffef');
-  gradient.addColorStop(.4, '#ffffff40');
-  gradient.addColorStop(1, '#ffffff00');
-  glowContext.fillStyle = gradient;
-  glowContext.fillRect(0, 0, 64, 64);
-  const glow = new THREE.CanvasTexture(glowCanvas);
+  const glow = createGlowTexture();
   const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({
     size: 28, map: glow, vertexColors: true, transparent: true, fog: false,
     depthWrite: false, blending: THREE.AdditiveBlending
@@ -196,7 +200,7 @@ export function createSpaceBackground(scene, camera, reducedMotion, sample = Mat
     // Keep the sky centered, never copy camera rotation: stars and horizon turn together.
     distantSky.position.copy(camera.position);
     planet.visible = started && level % 4 === 0;
-    middleStars.visible = flightDust.visible = started && !reducedMotion;
+    middleStars.visible = flightDust.visible = started;
     if (!flightDust.visible || (paused && !crashDrifting)) return;
     for (let i = 0; i < starCount; i++) {
       starDirection.fromArray(starPositions, i * 3).addScaledVector(worldStep, .025);

@@ -8,7 +8,7 @@ import { getAsteroidEncounters } from '../src/course/encounter-plan.js';
 for (const level of [2, 3]) {
   const encounter = createAsteroidEncounter({ scene: new THREE.Scene(), courseOrigin: new THREE.Vector3(),
     roundDuration: 45, levelFlightSpeed: () => 400, flightDistanceAt: time => time * 340, showerWarning: {} });
-  const events = getAsteroidEncounters(level, false);
+  const events = getAsteroidEncounters(level);
   encounter.reset(level, events);
   assert.equal(encounter.kind, events[0].kind);
   const opening = encounter.layout.origin.z, corridor = encounter.corridorPlan.origin.z;
@@ -20,21 +20,21 @@ for (const level of [2, 3]) {
   assert.equal(encounter.pool.length, 0);
 }
 
-for (const reduced of [false, true]) {
-  const game = makeGame(reduced); game.setLevel(2); game.setupLevelFleet(); game.camera.updateMatrixWorld();
+{
+  const game = makeGame(); game.setLevel(2); game.setupLevelFleet(); game.camera.updateMatrixWorld();
   game.setTime(1); game.updateAsteroidShower(0);
   const field = game.coursePlan();
   assert.equal(field.kind, 'field'); assert.equal(field.velocity.lengthSq(), 0);
   assert.equal(field.direction.distanceTo(new THREE.Vector3(0, 0, -1)), 0);
   assert.equal(field.origin.x, 0); assert.equal(field.origin.y, 0, 'No leftover shower crossing offset');
   assert.ok(game.warningText.includes(t('asteroidField')));
-  assert.ok(game.grit.count >= (reduced ? 12 : 90), 'A broad stationary debris cloud surrounds the detailed chunks');
+  assert.ok(game.grit.count >= 90, 'A broad stationary debris cloud surrounds the detailed chunks');
   const rocks = game.showerPool.filter(rock => rock.visible);
   assert.ok(rocks.length > 0);
   for (const rock of rocks) {
     const before = {position: rock.position.clone(), rotation: rock.quaternion.clone()};
     assert.equal(rock.userData.courseVelocity.lengthSq(), 0);
-    moveRock(rock, 1, false, reduced);
+    moveRock(rock, 1, false);
     assert.ok(rock.position.equals(before.position)); assert.ok(rock.quaternion.equals(before.rotation), 'Fixed rocks do not tumble');
   }
   const origin = game.grit.position.clone();
@@ -52,8 +52,8 @@ for (const reduced of [false, true]) {
 }
 console.log('PASS stationary field geometry, distinct labels, fixed rotation, world anchoring and shower-to-field reuse');
 
-for (const reduced of [false, true]) for (const fps of [5, 60, 144]) {
-  const game = makeGame(reduced); game.setLevel(4); game.setupLevelFleet();
+for (const fps of [5, 60, 144]) {
+  const game = makeGame(); game.setLevel(4); game.setupLevelFleet();
   game.setTime(6); game.updateShipArrivals();
   const boss = game.capital, health = boss.userData.health;
   assert.ok(boss.visible); boss.position.set(0, -50, -1800);
@@ -88,8 +88,8 @@ for (const reduced of [false, true]) for (const fps of [5, 60, 144]) {
 }
 console.log('PASS first-boss combat, smooth non-firing retreat, no kill/reward, pause, full-health retry and later-boss isolation at 5–144 FPS');
 
-for (const reduced of [false, true]) {
-  const game = makeGame(reduced); game.setLevel(4); game.setupLevelFleet();
+{
+  const game = makeGame(); game.setLevel(4); game.setupLevelFleet();
   const planned = game.getAsteroidEncounters();
   assert.deepEqual(planned.map(event => [event.entry, event.exit]), [[5, 8], [32, 37]]);
   game.setTime(6); game.updateShipArrivals();
@@ -105,12 +105,12 @@ for (const reduced of [false, true]) {
 }
 console.log('PASS stationary warm-up/aftermath, early-kill extension with safe lead and clean retry');
 
-for (const reduced of [false, true]) for (const level of [2, 3, 5, 7, 8]) {
-  const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
+for (const level of [2, 3, 5, 7, 8]) {
+  const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   const plan = game.corridorPlan;
   if (level <= 3) {
     assert.equal(plan.shape, 0, 'Keep the first two corridors straight');
-    assert.equal(plan.gap, reduced ? (level === 2 ? 34 : 30) : (level === 2 ? 52 : 45), 'The level-two introduction has the widest opening');
+    assert.equal(plan.gap, (level === 2 ? 52 : 45), 'The level-two introduction has the widest opening');
   }
   else assert.ok(Math.abs(plan.bend) > plan.gap * 1.5, 'Later bends exceed the opening: straight flight cannot ignore them');
   assert.equal(Math.abs(game.corridorCenter(0, plan)), 0);
@@ -131,10 +131,10 @@ for (const reduced of [false, true]) for (const level of [2, 3, 5, 7, 8]) {
     }
     if (aim) {
       const delta = aim.sub(game.camera.position), yaw = -Math.atan2(delta.x, -delta.z);
-      const pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z)), motion = reduced ? .5 : 1;
+      const pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
       const yawError = Math.atan2(Math.sin(yaw - game.flightOrientation.y), Math.cos(yaw - game.flightOrientation.y));
-      game.target.set(THREE.MathUtils.clamp(-(yawError * 4 - game.flightTurn.x * .8) / (.9 * motion), -1, 1),
-        THREE.MathUtils.clamp(((pitch - game.flightOrientation.x) * 4 - game.flightTurn.y * .8) / (.65 * motion), -1, 1));
+      game.target.set(THREE.MathUtils.clamp(-(yawError * 4 - game.flightTurn.x * .8) / .9, -1, 1),
+        THREE.MathUtils.clamp(((pitch - game.flightOrientation.x) * 4 - game.flightTurn.y * .8) / .65, -1, 1));
     }
     clock.move(dt, time / 45); game.worldStep.copy(game.flightMotion).multiplyScalar(-dt);
     game.courseWorldOffset.addScaledVector(game.worldStep, .85); game.updateFlightRing();
@@ -149,8 +149,8 @@ for (const reduced of [false, true]) for (const level of [2, 3, 5, 7, 8]) {
   });
   while (time < 45 && game.flightRings.some(gate => !gate.userData.resolved)) clock.frame(1 / 60);
   assert.ok(corridorFrames > 500);
-  assert.ok(minimumClearance > 0, `Full hull can follow the stronger bend: level=${level}, reduced=${reduced}, clearance=${minimumClearance}`);
+  assert.ok(minimumClearance > 0, `Full hull can follow the stronger bend: level=${level}, clearance=${minimumClearance}`);
   assert.deepEqual(game.sounds, Array(5).fill('checkpoint'), 'Curve-following still reaches every checkpoint');
-  assert.ok(time <= 41.5, `Keep at least 3.5 seconds of finish margin after the longer curved route: level=${level}, reduced=${reduced}, time=${time}`);
+  assert.ok(time <= 41.5, `Keep at least 3.5 seconds of finish margin after the longer curved route: level=${level}, time=${time}`);
 }
-console.log('PASS readable bends with straight lead-ins and real-inertia full-hull traversal, including reduced motion');
+console.log('PASS readable bends with straight lead-ins and real-inertia full-hull traversal');

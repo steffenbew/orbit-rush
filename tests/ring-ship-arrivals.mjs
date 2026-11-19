@@ -5,9 +5,9 @@ import { makeGame } from './helpers/flight-game.mjs';
 const full = process.env.ORBIT_TEST_FULL === '1';
 
 // A busy encounter can delay route traffic until the corridor is already under or behind the player.
-for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (const shape of full ? [0, 1, 2] : [2]) {
+for (const level of [1, 10]) for (const shape of full ? [0, 1, 2] : [2]) {
   for (const progress of full ? [-.01, 0, .02, .5, .99, 1, 1.01] : [0, .5, 1]) {
-    const game = makeGame(reducedMotion);
+    const game = makeGame();
     game.setLevel(level); game.setupLevelFleet();
     const field = game.ringCourse(true, shape), depth = field.length * progress;
     game.setTime(30);
@@ -22,7 +22,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
     assert.ok(gates.length > 0, 'Keep checkpoints ahead so delayed traffic has a route');
     let pool = [...game.ringShips];
     const allocated = game.ships.length;
-    const context = `reduced=${reducedMotion}, level=${level}, shape=${shape}, progress=${progress}`;
+    const context = `level=${level}, shape=${shape}, progress=${progress}`;
     assert.doesNotThrow(() => game.resetRingShips(true), context);
     assert.deepEqual(game.ringShips.slice(0, pool.length), pool, 'Reuse the original companion models');
     assert.equal(game.ships.length, allocated + (level >= 5 ? 2 : 0), 'Only the two extra corridor companions need new models');
@@ -77,7 +77,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 10]) for (con
     });
   }
 }
-console.log('PASS late route traffic at corridor entry, inside and after the passage, normal/reduced motion, model reuse and finite forward paths');
+console.log('PASS late route traffic at corridor entry, inside and after the passage, normal, model reuse and finite forward paths');
 
 const finished = makeGame(); finished.setupLevelFleet(); finished.ringCourse(true);
 finished.flightRings.forEach(gate => { gate.userData.resolved = true; gate.visible = false; });

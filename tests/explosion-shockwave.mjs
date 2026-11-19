@@ -14,9 +14,9 @@ const end = source.indexOf('  function resize()', start);
 assert.ok(start >= 0 && end > start);
 const math = Object.create(Math);
 math.random = () => .5;
-const makeGame = (reducedMotion = false) => {
+const makeGame = () => {
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), flightVelocity = new THREE.Vector2();
-  const pilot = new Function('physics', 'camera', 'flightVelocity', 'reducedMotion', `
+  const pilot = new Function('physics', 'camera', 'flightVelocity', `
     let started = true, paused = false, roundEnded = false, crashing = false, speed = 400, shake = 0, flash = 0;
     ${activeFlightSource}
     ${source.slice(start, end)}
@@ -24,8 +24,8 @@ const makeGame = (reducedMotion = false) => {
       reset: () => { shake = flash = 0; flightVelocity.set(0, 0); },
       setMode(mode) { started = mode !== 'intro'; paused = mode === 'paused'; roundEnded = mode === 'result'; crashing = mode === 'crash'; }
     };
-  `)(physics, camera, flightVelocity, reducedMotion);
-  const fx = createExplosions({ scene, camera, glow: new THREE.Texture(), reducedMotion, pick: values => values[0],
+  `)(physics, camera, flightVelocity);
+  const fx = createExplosions({ scene, camera, glow: new THREE.Texture(), pick: values => values[0],
     random: (a, b) => a === 0 && b === 1 ? math.random() : (a + b) / 2, onBlast: pilot.applyExplosionShockwave });
   let paused = false;
   return { ...pilot, scene, camera, flightVelocity, explode: fx.explode, crashBurst: fx.crashBurst,
@@ -60,12 +60,12 @@ for (const distance of [25, 150, 400, 650, 700, 3000]) {
 console.log('PASS smooth distance falloff, silent distant blasts and no direct damage or score changes');
 
 // Halfway to the 700-unit cutoff: a unit blast has quarter strength and adds to existing drift.
-for (const reducedMotion of [false, true]) {
+{
   const playerPosition = new THREE.Vector3(100, 50, 20), drift = new THREE.Vector2(8, -3);
-  const flight = {playerPosition, speed: 400, drift, reducedMotion};
+  const flight = {playerPosition, speed: 400, drift};
   const origin = playerPosition.clone().add(new THREE.Vector3(210, -280, 0));
   assert.equal(physics.applyBlastImpulse(origin, 1, flight), .25);
-  const impulse = 35 * (reducedMotion ? .12 : 1);
+  const impulse = 35;
   assert.ok(drift.distanceTo(new THREE.Vector2(8 - .6 * impulse, -3 + .8 * impulse)) < 1e-9);
   const before = drift.clone();
   assert.equal(physics.applyBlastImpulse(playerPosition.clone().addScalar(700), 1, flight), 0);
@@ -90,18 +90,13 @@ game.applyExplosionShockwave(new THREE.Vector3(0, 0, -600), 1);
 assert.equal(game.state().shake, strongest, 'A distant blast must not cancel a stronger existing kick');
 console.log('PASS size scaling, bounded chain reactions and strongest-camera-kick preservation');
 
-const reduced = makeGame(true);
-reduced.applyExplosionShockwave(close, 1);
-assert.equal(reduced.state().shake, 0); assert.equal(reduced.state().flash, 0);
-assert.ok(reduced.flightVelocity.length() > 0);
-assert.ok(reduced.flightVelocity.length() < new THREE.Vector2(...normal.velocity).length() * .13);
 for (const mode of ['intro', 'paused', 'result', 'crash']) {
   game.reset(); game.setMode(mode); const before = game.state();
   game.applyExplosionShockwave(close, 1);
   assert.deepEqual(game.state(), before, mode + ' must not receive new shockwave impulses');
 }
 game.setMode('playing');
-console.log('PASS reduced motion, pause, intro, results and player-crash isolation');
+console.log('PASS pause, intro, results and player-crash isolation');
 
 game.reset(); game.explode(close, 12);
 assert.equal(game.state().shake, 0, 'Ordinary hit sparks are not blast waves');
@@ -118,16 +113,16 @@ game.reset(); game.explode(close);
 assert.ok(game.state().shake > 0 && game.state().flash > 0);
 console.log('PASS actual explosion wiring: destructions and asteroid accidents, not hit sparks or crash bursts');
 
-for (const reducedMotion of [false, true]) {
-  const crash = makeGame(reducedMotion);
+{
+  const crash = makeGame();
   crash.setMode('crash');
   const origin = new THREE.Vector3(7, -4, -22);
-  crash.explode(origin, reducedMotion ? 12 : 120, true);
-  assert.equal(crash.shockwaves.length, 1, 'Both motion modes get an opening hull blast');
+  crash.explode(origin, 120, true);
+  assert.equal(crash.shockwaves.length, 1, 'The crash starts with a hull blast');
   const wave = crash.shockwaves[0];
   assert.equal(wave.life, .8);
-  assert.equal(wave.size, reducedMotion ? .3 : 1.8, 'Larger fatal-impact blast keeps the reduced-motion size unchanged');
-  assert.equal(crash.particles.length, reducedMotion ? 15 : 127, 'Crash particle/debris budget stays bounded');
+  assert.equal(wave.size, 1.8, 'Fatal-impact blast uses the full hull effect');
+  assert.equal(crash.particles.length, 127, 'Crash particle/debris budget stays bounded');
   assert.equal(crash.state().shield, 100); assert.equal(crash.state().score, 123);
   assert.equal(crash.flightVelocity.length(), 0, 'The opening blast cannot apply a second gameplay impulse');
   crash.tick(.1);
@@ -135,12 +130,7 @@ for (const reducedMotion of [false, true]) {
   const firstSize = wave.fireball.scale.x, firstOpacity = wave.fireball.material.opacity;
   crash.tick(.15);
   assert.ok(wave.fireball.material.opacity < firstOpacity, 'The fireball fades without repeated flashes');
-  if (reducedMotion) {
-    assert.equal(wave.fireball.scale.x, firstSize, 'Reduced-motion blast does not expand');
-    assert.ok(firstSize <= 12 && firstOpacity < .3, 'Reduced-motion blast stays small and soft');
-  } else {
-    assert.ok(wave.fireball.scale.x > firstSize && firstSize > 60, 'The opening fireball fills much of the view');
-  }
+  assert.ok(wave.fireball.scale.x > firstSize && firstSize > 60, 'The opening fireball fills much of the view');
   crash.tick(.3);
   assert.equal(wave.fireball.material.opacity, 0, 'Fire clears into drifting debris within about half a second');
   let disposed = 0;
@@ -149,12 +139,12 @@ for (const reducedMotion of [false, true]) {
   crash.tick(.3);
   assert.equal(crash.shockwaves.length, 0); assert.equal(disposed, 2, 'The whole blast is cleaned up before the result screen');
 }
-console.log('PASS brief moving-cockpit crash blast, expanding fireball, soft static reduced-motion version, no extra damage and timely cleanup');
+console.log('PASS brief moving-cockpit crash blast, expanding fireball, no extra damage and timely cleanup');
 
 // Drive real particle movement/cleanup with the same coast-down as the crash flight.
 function makeDrift(speed) {
   const flightMotion = new THREE.Vector3();
-  const drift = createCrashMotion({ reducedMotion: false, flightMotion, flightVelocity: new THREE.Vector2(),
+  const drift = createCrashMotion({ flightMotion, flightVelocity: new THREE.Vector2(),
     flightViewOffset: new THREE.Vector2(), flightDirection: new THREE.Vector3(),
     flightTilt: new THREE.Vector3(), flightOrientation: new THREE.Euler(0, 0, 0, 'YXZ') });
   drift.begin(speed, new THREE.Vector3(3, -1, -22));
@@ -212,18 +202,12 @@ math.random = () => .5;
 previousCapital.tick(1.2); assert.equal(previousCapital.shockwaves.length, 0, 'Normal explosion timing must remain unchanged');
 console.log('PASS guaranteed oversized capital finale, long-lived fireball, bounded particles/debris, pause and disposal');
 
-const quietCapital = makeGame(true); quietCapital.explode(close, 65, false, false, 2.5, true, true);
 const fullCapital = makeGame(); fullCapital.explode(close, 65, false, false, 2.5, true, true);
-assert.equal(quietCapital.particles.length, 33); assert.ok(quietCapital.particles.every(p => p.spin === 0));
-assert.ok(quietCapital.shockwaves[0].size < fullCapital.shockwaves[0].size);
-const particleSpeed = p => Math.hypot(p.vx, p.vy, p.vz);
-assert.ok(particleSpeed(quietCapital.particles[0]) < particleSpeed(fullCapital.particles[0]) * .25);
-assert.equal(quietCapital.state().shake, 0); assert.equal(quietCapital.state().flash, 0);
 assert.ok(fullCapital.state().shake <= 2.2 && fullCapital.state().flash <= .3);
 assert.ok(fullCapital.flightVelocity.length() <= 400 * 1.6);
 const accident = makeGame(); accident.explode(close, 65, false, false, 2.5, false, true);
 assert.equal(accident.state().flash, 0); assert.equal(accident.shockwaves[0].size, fullCapital.shockwaves[0].size);
-console.log('PASS reduced-motion boss finale, unchanged feedback limits and no environmental screen flash');
+console.log('PASS Boss finale, unchanged feedback limits and no environmental screen flash');
 
 const hitStart = source.indexOf('  function hitShipWithLaser(');
 const hitEnd = source.indexOf('  function updateFlightEffects(', hitStart);

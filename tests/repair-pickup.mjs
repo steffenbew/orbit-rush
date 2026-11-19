@@ -9,7 +9,7 @@ test('blocked or ineligible repair opportunities wait; a swept collection consum
   const blocker = new THREE.Group(); blocker.position.set(-85, 0, -500); blocker.userData.type = {radius: 20};
   const marker = {style: {}};
   let roll = .6;
-  const repair = createRepairPickup({ scene, camera, glow: new THREE.Texture(), reducedMotion: false,
+  const repair = createRepairPickup({ scene, camera, glow: new THREE.Texture(),
     flightOrientation: camera.rotation, flightMotion, worldStep, ships: [blocker], hasPassedCamera: () => false,
     repairMarker: marker, sample: () => roll });
   const tick = () => repair.update(1 / 60, { needsRepair: true, duringRest: true, viewCamera: camera, width: 800, height: 400 });

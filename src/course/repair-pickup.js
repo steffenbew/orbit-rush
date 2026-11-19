@@ -1,6 +1,6 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 
-export function createRepairPickup({ scene, camera, glow, reducedMotion, flightOrientation, flightMotion, worldStep,
+export function createRepairPickup({ scene, camera, glow, flightOrientation, flightMotion, worldStep,
   ships, hasPassedCamera, repairMarker, sample = Math.random }) {
   const repairPickup = new THREE.Group();
   const repairShell = new THREE.MeshStandardMaterial({ color: 0x123d37, metalness: .45, roughness: .4 });
@@ -35,8 +35,8 @@ export function createRepairPickup({ scene, camera, glow, reducedMotion, flightO
   function update(dt, { needsRepair, duringRest, viewCamera, width, height }) {
     repairMarker.hidden = true;
     if (repairPending && !repairPickup.visible && needsRepair && duringRest && flightMotion.length() > 25) {
-      const distance = Math.max(reducedMotion ? 140 : 500, flightMotion.length() * .85 * 3.5);
-      repairPickup.position.set((sample() < .5 ? -1 : 1) * (reducedMotion ? 30 : 85), 0, -distance)
+      const distance = Math.max(500, flightMotion.length() * .85 * 3.5);
+      repairPickup.position.set((sample() < .5 ? -1 : 1) * 85, 0, -distance)
         .applyEuler(flightOrientation).add(camera.position);
       // Do not hide a reward inside an existing solid obstacle.
       const blocked = ships.some(ship => ship.visible && ship.position.distanceTo(repairPickup.position)
@@ -47,7 +47,7 @@ export function createRepairPickup({ scene, camera, glow, reducedMotion, flightO
     repairPrevious.copy(repairPickup.position);
     repairPickup.position.addScaledVector(worldStep, .85);
     repairPickup.quaternion.copy(viewCamera.quaternion);
-    if (!reducedMotion) repairRing.rotation.z += dt * .25;
+    repairRing.rotation.z += dt * .25;
     repairPath.set(repairPrevious, repairPickup.position).closestPointToPoint(camera.position, true, repairClosest);
     if (needsRepair && repairClosest.distanceToSquared(camera.position) <= 18 * 18) {
       repairPickup.visible = false;

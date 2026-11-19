@@ -16,10 +16,10 @@ function section(start, end) {
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 }
-const makeGame = reducedMotion => new Function('hitFlashStrength', 'createShieldHud', 'createFlightBoundary', 'physics', 'THREE', 't', 'reducedMotion', `
+const makeGame = () => new Function('hitFlashStrength', 'createShieldHud', 'createFlightBoundary', 'physics', 'THREE', 't', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, 16 / 9, .03, 14000);
   const courseWorldOffset = new THREE.Vector3(), worldStep = new THREE.Vector3();
-  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const playerFlight = physics.createPlayerFlight();
   const { target, flightMotion, flightDirection, flightViewOffset, flightTurn, flightVelocity, flightOrientation, flightTilt } = playerFlight;
   const playerHullRadius = 26, roundDuration = 45, level = 1;
   let started = true, paused = false, roundEnded = false, crashing = false, crashDrifting = false;
@@ -40,7 +40,7 @@ const makeGame = reducedMotion => new Function('hitFlashStrength', 'createShield
   const showFeedback = (message, negative) => messages.push({message, negative});
   const startCrash = object => { crashes.push(object); crashing = true; paused = true; object.visible = false; worldStep.set(0, 0, 0); };
   ${activeFlightSource}
-  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, reducedMotion, progress);
+  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, progress);
   ${section('  const shieldHud =', '  const repairMarker =')}
   ${section('  const boundary =', '  function collideWith(')}
   resetFlightBoundary();
@@ -69,7 +69,7 @@ const makeGame = reducedMotion => new Function('hitFlashStrength', 'createShield
     place(x, y, z = 0) { courseWorldOffset.set(-x, -y, -z); },
     step: dt => step(dt), fly: dt => step(dt, true)
   };
-`)(hitFlashStrength, createShieldHud, createFlightBoundary, physics, THREE, t, reducedMotion);
+`)(hitFlashStrength, createShieldHud, createFlightBoundary, physics, THREE, t);
 
 function radius(game) {
   const position = game.courseWorldOffset.clone().negate();
@@ -81,11 +81,11 @@ function impact(game, dt = .1) {
   game.step(dt);
 }
 // Sample selection uses incoming speed into the wall, not forward speed or the rebound.
-for (const reducedMotion of [false, true]) {
-  const threshold = reducedMotion ? 15 : 150;
+{
+  const threshold = 150;
   for (const outward of [threshold - 1, threshold, threshold + 1]) {
     for (const forward of [400, 5000]) {
-      const game = makeGame(reducedMotion);
+      const game = makeGame();
       game.place(game.radii.x - 26 - .001, 0);
       game.flightMotion.set(outward, 0, -forward);
       game.step(.01);
@@ -103,9 +103,9 @@ function separate(game, dt) {
   game.place(0, 0); game.flightMotion.set(0, 0, -400); game.step(dt);
 }
 
-for (const reducedMotion of [false, true]) {
-  const game = makeGame(reducedMotion), {radii, uniforms} = game;
-  assert.deepEqual(radii.toArray(), reducedMotion ? [600, 360] : [1800, 1100]);
+{
+  const game = makeGame(), {radii, uniforms} = game;
+  assert.deepEqual(radii.toArray(), [1800, 1100]);
   assert.equal(game.boundary.visible, false);
   game.flightMotion.set(0, 0, -400); game.step(.1);
   assert.equal(game.boundary.visible, false);
@@ -115,8 +115,7 @@ for (const reducedMotion of [false, true]) {
   assert.equal(game.boundary.visible, true, 'A projected collision two seconds away reveals the membrane');
   assert.equal(game.state().shield, 100, 'A warning never damages the ship');
   assert.ok(Math.abs(uniforms.warningPoint.value.x - game.courseWorldOffset.x - radii.x) < 1e-8);
-  assert.equal(uniforms.motion.value, reducedMotion ? 0 : 1);
-  assert.equal(uniforms.phase.value, reducedMotion ? 0 : game.state().time);
+  assert.equal(uniforms.phase.value, game.state().time);
   assert.equal(game.boundary.material.depthWrite, false);
   assert.equal(game.boundary.material.side, THREE.DoubleSide);
   const shader = game.boundary.material.fragmentShader;
@@ -128,10 +127,10 @@ for (const reducedMotion of [false, true]) {
   assert.ok(shader.includes('impactGlow * (0.12 + edge * 0.075'), 'The contact adds a localized highlight');
   assert.ok(shader.includes('wave < 3') && shader.includes('float(wave) * 0.12') && shader.includes('* 1100.0'),
     'Three delayed wavefronts spread quickly across the surface');
-  assert.ok(shader.includes('smoothstep(0.08, 0.8, waveAge)') && shader.includes('ripple *= motion;'));
+  assert.ok(shader.includes('smoothstep(0.08, 0.8, waveAge)'));
   assert.ok(!shader.includes('float ripple = contact *'), 'Wave propagation must outlive the contact flash');
   assert.equal(uniforms.contact.value, 0, 'No impact flash, ripple or sparks before contact');
-  assert.equal(uniforms.patchSize.value, reducedMotion ? 260 : 1100, 'Default coverage does not expand with speed');
+  assert.equal(uniforms.patchSize.value, 1100, 'Default coverage does not expand with speed');
   assert.ok(shader.includes('fieldOffset.xy *= 0.8;'), 'Reveal a modest 25% more shield to either side');
   assert.ok(shader.includes('fieldOffset.z *= 0.15;'), 'Keep the original forward horizon');
   assert.ok(shader.includes('p.y += gridOffset;') && shader.includes('p.y * 0.6'), 'Cells and sheen remain world-anchored when recentering the tube');
@@ -146,7 +145,7 @@ for (const reducedMotion of [false, true]) {
   assert.equal(uniforms.contact.value, 1); assert.equal(uniforms.impactAge.value, 0);
   assert.ok(radius(game) < 1, 'The whole hull remains inside');
   assert.ok(game.flightMotion.x < 0 && game.flightOrientation.y > 0, 'Both velocity and heading point inward');
-  assert.equal(game.state().shake, reducedMotion ? 0 : .45);
+  assert.equal(game.state().shake, .45);
   const impactPoint = uniforms.impactPoint.value.clone().sub(game.courseWorldOffset);
   assert.ok(Math.abs(gridAt(-100 + game.courseWorldOffset.z - travelBefore) - gridBefore) < 1e-9,
     'The same surface point retains its hexagon coordinates through forward travel');
@@ -157,7 +156,7 @@ for (const reducedMotion of [false, true]) {
   separate(game, .72);
   assert.equal(game.state().shield, 90);
   assert.equal(uniforms.contact.value, 0, 'The contact flash disappears within .75 seconds');
-  assert.equal(game.boundary.visible, !reducedMotion, 'Travelling ripples remain visible after the contact glow and warning fade');
+  assert.equal(game.boundary.visible, true, 'Travelling ripples remain visible after the contact glow and warning fade');
   game.step(.3); assert.equal(game.boundary.visible, false, 'All wavefronts expire in about 1.1 seconds');
   assert.equal(game.crashes.length, 0);
   const geometry = game.boundary.geometry, material = game.boundary.material, count = game.scene.children.length;
@@ -175,11 +174,11 @@ for (const reducedMotion of [false, true]) {
   assert.ok(game.boundary.position.z - game.boundary.scale.z / 2 < game.camera.position.z - game.camera.far);
   assert.ok(game.boundary.position.z + game.boundary.scale.z / 2 > game.camera.position.z + game.camera.far);
 }
-console.log('PASS extended stable shield coverage, quick ripple fade, world-anchored cells/impacts, reduced motion and bounded reuse');
+console.log('PASS extended stable shield coverage, quick ripple fade, world-anchored cells/impacts motion and bounded reuse');
 
 // The approaching shield is already visible here: entering predictive warning must not shift its horizon.
-for (const reducedMotion of [false, true]) for (const forward of [35, 400, 2500, 5000]) {
-  const game = makeGame(reducedMotion), sideways = reducedMotion ? 10 : 100;
+for (const forward of [35, 400, 2500, 5000]) {
+  const game = makeGame(), sideways = 100;
   const probe = timeToContact => {
     game.place(game.radii.x - 26 - sideways * .85 * (timeToContact + .01), 0);
     game.flightMotion.set(sideways, 0, -forward); game.step(.01);
@@ -187,22 +186,22 @@ for (const reducedMotion of [false, true]) for (const forward of [35, 400, 2500,
   };
   const before = probe(3.0001), after = probe(2.9999);
   assert.ok(before.distanceTo(after) < .1, 'No sudden forward extension at the 3-second warning threshold');
-  assert.equal(game.uniforms.patchSize.value, reducedMotion ? 260 : 1100, 'The default extent stays fixed even at extreme speed');
+  assert.equal(game.uniforms.patchSize.value, 1100, 'The default extent stays fixed even at extreme speed');
   assert.equal(game.boundary.scale.z, game.camera.far * 4);
 }
 console.log('PASS continuous warning horizon and constant default extent at slow/extreme speeds');
 
 // Earlier visibility for parallel near-wall flight and predicted approaches, without damage.
-for (const reducedMotion of [false, true]) {
-  const nearby = makeGame(reducedMotion);
-  nearby.place(nearby.radii.x - 26 - (reducedMotion ? 100 : 450), 0);
+{
+  const nearby = makeGame();
+  nearby.place(nearby.radii.x - 26 - 450, 0);
   nearby.flightMotion.set(0, 0, -400);
   nearby.step(.2);
   assert.equal(nearby.boundary.visible, true, 'Show the wall before the old proximity threshold');
   assert.equal(nearby.state().shield, 100);
 
-  const approach = makeGame(reducedMotion);
-  const outward = reducedMotion ? 70 : 300;
+  const approach = makeGame();
+  const outward = 300;
   approach.place(approach.radii.x - 26 - outward * .85 * 2.9, 0);
   approach.flightMotion.set(outward, 0, -400);
   approach.step(.1);
@@ -212,13 +211,13 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS earlier proximity and predictive warnings without damage');
 
 // Sweep all sides and corners at speeds far above gameplay. No endpoint clamping through the wall.
-for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) for (let i = 0; i < 16; i++) {
-  const game = makeGame(reducedMotion), angle = i * Math.PI / 8;
+for (const fps of [5, 30, 60, 144]) for (let i = 0; i < 16; i++) {
+  const game = makeGame(), angle = i * Math.PI / 8;
   game.place(Math.cos(angle) * (game.radii.x - 26) * .8, Math.sin(angle) * (game.radii.y - 26) * .8);
   game.flightMotion.set(Math.cos(angle) * 300000, Math.sin(angle) * 200000, -400000);
   const forward = game.flightMotion.z, start = game.courseWorldOffset.clone();
   game.step(1 / fps);
-  assert.ok(radius(game) < 1, `Cannot cross the field: reduced=${reducedMotion}, fps=${fps}, angle=${angle}`);
+  assert.ok(radius(game) < 1, `Cannot cross the field: fps=${fps}, angle=${angle}`);
   assert.ok(game.flightMotion.dot(game.normal) < 0, 'Rebound velocity must point back inside');
   assert.ok(new THREE.Vector3(0, 0, -1).applyEuler(game.flightOrientation).dot(game.normal) < 0);
   assert.ok(Math.abs(game.flightMotion.z - forward) < 1e-8, 'Preserve forward momentum at contact');
@@ -229,8 +228,8 @@ for (const reducedMotion of [false, true]) for (const fps of [5, 30, 60, 144]) f
   assert.equal(game.state().shield, 90);
 }
 // Glancing hits near the steering limits must still point inward after heading clamping.
-for (const reducedMotion of [false, true]) {
-  const game = makeGame(reducedMotion);
+{
+  const game = makeGame();
   for (let face = 0; face < 24; face++) for (let yaw = -45; yaw <= 45; yaw += 9) for (let pitch = -45; pitch <= 45; pitch += 15) {
     const angle = face * Math.PI / 12, rx = game.radii.x - 26, ry = game.radii.y - 26;
     const normal = new THREE.Vector3(Math.cos(angle) / rx, Math.sin(angle) / ry, 0).normalize();
@@ -243,7 +242,7 @@ for (const reducedMotion of [false, true]) {
     assert.ok(radius(game) < 1);
   }
 }
-const glance = makeGame(false);
+const glance = makeGame();
 glance.place(glance.radii.x - 27, 0); glance.flightMotion.set(100, 80, -400);
 const incoming = glance.flightMotion.clone(); glance.step(.1);
 const tangent = new THREE.Vector3(-glance.normal.y, glance.normal.x, 0);
@@ -251,8 +250,8 @@ assert.ok(Math.abs(glance.flightMotion.dot(tangent) - incoming.dot(tangent)) < 1
 assert.ok(Math.abs(glance.flightMotion.dot(glance.normal) + .3 * incoming.dot(glance.normal)) < 1e-8);
 console.log('PASS swept high-speed containment on all ellipse faces, forward/tangent momentum, 30% rebound and shared world alignment');
 
-for (const reducedMotion of [false, true]) {
-  const game = makeGame(reducedMotion);
+{
+  const game = makeGame();
   impact(game);
   for (let i = 0; i < 100; i++) impact(game, .02);
   assert.equal(game.state().shield, 90, 'Persistent contact is one impact even after the cooldown expires');
@@ -280,7 +279,7 @@ for (const reducedMotion of [false, true]) {
   assert.equal(game.boundary.visible, false);
   game.step(1); assert.equal(game.crashes.length, 1, 'Use the existing life-loss flow exactly once');
 
-  const smooth = makeGame(reducedMotion);
+  const smooth = makeGame();
   smooth.configure({speed: 400}); smooth.place(smooth.radii.x - 27, 0);
   smooth.flightOrientation.y = -Math.PI / 4;
   smooth.fly(1 / 60);
@@ -297,10 +296,10 @@ for (const reducedMotion of [false, true]) {
 console.log('PASS per-impact damage, cooldown, no continuous drain, smooth camera recovery, pause and single life loss');
 
 // Exercise actual flight/steering and boundary resolution at the production 60 Hz simulation rate.
-for (const reducedMotion of [false, true]) {
+{
   let reference;
   for (const fps of [5, 30, 60, 144]) {
-    const game = makeGame(reducedMotion); game.target.set(1, .6);
+    const game = makeGame(); game.target.set(1, .6);
     let remainder = 0;
     for (let frame = 0; frame < fps * 30; frame++) {
       remainder += 1 / fps;
@@ -317,7 +316,7 @@ for (const reducedMotion of [false, true]) {
   }
 }
 for (const inactive of [{started: false}, {ended: true}, {crashing: true}]) {
-  const game = makeGame(false); game.place(2000, 0); game.flightMotion.set(400, 0, -400);
+  const game = makeGame(); game.place(2000, 0); game.flightMotion.set(400, 0, -400);
   const offset = game.courseWorldOffset.clone(), velocity = game.flightMotion.clone();
   game.configure(inactive); game.step(5);
   assert.equal(game.state().shield, 100); assert.equal(game.crashes.length, 0);

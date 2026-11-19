@@ -152,7 +152,7 @@ assert.equal(meterGame.controls.normalHeld, false, 'Inactive controls reject new
 
 const THREE = await import('../assets/vendor/three.module.js');
 function makeCursor(innerWidth, innerHeight) {
-  const flight = createPlayerFlight(false);
+  const flight = createPlayerFlight();
   const { target, flightTurn, flightTilt } = flight;
   const mouseAim = new THREE.Vector2(), reticle = { style: {} };
   const aim = createPlayerAim({ target, mouseAim, reticle, headingPoint: new THREE.Vector3(), getCameraMode: () => 'clear', viewport: { innerWidth, innerHeight } });
@@ -207,7 +207,6 @@ assert.match(css, /#touch-controls button \{[^}]*width: 92px; height: 92px;/, 'O
 assert.ok(css.includes('#touch-controls #touch-laser { left: -12px; }'), 'Only the orange button moves slightly left');
 assert.match(css, /#touch-joystick\.held \.joystick-knob \{[^}]*transition: transform 40ms linear;/, 'Only the held knob gets a brief visual transition');
 assert.doesNotMatch(css.match(/\.joystick-knob \{[^}]*\}/)[0], /transition:/, 'Release snaps the knob back without a transition');
-assert.ok(css.includes('@media (prefers-reduced-motion: reduce) { #touch-joystick.held .joystick-knob { transition: none; } }'));
 assert.ok(html.includes('<span class="power-dot" aria-hidden="true"></span>'));
 assert.match(css, /\.power-dot \{ width: 34px; height: 34px;[^}]*background: currentColor;[^}]*box-shadow:/);
 assert.ok(!html.includes('power-bars') && !html.includes('power-symbol'), 'Power laser uses a larger glowing center without text or pause-like bars');
@@ -223,7 +222,8 @@ assert.match(landscape, /body\.touch-device \.hud-actions \{ flex-direction: row
 assert.match(landscape, /body\.touch-device #capital-hud \{ width: min\(320px, calc\(100vw - 416px/, 'Boss strip fits between the landscape controls');
 assert.doesNotMatch(landscape.match(/body\.touch-device #capital-hud \{[^}]*\}/)[0], /bottom:/, 'Boss strip stays above the shield, not in the middle of gameplay');
 assert.match(css, /body\.touch-device #capital-health \{ display: block; height: 4px; margin: 0;/, 'Compact boss strip retains its health bar');
-assert.match(css, /body\.touch-device #shield-hud \{[^}]*bottom: calc\(8px \+ env\(safe-area-inset-bottom\)\)/, 'Mobile shield sits close to the bottom without covering the home indicator');
+assert.match(css, /body\.touch-device \{[^}]*--hud-bottom: calc\(8px \+ env\(safe-area-inset-bottom\)\)/, 'Mobile HUD clears the home indicator');
+assert.match(css, /#shield-hud \{[^}]*bottom: var\(--hud-bottom\)/);
 assert.match(css, /body\.touch-device \.brand \{ display: none; \}/, 'Hide the in-game title on touch devices regardless of landscape width');
 const from = gameSource.indexOf('    if (!paused && !roundEnded) {\n      if (controls.normalHeld)');
 const to = gameSource.indexOf('    if (celebrating &&', from);

@@ -13,8 +13,9 @@ import { createShieldHud } from './flight/shield-hud.js';
 import { createSimulationClock, simulationStep } from './flight/simulation-clock.js';
 import { createWeaponHud, createTargetHud } from './weapons/hud.js';
 import { createRoundClock } from './presentation/round-clock.js';
-import { createFrameStats } from './presentation/frame-stats.js';
 import { createRenderDiagnostics } from './platform/render-diagnostics.js';
+
+const devTools = import.meta.env.DEV ? (await import('../studio/game-tools.js')).createGameTools() : null;
 
 const touchMode = matchMedia('(any-pointer: coarse)').matches;
 document.body.classList.toggle('touch-device', touchMode);
@@ -49,7 +50,7 @@ const renderDiagnostics = createRenderDiagnostics({
 try {
   const [THREE, { createSpaceBackground }, { createShipModels, shipTypes },
     { createPlayerCollision }, { createAsteroidEncounter }, physics,
-    { getAsteroidEncounters },
+    { getAsteroidEncounters, roundDuration, firstCheckpointTime },
     { createPlayerProjectiles }, { createTargetLock, aimLaser },
     { createFleetRoster, initialFleetTypes }, { createFleetTraffic }, { createFleetVisuals, setShipOpacity },
     { createCheckpoints, planCheckpoints }, { createFlightBoundary }, { createCapitalEncounter }, { createFleetSpawn }, { createFleetArrivals }, { createFragments }, { createExplosions },
@@ -79,7 +80,6 @@ try {
     import('./course/repair-pickup.js'),
     import('./flight/crash-motion.js')
   ]);
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('#space'), antialias: true });
   // Stop after the current callback, once Three.js has scheduled its next frame.
   stopRendering = () => queueMicrotask(() => renderer.setAnimationLoop(null));
@@ -89,31 +89,23 @@ try {
   scene.background = new THREE.Color('#030711');
   // A clearer showcase keeps the full-size distant ships readable on the menu.
   scene.fog = new THREE.FogExp2('#030711', .0003);
-  const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .03, 14000);
+  // Keep distant hull panels depth-separated without clipping the power laser's glow, 2.4 units ahead.
+  const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 2, 14000);
   scene.add(new THREE.HemisphereLight(0xadcaff, 0x32205c, 3));
   const sun = new THREE.DirectionalLight(0xffddc4, 3);
   sun.position.set(-100, 100, 50);
   scene.add(sun);
   const random = (a, b) => a + Math.random() * (b - a);
   const pick = items => items[Math.floor(Math.random() * items.length)];
-  const { planet, glow, updateSpaceBackground } = createSpaceBackground(scene, camera, reducedMotion);
+  const { planet, glow, updateSpaceBackground } = createSpaceBackground(scene, camera);
 
-  const { createModel, createPlayerModel, fadeAsteroidShader } = createShipModels(glow, reducedMotion);
-  function localTestLevel() {
-    if (!['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return null;
-    const params = new URLSearchParams(location.search);
-    if (!params.has('test')) return null;
-    const value = params.get('level');
-    if (!value || !/^\d+$/.test(value)) return null;
-    const requested = Number(value);
-    return Number.isInteger(requested) && requested >= 1 && requested <= 1000 ? requested : null;
-  }
+  const { createModel, createPlayerModel, fadeAsteroidShader } = createShipModels(glow);
   let { level, score, kills, retries, shield, levelCheckpoint } = newRun();
-  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, reducedMotion, progress);
-  const flightDistanceAt = time => physics.flightDistanceAt(time, { level, reducedMotion, roundDuration, simulationStep });
+  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, progress);
+  const flightDistanceAt = time => physics.flightDistanceAt(time, { level, roundDuration, simulationStep });
   const ships = [];
-  const { updateShipHitFlash, updateEngineVisuals, recordVisibleFleet } = createFleetVisuals(camera, reducedMotion);
-  const spawn = createFleetSpawn({ reducedMotion, random, updateShipHitFlash });
+  const { updateShipHitFlash, updateEngineVisuals, recordVisibleFleet } = createFleetVisuals(camera);
+  const spawn = createFleetSpawn({ random, updateShipHitFlash });
   function resetShip(ship, initial = false, formationSlot = ship.userData.slot, maxAsteroidTier = 3) {
     spawn.resetShip(ship, { level, formationSlot, maxAsteroidTier, openingSpeed: levelFlightSpeed(0),
       flight: initial ? null : { speed: flightMotion.length(), position: camera.position, orientation: flightOrientation,
@@ -132,15 +124,15 @@ try {
 
   // Reuse one ship of each type for the intro; gameplay unlocks the fleet gradually.
   createShip(4);
-  const intro = createIntro({ scene, camera, ships, reducedMotion,
+  const intro = createIntro({ scene, camera, ships,
     introPlay: document.querySelector('#start'), orbitHover: matchMedia('(hover: hover)') });
   intro.update(0, innerWidth, innerHeight, false);
   const canvas = document.querySelector('#effects');
-  const effects = createExplosions({ scene, camera, glow, reducedMotion, random, pick, onBlast: applyExplosionShockwave });
+  const effects = createExplosions({ scene, camera, glow, random, pick, onBlast: applyExplosionShockwave });
   const { explode } = effects;
   let emission = 0;
   let paused = true, speed = 0;
-  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const playerFlight = physics.createPlayerFlight();
   const { target, flightVelocity, flightTurn, flightTilt, flightViewOffset, flightMotion, flightDirection, flightOrientation } = playerFlight;
   const worldStep = new THREE.Vector3();
 
@@ -159,33 +151,28 @@ try {
     // Keep the whole hull, not just its center, until it is safely behind the view.
     return passedBox.copy(bounds).applyMatrix4(passedMatrix).min.z > 100;
   }
-  const fragments = createFragments({ scene, reducedMotion, random, pick, viewFrustum, hasPassedCamera, crossesPlayer });
+  const fragments = createFragments({ scene, random, pick, viewFrustum, hasPassedCamera, crossesPlayer });
   const mouseAim = new THREE.Vector2();
   const headingPoint = new THREE.Vector3();
   const reticle = document.querySelector('.reticle');
-  const roundDuration = 45;
-  const frameStats = createFrameStats(document.querySelector('#performance-hud'), location.search, () =>
-    document.hidden ? 'inactive' : !started ? 'ready' : crashing ? 'collision' : roundEnded ? 'ended' : paused ? 'pause' : null);
   const simulationClock = createSimulationClock(updateSimulation, () => document.hidden || (started && paused && !crashDrifting));
   let lastFrameTime = performance.now();
   function resetSimulationClock() {
     lastFrameTime = performance.now();
     simulationClock.reset();
-    frameStats.reset();
   }
   const progressionTimeScale = roundDuration / 30;
   const roster = createFleetRoster(ships, createShip);
   function isFlightActive() {
     return started && !paused && !roundEnded && !crashing;
   }
-  const traffic = createFleetTraffic({ camera, flightMotion, reducedMotion, random, constrainShipToBoundary, isFlightActive });
+  const traffic = createFleetTraffic({ camera, flightMotion, random, constrainShipToBoundary, isFlightActive });
   const { activeAsteroids } = traffic;
-  const crossingAsteroids = createCrossingAsteroids({ reducedMotion, flightMotion, levelFlightSpeed, playerHullRadius,
+  const crossingAsteroids = createCrossingAsteroids({ flightMotion, levelFlightSpeed, playerHullRadius,
     createShip, resetShip, spawn, forecastFlightPosition });
   function encounterRest(time = gameTime - courseStartTime) {
     return (time >= 10 && time < 15) || (time >= 28 && time < 33);
   }
-  const firstCheckpointTime = 5;
   const courseWorldOffset = new THREE.Vector3(), courseOrigin = new THREE.Vector3();
   let courseStartTime = 0;
   let capitalShip = roster.capital, capitalPending = false;
@@ -193,7 +180,7 @@ try {
   const capitalHealth = document.querySelector('#capital-health');
   const capitalState = document.querySelector('#capital-state');
   const showerWarning = document.querySelector('#shower-warning');
-  const encounter = createAsteroidEncounter({ scene, camera, reducedMotion, random, createShip, resetShip, hasPassedCamera,
+  const encounter = createAsteroidEncounter({ scene, camera, random, createShip, resetShip, hasPassedCamera,
     flightMotion, worldStep, courseOrigin, courseWorldOffset, getGates: () => flightRings, roundDuration, firstCheckpointTime,
     flightDistanceAt, levelFlightSpeed, asteroidType: shipTypes[3], fadeAsteroidShader, playerHullRadius, crossesPlayer, showerWarning });
   const { mesh: showerGrit, previousOrigin: showerPreviousOrigin, debrisField, corridorCenter } = encounter;
@@ -248,9 +235,9 @@ try {
       ship.userData.asteroidTier = 2; ship.scale.setScalar(1.3);
       ship.userData.health = ship.userData.maxHealth = 2;
     }
-    ship.position.set(0, 0, reducedMotion ? -110 : -200).applyEuler(flightOrientation).add(camera.position);
+    ship.position.set(0, 0, -200).applyEuler(flightOrientation).add(camera.position);
     // The ship gently descends into the path; the closer asteroid approaches straight along it.
-    const offset = reducedMotion ? 7 : 28;
+    const offset = 28;
     ship.userData.tutorialEntry = new THREE.Vector3(0, ship.userData.type.asteroid ? 0 : offset, -offset * 1.5)
       .applyEuler(flightOrientation);
     ship.position.add(ship.userData.tutorialEntry);
@@ -300,7 +287,7 @@ try {
     crossingAsteroids.start(0);
     repair.reset();
     courseWorldOffset.set(0, 0, 0); courseOrigin.copy(camera.position); courseStartTime = 0;
-    encounter.reset(level, getAsteroidEncounters(level, reducedMotion));
+    encounter.reset(level, getAsteroidEncounters(level));
     resetFlightRing();
     arrivals.prepareRoutes(0, level, encounter.corridorPlan);
     resetFlightBoundary();
@@ -317,7 +304,7 @@ try {
       position.addScaledVector(velocity, .85 * step);
       const progress = Math.min(1, (gameTime - courseStartTime + (i + 1) * step) / roundDuration);
       forward = physics.advanceFlightMotion(step, { speed: forward, cruiseSpeed: levelFlightSpeed(progress),
-        orientation, turn, input: target, drift, velocity, reducedMotion });
+        orientation, turn, input: target, drift, velocity });
     }
   }
   function updateAsteroidShower(dt = 0) {
@@ -325,7 +312,7 @@ try {
     encounter.update(dt, gameTime, courseStartTime, isFlightActive(), earlyFinale);
   }
   function queueShip(ship) { arrivals.queueShip(ship, gameTime); }
-  const impacts = createAsteroidImpacts({ ships, encounter, fragments, reducedMotion, sample: Math.random });
+  const impacts = createAsteroidImpacts({ ships, encounter, fragments, sample: Math.random });
   function collideAsteroids() {
     return isFlightActive() ? impacts.collideRocks(activeAsteroids, gameTime) : 0;
   }
@@ -408,11 +395,11 @@ try {
   let roundEnded = false, difficulty = 0;
   let celebrating = false;
   let crashing = false, crashTime = 0, crashDrifting = false;
-  const crashMotion = createCrashMotion({ reducedMotion, flightOrientation, flightTilt, flightViewOffset,
+  const crashMotion = createCrashMotion({ flightOrientation, flightTilt, flightViewOffset,
     flightVelocity, flightMotion, flightDirection });
   let shieldHitTime = 0, shieldHitStrength = 1;
   const shieldHit = document.querySelector('#shield-hit');
-  const shieldHud = createShieldHud(document, reducedMotion, shield);
+  const shieldHud = createShieldHud(document, shield);
   function updateShield(animate = true) {
     shieldHud.set(shield, animate);
     renderShieldHud();
@@ -430,7 +417,7 @@ try {
     shieldHud.render(paused);
   }
   const repairMarker = document.querySelector('#repair-marker');
-  const repair = createRepairPickup({ scene, camera, glow, reducedMotion, flightOrientation, flightMotion, worldStep,
+  const repair = createRepairPickup({ scene, camera, glow, flightOrientation, flightMotion, worldStep,
     ships, hasPassedCamera, repairMarker, sample: Math.random });
   function updateRepairPickup(dt) {
     if (!isFlightActive()) { repairMarker.hidden = true; return; }
@@ -441,12 +428,12 @@ try {
     showFeedback(t('repaired', { amount: 25 }));
     playSound('reward');
   }
-  const checkpoints = createCheckpoints({ scene, camera, reducedMotion, onCrossing: resolveFlightRing,
+  const checkpoints = createCheckpoints({ scene, camera, onCrossing: resolveFlightRing,
     flightRingWash: document.querySelector('#flight-ring-wash'), flightRingGuide: document.querySelector('#flight-ring-guide') });
   const flightRings = checkpoints.gates;
   function resetFlightRing(openingComplete = false) {
     const { corridorPlan } = encounter;
-    const plan = planCheckpoints({ level, reducedMotion, firstCheckpointTime, roundDuration, flightDistanceAt, levelFlightSpeed,
+    const plan = planCheckpoints({ level, firstCheckpointTime, roundDuration, flightDistanceAt, levelFlightSpeed,
       openingComplete, corridorPlan, originZ: courseOrigin.z, exitHeightAtCorridor: corridorPlan ? corridorCenter(corridorPlan.length, corridorPlan) : 0 });
     checkpoints.reset(plan, courseOrigin, courseWorldOffset, gameTime, openingComplete);
   }
@@ -477,13 +464,13 @@ try {
     if (isFlightActive()) checkpoints.update(gameTime, worldStep, flightMotion);
   }
   const arrivals = createFleetArrivals({ ships, flightRings, camera, flightMotion, courseOrigin, courseWorldOffset,
-    reducedMotion, random, createShip, resetShip, constrainShipToBoundary, shipCruiseSpeed: traffic.shipCruiseSpeed,
+    random, createShip, resetShip, constrainShipToBoundary, shipCruiseSpeed: traffic.shipCruiseSpeed,
     flightDistanceAt, levelFlightSpeed, firstCheckpointTime, roundDuration, progressionTimeScale });
   function updateRingShipArrivals() {
     if (!isFlightActive() || tutorial.active) return;
     arrivals.updateRingShipArrivals(gameTime, gameTime - courseStartTime, level, encounter.corridorPlan);
   }
-  const boundary = createFlightBoundary({ scene, camera, reducedMotion, courseWorldOffset, flightMotion, playerHullRadius });
+  const boundary = createFlightBoundary({ scene, camera, courseWorldOffset, flightMotion, playerHullRadius });
   const flightBoundary = boundary.mesh;
   function resetFlightBoundary() {
     boundary.reset();
@@ -509,9 +496,9 @@ try {
       startCrash(flightBoundary);
       return;
     }
-    if (!reducedMotion) shake = Math.max(shake, .45);
+    shake = Math.max(shake, .45);
     // Use incoming normal speed, before the rebound; forward/tangential speed is irrelevant.
-    playSound(outward >= (reducedMotion ? 15 : 150) ? 'shieldHard' : 'shieldGlance');
+    playSound(outward >= 150 ? 'shieldHard' : 'shieldGlance');
   }
   function updateFlightBoundary(dt) {
     if (!started || roundEnded || crashing) {
@@ -531,9 +518,9 @@ try {
       startCrash(object);
       return;
     }
-    shake = reducedMotion ? 0 : Math.max(shake, .9 + damage / 60);
+    shake = Math.max(shake, .9 + damage / 60);
     // Push away from the impact; existing steering inertia lets the pilot recover.
-    const impulse = Math.max(speed, 180) * (.15 + damage / 200) * (reducedMotion ? .15 : 1);
+    const impulse = Math.max(speed, 180) * (.15 + damage / 200);
     const pushX = object.position.x === camera.position.x ? (Math.random() < .5 ? -1 : 1) : Math.sign(camera.position.x - object.position.x);
     const pushY = object.position.y === camera.position.y ? (Math.random() < .5 ? -1 : 1) : Math.sign(camera.position.y - object.position.y);
     if (!object.userData.enemyBolt) {
@@ -601,7 +588,8 @@ try {
     sound.setMuted(!soundEnabled);
   }
   async function startGame(withSound = true) {
-    if (globalThis.orbitUpdates?.locked) return;
+    if (globalThis.orbitUpdates?.locked || (devTools && !devTools.levelInput.reportValidity())) return;
+    if (devTools) devTools.levelInput.disabled = true;
     const button = document.querySelector('#start');
     const label = document.querySelector('#start-label');
     button.disabled = true;
@@ -635,14 +623,13 @@ try {
       document.querySelector('#sound').setAttribute('aria-label', t(withSound ? 'soundOff' : 'soundOn'));
       document.querySelector('#sound').title = t(withSound ? 'soundOff' : 'soundOn');
       // Start at the gameplay FOV: widening it over the first frames looks like reversing.
-      camera.fov = reducedMotion ? 70 : 90;
+      camera.fov = 90;
       camera.updateProjectionMatrix();
       started = true; paused = false;
       intro.hide();
       scene.fog.density = .00065;
-      const testLevel = localTestLevel();
-      if (testLevel !== null) {
-        level = testLevel;
+      if (devTools) {
+        level = devTools.levelInput.valueAsNumber;
         tutorialCompleted = true;
       }
       setupLevelFleet();
@@ -664,6 +651,7 @@ try {
       clearTimeout(audioTimeout);
       button.disabled = false;
       languagePicker.disabled = false;
+      if (devTools) devTools.levelInput.disabled = false;
       globalThis.orbitUpdates?.check();
     }
   }
@@ -727,7 +715,7 @@ try {
   scene.add(playerShip);
   updateEngineVisuals(playerShip);
 
-  const flightView = createFlightView(camera, playerShip, reducedMotion);
+  const flightView = createFlightView(camera, playerShip);
   function updateCameraView(dt = 0) {
     viewCamera = flightView.update({ chase: started && cameraMode === 'chase', crashing, playerHullRotation, vertical: target.y }, dt);
   }
@@ -767,8 +755,8 @@ try {
     camera.updateMatrixWorld();
     const impact = new THREE.Vector3(localContact.x > 0 ? 3 : -3, -1, -22).applyMatrix4(camera.matrixWorld);
     effects.crashBurst(impact, flightMotion);
-    flash = reducedMotion ? 0 : .45;
-    shake = reducedMotion ? 0 : 1;
+    flash = .45;
+    shake = 1;
     sound.setAlarm(false);
     syncMusic();
     playSound('explosion', 3, true);
@@ -891,7 +879,7 @@ try {
     sound.setAlarm(false);
     document.querySelector('#impact-label').hidden = true;
     camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0);
-    camera.fov = reducedMotion ? 70 : 90;
+    camera.fov = 90;
     camera.updateProjectionMatrix();
   }
 
@@ -910,7 +898,7 @@ try {
       if (event.code === 'Space') event.preventDefault();
     });
   }
-  const capitalEncounter = createCapitalEncounter({ scene, glow, camera, reducedMotion, flightMotion, flightDirection, traffic,
+  const capitalEncounter = createCapitalEncounter({ scene, glow, camera, flightMotion, flightDirection, traffic,
     worldStep, pathHitsPlayer, onHit: object => { collideWith(object); return crashing; } });
   const clearEnemyBolts = capitalEncounter.clear;
   function updateCapitalShip(ship, dt) {
@@ -937,7 +925,7 @@ try {
     if (!started || roundEnded || crashing) { targetLock.clear(); return; }
     if (paused) return;
     camera.updateMatrixWorld();
-    if (targetLock.update(dt, ships, { camera, viewCamera, mouseAim, width: innerWidth, height: innerHeight, reducedMotion })) {
+    if (targetLock.update(dt, ships, { camera, viewCamera, mouseAim, width: innerWidth, height: innerHeight })) {
       playSound('lock');
     }
   }
@@ -998,8 +986,8 @@ try {
   function applyExplosionShockwave(position, sizeFactor, screenFlash = true) {
     if (!isFlightActive()) return;
     const strength = physics.applyBlastImpulse(position, sizeFactor, {
-      playerPosition: camera.position, speed, drift: flightVelocity, reducedMotion });
-    if (reducedMotion || strength === 0) return;
+      playerPosition: camera.position, speed, drift: flightVelocity });
+    if (strength === 0) return;
     // Keep the strongest kick rather than stacking camera motion from clustered blasts.
     shake = Math.max(shake, Math.min(2.2, strength * 2.2));
     if (screenFlash) flash = Math.max(flash, Math.min(.3, strength * .3));
@@ -1182,7 +1170,7 @@ try {
     else if (paused) speed = 0;
     else {
       hitMarker = Math.max(0, hitMarker - dt);
-      const cruiseSpeed = celebrating ? (reducedMotion ? 35 : 150) : levelFlightSpeed(difficulty);
+      const cruiseSpeed = celebrating ? 150 : levelFlightSpeed(difficulty);
       speed = playerFlight.advance(dt, speed, cruiseSpeed);
       camera.rotation.set(flightTilt.x, flightTilt.y, flightTilt.z, 'YXZ');
       // Follow the aircraft, never cosmetic camera shake.
@@ -1199,7 +1187,7 @@ try {
     }
     flash = Math.max(0, flash - dt * 3);
     updateSpaceBackground(worldStep, level, started, paused, crashDrifting);
-    camera.fov = started && !reducedMotion ? 90 : 70;
+    camera.fov = started ? 90 : 70;
     camera.updateProjectionMatrix();
     danger = false;
     camera.updateMatrixWorld();
@@ -1231,7 +1219,7 @@ try {
     }
     if (celebrating && !paused && (controls.normalHeld || controls.heavyHeld)) {
       const pointer = controls.pointer;
-      emission += dt * (reducedMotion ? 15 : 30);
+      emission += dt * 30;
       const count = Math.floor(emission);
       emission -= count;
       const x = pointer ? pointer.x : (mouseAim.x * .5 + .5) * innerWidth;
@@ -1284,7 +1272,7 @@ try {
     renderRoundClock();
     renderWeaponHud(weapons);
     shieldHit.hidden = shieldHitTime === 0;
-    shieldHit.style.opacity = String((reducedMotion ? .35 : 1) * shieldHitStrength * shieldHitTime / .55);
+    shieldHit.style.opacity = String(shieldHitStrength * shieldHitTime / .55);
     renderShieldHud();
     const cross = document.querySelector('#hit-cross');
     cross.style.opacity = hitMarker > 0 ? 1 : 0;
@@ -1298,7 +1286,7 @@ try {
     // The crash pulse fades; defeat keeps a static dark-red tint beneath the results.
     const crashTint = Math.min(1, crashTime / .45) * Math.min(1, Math.max(0, (2 - crashTime) / 1.2));
     dangerVignette.style.opacity = roundEnded && !celebrating ? 1
-      : crashing ? (reducedMotion ? .3 : .7) * crashTint : danger && !paused && !roundEnded ? .4 : 0;
+      : crashing ? .7 * crashTint : danger && !paused && !roundEnded ? .4 : 0;
     sound.setAlarm(danger && !paused && !roundEnded);
     flightPath.hidden = !started || (roundEnded && !celebrating) || crashing;
     if (!flightPath.hidden) {
@@ -1317,8 +1305,8 @@ try {
       capitalState.textContent = t('capitalStatus', { health: capitalShip.userData.health, max: capitalShip.userData.maxHealth, state: t(capitalShip.userData.retreating ? 'capitalRetreating' : charging ? 'capitalCharging' : 'capitalEnemy') });
     }
     updateTargetLock(0);
-    reticle.classList.toggle('firing', !paused && !reducedMotion && gameTime * 1000 < shotFlashUntil);
-    reticle.classList.toggle('empty', !paused && !reducedMotion && gameTime * 1000 < emptyFlashUntil);
+    reticle.classList.toggle('firing', !paused && gameTime * 1000 < shotFlashUntil);
+    reticle.classList.toggle('empty', !paused && gameTime * 1000 < emptyFlashUntil);
     renderTargetHud(targetLock, viewCamera, innerWidth, innerHeight);
     if (started && cameraMode === 'canopy' && !roundEnded) {
       const bank = THREE.MathUtils.radToDeg(camera.rotation.z);
@@ -1353,7 +1341,7 @@ try {
     started = true; updateRestored = true;
     intro.hide();
     scene.fog.density = .00065;
-    camera.fov = reducedMotion ? 70 : 90; camera.updateProjectionMatrix();
+    camera.fov = 90; camera.updateProjectionMatrix();
     document.body.classList.add('playing');
     document.querySelector('#intro').hidden = true;
     setupLevelFleet();
@@ -1362,7 +1350,7 @@ try {
     updateScore();
   }
   getRenderState = () => ({
-    phase: renderPhase, level, gameTime, started, paused, roundEnded, crashing, reducedMotion, touchMode,
+    phase: renderPhase, level, gameTime, started, paused, roundEnded, crashing, touchMode,
     effects: { particles: effects.particles.length + fragments.rocks.length, shockwaves: effects.shockwaves.length, rockets: projectiles.count, enemyBolts: capitalEncounter.bolts.length },
     visibleShips: ships.filter(ship => ship.visible).length,
     renderer: { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, points: renderer.info.render.points,
@@ -1378,14 +1366,14 @@ try {
   resetSimulationClock();
   renderer.setAnimationLoop(time => {
     renderDiagnostics.runFrame(() => {
+      devTools?.stats.begin();
       const elapsed = Math.max(0, (time - lastFrameTime) / 1000);
       lastFrameTime = time;
       renderPhase = 'simulation';
       simulationClock.advance(elapsed);
       renderPhase = 'render';
       renderFrame();
-      renderPhase = 'frame-stats';
-      frameStats.sample(time);
+      devTools?.stats.end();
     });
   });
   if (renderDiagnostics.failed) stopRendering();

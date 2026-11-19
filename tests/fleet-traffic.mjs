@@ -14,7 +14,7 @@ function rock(x) {
 test('the snapshot lists visible asteroids and keeps their pre-move positions for swept contacts', () => {
   const visible = rock(8), hidden = rock(14);
   hidden.visible = false;
-  const traffic = createFleetTraffic({ reducedMotion: false });
+  const traffic = createFleetTraffic({});
   traffic.snapshotFleet([hidden, visible]);
   assert.deepEqual(traffic.activeAsteroids, [visible]);
   traffic.moveShip(visible, .5, new THREE.Vector3(100, 0, 0), true);
@@ -26,12 +26,12 @@ test('the snapshot lists visible asteroids and keeps their pre-move positions fo
   assert.deepEqual(traffic.activeAsteroids, []);
 });
 
-test('pausing freezes intrinsic drift and hit feedback; reduced motion suppresses only tumbling', () => {
+test('pausing freezes intrinsic drift and hit feedback', () => {
   const ship = rock(0), worldStep = new THREE.Vector3();
-  const traffic = createFleetTraffic({ reducedMotion: true });
+  const traffic = createFleetTraffic({});
   traffic.moveShip(ship, .1, worldStep, false);
   assert.equal(ship.position.x, 0); assert.equal(ship.userData.hitFlash, .2);
   traffic.moveShip(ship, .1, worldStep, true);
   assert.ok(Math.abs(ship.position.x - .6) < 1e-9);
-  assert.equal(ship.rotation.y, 0); assert.equal(ship.userData.hitFlash, .1);
+  assert.equal(ship.rotation.y, .2); assert.equal(ship.userData.hitFlash, .1);
 });

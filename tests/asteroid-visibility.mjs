@@ -15,7 +15,7 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 };
-const makeGame = (reducedMotion = false) => {
+const makeGame = () => {
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
   const { crossesPlayer } = createPlayerCollision(camera.position);
   const hasPassedCamera = new Function('THREE', 'viewCamera', `
@@ -23,7 +23,7 @@ const makeGame = (reducedMotion = false) => {
     return hasPassedCamera;
   `)(THREE, camera);
   const viewFrustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
-  const fragments = createFragments({ scene, reducedMotion, viewFrustum, hasPassedCamera, crossesPlayer,
+  const fragments = createFragments({ scene, viewFrustum, hasPassedCamera, crossesPlayer,
     random: (a,b) => (a+b)/2, pick: values => values[0] });
   const hits = [];
   let paused = false, gameTime = 0;
@@ -44,14 +44,14 @@ const makeGame = (reducedMotion = false) => {
 };
 
 // Test the fleet's render-time sighting rules independently of simulation ticks.
-for (const reducedMotion of [false, true]) {
+{
   const camera = new THREE.PerspectiveCamera(90, 1, .03, 14000);
   const frustum = new THREE.Frustum().setFromProjectionMatrix(camera.projectionMatrix);
-  const { recordVisibleFleet } = createFleetVisuals(camera, reducedMotion);
+  const { recordVisibleFleet } = createFleetVisuals(camera);
   const rock = new THREE.Object3D(), bounds = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
   const data = rock.userData = {type: {asteroid: true}, arrivalOpacity: 1, hull: {opacity: 1},
     collisionBox: bounds, collisionParts: [{bounds}], lastVisibleTime: -Infinity};
-  const range = reducedMotion ? 500 : 2800;
+  const range = 2800;
   rock.position.z = -range;
   recordVisibleFleet([rock], frustum, 1);
   assert.equal(data.lastVisibleTime, -Infinity, 'At the fade-distance cutoff the rock has not been seen');
@@ -106,8 +106,8 @@ assert.equal(game.hasPassedCamera(hull), false, 'Cleanup must also account for c
 assert.ok(source.includes('if (!ship.userData.tutorialTarget && hasPassedCamera(ship)) queueShip(ship);'));
 console.log('PASS whole-hull recycling, camera turns and camera translation');
 
-for (const reducedMotion of [false, true]) {
-  const fragments = makeGame(reducedMotion);
+{
+  const fragments = makeGame();
   const asteroid = { scale: { x: 3.2 }, position: new THREE.Vector3(0, 0, -100) };
   fragments.shatterAsteroid(asteroid);
   const particle = fragments.particles[0], rock = particle.object;
@@ -157,7 +157,7 @@ for (const reducedMotion of [false, true]) {
   fragments.step(0);
   assert.equal(fragments.particles.length, 0, 'Off-screen expiry must free the fragment budget');
 
-  const fx = createExplosions({ scene: fragments.scene, camera: fragments.camera, glow: new THREE.Texture(), reducedMotion,
+  const fx = createExplosions({ scene: fragments.scene, camera: fragments.camera, glow: new THREE.Texture(),
     random: (a,b) => (a+b)/2, pick: values => values[0] });
   fx.dust(asteroid);
   const dust = fx.particles[0].object;
@@ -186,8 +186,8 @@ unseen.step(1 / 60, false);
 assert.ok(unseen.hits.includes(freshRock), 'The same fragment becomes a real hazard after it has been shown');
 console.log('PASS render-only visibility: no unseen fragment hits during a catch-up frame');
 
-for (const reducedMotion of [false, true]) for (const side of [-1, 1]) {
-  const wings = makeGame(reducedMotion);
+for (const side of [-1, 1]) {
+  const wings = makeGame();
   wings.shatterAsteroid({scale: {x: 3.2}, position: new THREE.Vector3(0, 0, -100)});
   for (const p of wings.particles) {
     p.vx = p.vy = p.vz = p.spin = 0; p.age = 1;
@@ -206,4 +206,4 @@ for (const reducedMotion of [false, true]) for (const side of [-1, 1]) {
   wings.step(1 / 60);
   assert.equal(wings.hits.length, 1, 'Overlapping hull probes must not multiply shield damage');
 }
-console.log('PASS real off-screen fragment wing contacts after one second, reduced motion and single-hit damage');
+console.log('PASS real off-screen fragment wing contacts after one second motion and single-hit damage');

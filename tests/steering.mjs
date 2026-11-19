@@ -11,15 +11,15 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 };
-function makeFlight(reducedMotion) {
-  const flight = createPlayerFlight(reducedMotion);
+function makeFlight() {
+  const flight = createPlayerFlight();
   return { ...flight, step: dt => flight.advance(dt, 400, 400) };
 }
 
-for (const reducedMotion of [false, true]) {
+{
   const outcomes = [];
   for (const fps of [5, 30, 60, 120, 144]) {
-    const flight = makeFlight(reducedMotion), yawRate = reducedMotion ? .45 : .9, rate = yawRate * .25;
+    const flight = makeFlight(), yawRate = .9, rate = yawRate * .25;
     flight.target.set(.25, 0); // Keep this inertia test inside the narrower soft-limit region.
     flight.step(.1);
     assert.ok(Math.abs(flight.flightTurn.x) > rate * .3 && Math.abs(flight.flightTurn.x) < rate * .35,
@@ -40,7 +40,7 @@ for (const reducedMotion of [false, true]) {
     outcomes.push(flight.flightOrientation.y);
     assert.ok(Math.abs(flight.flightTilt.z) < .001, 'Wings level after the turn, without undoing yaw');
 
-    const response = makeFlight(reducedMotion), pitchRate = reducedMotion ? .325 : .65;
+    const response = makeFlight(), pitchRate = .65;
     response.target.set(1, 1);
     for (let i = 0; i < Math.ceil(fps * .6); i++) response.step(1 / fps);
     assert.ok(-response.flightTurn.x > yawRate * .9 && response.flightTurn.y > pitchRate * .9,
@@ -57,7 +57,7 @@ for (const reducedMotion of [false, true]) {
 }
 // Full input reaches a sideways bank without widening the heading cone.
 for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) for (const input of [.25, .5, 1]) {
-  const banked = makeFlight(false);
+  const banked = makeFlight();
   banked.target.set(sign * input, 0);
   banked.step(1 / fps);
   const firstBank = THREE.MathUtils.clamp(-sign * input ** 2 * Math.PI / 2 * (1 - Math.exp(-1.2 / fps)),
@@ -74,7 +74,7 @@ for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) for (const input of 
 }
 // A full reversal must respect the same roll-speed cap, not snap through 180 degrees.
 for (const fps of [5, 60, 144]) {
-  const banked = makeFlight(false);
+  const banked = makeFlight();
   banked.target.set(1, 0);
   for (let frame = 0; frame < fps * 20; frame++) banked.step(1 / fps);
   banked.target.set(-1, 0);
@@ -86,18 +86,10 @@ for (const fps of [5, 60, 144]) {
   }
   assert.ok(banked.flightTilt.z > 0, 'A sustained reversal eventually banks the other way');
 }
-for (const sign of [-1, 1]) {
-  const banked = makeFlight(true);
-  banked.flightTurn.x = sign * .45;
-  banked.target.set(-sign, 0);
-  banked.step(.1);
-  const expected = banked.flightTurn.x / .9 * .1 * (1 - Math.exp(-.4));
-  assert.ok(Math.abs(banked.flightTilt.z - expected) < 1e-10, 'Reduced-motion banking stays unchanged');
-}
-console.log('PASS curved ±90° input banking, gentle partial turns, smooth leveling and unchanged reduced motion');
+console.log('PASS curved ±90° input banking, gentle partial turns, smooth leveling');
 const yawLimit = Math.PI / 4, pitchLimit = Math.PI / 4;
-for (const reducedMotion of [false, true]) for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) {
-  const bounded = makeFlight(reducedMotion);
+for (const fps of [5, 60, 144]) for (const sign of [-1, 1]) {
+  const bounded = makeFlight();
   bounded.target.set(sign, sign);
   for (let i = 0; i < fps * 20; i++) {
     bounded.step(1 / fps);
@@ -116,7 +108,7 @@ for (const reducedMotion of [false, true]) for (const fps of [5, 60, 144]) for (
   assert.ok(Math.abs(bounded.flightOrientation.y) < Math.abs(yaw) - .1 && Math.abs(bounded.flightOrientation.x) < Math.abs(pitch) - .08,
     'Turning back into the forward cone stays responsive, without a sticky boundary');
 }
-const soft = makeFlight(false), center = makeFlight(false);
+const soft = makeFlight(), center = makeFlight();
 soft.flightOrientation.y = -42 * Math.PI / 180;
 soft.target.set(1, 0); center.target.set(1, 0);
 soft.step(.1); center.step(.1);
@@ -156,13 +148,16 @@ function pointerEvent(receiver, type, target = canvas, overrides = {}) {
   return event;
 }
 const creditLink = new Element();
-creditLink.closest = selector => selector === '#audio-credits, #render-diagnostics' ? creditLink : null;
+creditLink.closest = selector => selector.split(', ').includes('#audio-credits') ? creditLink : null;
 const reportField = new Element();
-reportField.closest = selector => selector === '#audio-credits, #render-diagnostics' ? reportField : null;
+reportField.closest = selector => selector.split(', ').includes('#render-diagnostics') ? reportField : null;
+const numberField = new Element();
+numberField.closest = selector => selector.split(', ').includes('input') ? numberField : null;
 for (const type of ['contextmenu', 'auxclick', 'dblclick', 'dragstart', 'selectstart', 'wheel', 'gesturestart', 'gesturechange', 'gestureend']) {
   for (const target of [canvas, hud]) {
     assert.equal(pointerEvent(document, type, target).defaultPrevented, true, `${type} is blocked across game surfaces and overlays`);
   }
+  assert.equal(pointerEvent(document, type, numberField).defaultPrevented, false, `${type} remains native inside a number field`);
   assert.equal(pointerEvent(document, type, creditLink).defaultPrevented, false, `${type} remains available inside credits`);
   assert.equal(pointerEvent(document, type, reportField).defaultPrevented, false, `${type} remains available for diagnostic report copying`);
 }
@@ -235,12 +230,12 @@ key('Space'); key('Space', {}, 'keyup'); assert.equal(controls.heavyHeld, false)
 pointerEvent(canvas, 'pointerdown'); key('Space'); window.dispatchEvent(new Event('blur'));
 assert.ok(paused && !controls.normalHeld && !controls.heavyHeld, 'Blur pauses without carrying held fire into resume');
 
-const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.resolve(), frame = queueMicrotask) =>
-  new Function('createPlayerAim', 'THREE', 'fullscreenPreferred', 'enterFullscreen', 'requestAnimationFrame', `
+const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.resolve(), frame = queueMicrotask, levelInput = null) =>
+  new Function('createPlayerAim', 'THREE', 'fullscreenPreferred', 'enterFullscreen', 'requestAnimationFrame', 'levelInput', `
   let innerWidth = 1000, innerHeight = 800, started = false, paused = true, soundEnabled = true;
   const mouseAim = new THREE.Vector2(.7, -.6), target = new THREE.Vector2(.7, -.6), reticle = {style: {}};
   const cameraMode = 'clear', headingPoint = new THREE.Vector3();
-  const camera = new THREE.PerspectiveCamera(), scene = {fog: {}}, reducedMotion = false;
+  const camera = new THREE.PerspectiveCamera(), scene = {fog: {}};
   const elements = new Map(), calls = [], timers = new Map(), errors = [];
   let timerId = 0;
   const setTimeout = (callback, delay) => { timers.set(++timerId, {callback, delay}); return timerId; };
@@ -258,7 +253,9 @@ const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.r
   const intro = {hide() {}};
   let finishAudio = () => {}, lessons = 0;
   const sound = {initAudio: () => { calls.push('audio'); return new Promise(resolve => { finishAudio = resolve; }); }};
-  const t = key => key, localTestLevel = () => null, setupLevelFleet = () => {}, beginFlightTutorial = () => { lessons++; };
+  const t = key => key, devTools = levelInput ? {levelInput} : null;
+  let level = 1, tutorialCompleted = false, fleetLevel;
+  const setupLevelFleet = () => { fleetLevel = level; }, beginFlightTutorial = () => { lessons++; };
   const resetSimulationClock = () => {}, syncMusic = () => {}, playSound = () => {};
   const audioError = error => { errors.push(error.message); audioNotice.hidden = false; };
   const playerAim = createPlayerAim({ target, mouseAim, reticle, headingPoint, getCameraMode: () => cameraMode,
@@ -267,13 +264,26 @@ const makeStart = (fullscreenPreferred = true, enterFullscreen = () => Promise.r
   return {
     start: startGame, loadAudio: () => finishAudio(), remember: value => { if (value) playerAim.remember(value); },
     expireAudio: () => { for (const timer of timers.values()) timer.callback(); },
-    state: () => ({started, paused, lessons, soundEnabled, calls, errors, timerDelays: [...timers.values()].map(timer => timer.delay),
+    state: () => ({started, paused, lessons, tutorialCompleted, fleetLevel, soundEnabled, calls, errors, timerDelays: [...timers.values()].map(timer => timer.delay),
       aim: mouseAim.toArray(), turn: target.toArray(), reticle: reticle.style,
       introHidden: document.querySelector('#intro').hidden, buttonDisabled: document.querySelector('#start').disabled,
       languageDisabled: languagePicker.disabled, label: document.querySelector('#start-label').textContent,
       silentDisabled: document.querySelector('#silent-start').disabled, noticeHidden: audioNotice.hidden})
   };
-`)(createPlayerAim, THREE, fullscreenPreferred, enterFullscreen, frame);
+`)(createPlayerAim, THREE, fullscreenPreferred, enterFullscreen, frame, levelInput);
+for (const value of [1, 5, 1000]) {
+  const game = makeStart(false, undefined, undefined, {valueAsNumber: value, reportValidity: () => true});
+  await game.start(false);
+  assert.equal(game.state().fleetLevel, value);
+  assert.equal(game.state().tutorialCompleted, true, 'Every selected development level skips training');
+}
+const normalStart = makeStart(false);
+await normalStart.start(false);
+assert.equal(normalStart.state().fleetLevel, 1);
+assert.equal(normalStart.state().tutorialCompleted, false, 'Production still starts with training');
+const invalidStart = makeStart(false, undefined, undefined, {reportValidity: () => false});
+await invalidStart.start(false);
+assert.equal(invalidStart.state().started, false, 'Correct an invalid level before starting');
 for (const withSound of [false, true]) {
   let completeFullscreen;
   const frames = [];

@@ -1,17 +1,16 @@
 import { Euler, Quaternion, Vector3 } from '../../assets/vendor/three.module.js';
 
 // Cosmetic flight only. The run owns pause, lives and the transition to results.
-export function createCrashMotion({ reducedMotion, flightOrientation, flightTilt, flightViewOffset,
+export function createCrashMotion({ flightOrientation, flightTilt, flightViewOffset,
   flightVelocity, flightMotion, flightDirection }) {
   const spin = new Vector3(), axis = new Vector3();
   const rotation = new Quaternion(), step = new Quaternion();
   let coastSpeed = 0;
 
   function begin(speed, localContact) {
-    coastSpeed = reducedMotion ? 3 : Math.min(120, speed * .08);
+    coastSpeed = Math.min(120, speed * .08);
     const awayX = localContact.x > 0 ? -1 : 1, awayY = localContact.y > 0 ? -1 : 1;
-    if (reducedMotion) spin.set(0, 0, 0);
-    else spin.set(awayY * .09, -awayX * .12, -awayX * .55);
+    spin.set(awayY * .09, -awayX * .12, -awayX * .55);
     // Bank is part of the attitude: the tumble axes belong to the aircraft.
     rotation.setFromEuler(new Euler(flightOrientation.x, flightOrientation.y, flightTilt.z, 'YXZ'));
   }

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131b">
+  <title>Model Studio · Orbit Rush</title>
+  <link rel="icon" href="/icons/icon.svg">
+  <link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+  <header><span>ORBIT RUSH <b>/</b> DEV TOOLS</span><a href="/">Back to game ↗</a></header>
+  <main>
+    <aside>
+      <h1>Model Studio</h1>
+      <label id="object-label" for="object">On stage</label>
+      <div class="stepper" id="object-controls">
+        <button id="object" type="button" popovertarget="object-list" aria-haspopup="listbox" aria-controls="object-list" aria-expanded="false" aria-labelledby="object-label object"></button>
+        <button class="step-arrow" id="prev-object" aria-label="Previous model" title="Previous model"></button>
+        <button class="step-arrow" id="next-object" aria-label="Next model" title="Next model"></button>
+      </div>
+      <div id="object-list" popover="auto" role="listbox" aria-labelledby="object-label"></div>
+      <div id="variation-controls">
+        <div class="variation-row">
+          <div id="level-controls">
+            <label for="level">Level</label>
+            <div class="stepper">
+              <input id="level" type="number" inputmode="numeric" min="1" max="1000" step="1" placeholder="—" disabled>
+              <button class="step-arrow" id="next-level" aria-label="Next level" title="Next level" disabled></button>
+              <button class="step-arrow" id="prev-level" aria-label="Previous level" title="Previous level" disabled></button>
+            </div>
+          </div>
+          <button id="reroll" aria-label="Reroll" title="Reroll" hidden>
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h2c5 0 8 12 13 12h3m-3-3 3 3-3 3"/>
+              <path d="M3 18h2c2 0 4-2 5.5-4m3-4C15 8 16 6 18 6h3m-3-3 3 3-3 3"/>
+            </svg>
+          </button>
+        </div>
+        <p id="level-timing" hidden>Encounter timing: <span id="timing-text"></span><select id="timing-select" aria-label="Encounter timing" hidden></select></p>
+      </div>
+      <p id="level-note" role="status"></p>
+      <div class="source"><div class="field-label">Model source</div><code id="source"></code></div>
+    </aside>
+    <section aria-label="Preview stage">
+      <canvas tabindex="0" aria-label="Model preview. Arrow keys to orbit, plus and minus to zoom, Home to reset."></canvas>
+      <button id="reset" title="Restore the default camera angle, position and zoom" hidden>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 4v6h6 M4 15a9 9 0 1 0 2-9L2 10"/>
+        </svg>
+        Reset view
+      </button>
+      <div class="caption"><h2 id="title"></h2><p>Drag to orbit · Scroll to zoom · Shift-drag to pan</p></div>
+      <output id="error" role="alert" hidden></output>
+    </section>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

@@ -2,13 +2,13 @@ import * as THREE from '../../assets/vendor/three.module.js';
 import { playerLaserSpeed } from './rules.js';
 
 const projectedShip = new THREE.Vector3();
-export function targetInfo(ship, { camera, viewCamera, mouseAim, width, height, reducedMotion }) {
+export function targetInfo(ship, { camera, viewCamera, mouseAim, width, height }) {
   if (!ship.visible || ship.userData.health <= 0 || ship.userData.arrivalOpacity < .25) return null;
   if (ship.userData.type.asteroid && (ship.userData.hull.opacity < .25
-    || ship.position.distanceToSquared(camera.position) > Math.pow(reducedMotion ? 500 : 2800, 2))) return null;
+    || ship.position.distanceToSquared(camera.position) > Math.pow(2800, 2))) return null;
   // Target brackets must not reveal traffic before its distant arrival fade ends.
   if (!ship.userData.type.asteroid && !ship.userData.type.capital
-    && ship.position.distanceToSquared(camera.position) > Math.pow(reducedMotion ? 900 : 2600, 2)) return null;
+    && ship.position.distanceToSquared(camera.position) > Math.pow(2600, 2)) return null;
   projectedShip.copy(ship.position).project(viewCamera);
   if (projectedShip.z <= -1 || projectedShip.z >= 1 || Math.abs(projectedShip.x) > 1 || Math.abs(projectedShip.y) > 1) return null;
   const depth = -ship.position.clone().applyMatrix4(viewCamera.matrixWorldInverse).z;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../assets/vendor/three.module.js';
 import { createIntro } from '../src/presentation/intro.js';
 
-function preview(width = 1280, height = 720, reducedMotion = false) {
+function preview(width = 1280, height = 720) {
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, width / height, .03, 14000);
   const ships = Array.from({length:9}, () => {
     const ship = new THREE.Group(); ship.userData.type = {scale:1}; return ship;
@@ -11,7 +11,7 @@ function preview(width = 1280, height = 720, reducedMotion = false) {
   for (const i of [4, 7]) ships[i].add(new THREE.Mesh(new THREE.IcosahedronGeometry(1), new THREE.MeshBasicMaterial()));
   const button = { hovered:false, disabled:false, matches() { return this.hovered; } };
   const hover = { matches:true };
-  const intro = createIntro({ scene, camera, ships, reducedMotion, introPlay:button, orbitHover:hover });
+  const intro = createIntro({ scene, camera, ships, introPlay:button, orbitHover:hover });
   const belt = scene.children[0];
   const step = (dt, hidden = false) => intro.update(dt, width, height, hidden);
   const diameter = Math.min(width * .98, height * 1.2, 1040), tilt = -24 * Math.PI / 180;
@@ -77,10 +77,10 @@ for (const mode of ['hover', 'disabled', 'touch']) {
   for (let i=0;i<600;i++) orbit.step(tick);
   assert.ok(Math.abs(speed(orbit, tick) / idle - 1) < .04);
 }
-for (const reduced of [false,true]) {
-  const orbit = preview(390,844,reduced);
+{
+  const orbit = preview(390,844);
   const frames = orbit.belt.children.map(r => [r.position.clone(),r.quaternion.clone()]);
-  orbit.button.hovered = true; orbit.step(10, !reduced);
+  orbit.button.hovered = true; orbit.step(10, true);
   orbit.belt.children.forEach((r,i) => {
     assert.ok(r.position.length() > 0 && r.position.equals(frames[i][0]) && r.quaternion.equals(frames[i][1]));
   });

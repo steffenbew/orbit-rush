@@ -2,7 +2,7 @@ import { simulationStep } from '../flight/simulation-clock.js';
 
 const openingDelay = 2, interval = 5 / .75, minimumApproach = 3;
 
-export function createCrossingAsteroids({ reducedMotion, flightMotion, levelFlightSpeed, playerHullRadius,
+export function createCrossingAsteroids({ flightMotion, levelFlightSpeed, playerHullRadius,
   createShip, resetShip, spawn, forecastFlightPosition }) {
   const rocks = [];
   let nextTime = openingDelay;
@@ -23,7 +23,7 @@ export function createCrossingAsteroids({ reducedMotion, flightMotion, levelFlig
       rock.userData.scheduledHazard = true; // Not a regular fleet reinforcement.
       rocks.push(rock);
     }
-    resetShip(rock, false, rock.userData.slot, reducedMotion ? 1 : 3);
+    resetShip(rock, false, rock.userData.slot, 3);
     // Even if the pilot is briefly over cruise speed, start beyond the fade boundary.
     const approachSpeed = Math.min(speed, cruise) * .85;
     const distance = spawn.asteroidArrivalDistance(rock) + speed * .85 * .3;

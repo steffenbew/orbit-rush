@@ -7,8 +7,8 @@ import {THREE, makeGame, randomState} from './helpers/flight-game.mjs';
 const full = process.env.ORBIT_TEST_FULL === '1';
 
 const orientations = [], positions = [], fractions = [], styles = new Set();
-for (const reduced of [false, true]) for (const level of [1, 2, 4, 5, 6, 7, 9, 12, 20]) {
-  const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
+for (const level of [1, 2, 4, 5, 6, 7, 9, 12, 20]) {
+  const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
   if (level === 1) {
     assert.equal(game.grit.visible, false, 'No formation at the start of level one');
     game.setTime(game.getAsteroidEncounters()[0].prepare); game.updateAsteroidShower(0);
@@ -18,12 +18,12 @@ for (const reduced of [false, true]) for (const level of [1, 2, 4, 5, 6, 7, 9, 1
   styles.add(first.diffuse);
   if (level === 1) assert.equal(first.diffuse, false, 'Preserve the approved compact introductory field');
   const orientation = game.fieldImpacts[0].drift.clone().normalize();
-  if (!reduced) { orientations.push(orientation); positions.push(first.position.clone()); fractions.push(-first.position.z / plan.length); }
+  orientations.push(orientation); positions.push(first.position.clone()); fractions.push(-first.position.z / plan.length);
   const placement = first.position.clone();
   if (level < 6) assert.equal(game.fieldShower.length, 0);
   else {
-    assert.equal(game.fieldShower.length, reduced ? 2 : 4 + game.getAsteroidEncounters()[0].strength * 2);
-    assert.ok(game.fieldShower.every(rock => rock.visible && rock.userData.courseVelocity.length() > (reduced ? 20 : 200)));
+    assert.equal(game.fieldShower.length, 4 + game.getAsteroidEncounters()[0].strength * 2);
+    assert.ok(game.fieldShower.every(rock => rock.visible && rock.userData.courseVelocity.length() > 200));
     assert.ok(first.rocks.every(rock => rock.userData.courseVelocity.lengthSq() === 0), 'Field is initially anchored while the crossing shower already moves');
   }
   game.setupLevelFleet(); game.setTime(game.getAsteroidEncounters()[0].prepare); game.updateAsteroidShower(0);
@@ -55,8 +55,8 @@ console.log('PASS delayed introduction, random 3D orientations, off-center/depth
   assert.equal(rockHitsShip(rock, ship, crossesHull), false, 'Inside the bounding box but just outside the triangle edge');
 }
 
-function pair(reduced = false, sizeA = 1.3, sizeB = 3.5, speed = 100) {
-  const game = makeGame(reduced); game.setLevel(2); game.setupLevelFleet();
+function pair(sizeA = 1.3, sizeB = 3.5, speed = 100) {
+  const game = makeGame(); game.setLevel(2); game.setupLevelFleet();
   game.ships.forEach(ship => ship.visible = false);
   const a = game.eventAsteroid(), b = game.eventAsteroid();
   for (const [rock, size] of [[a, sizeA], [b, sizeB]]) {
@@ -68,8 +68,8 @@ function pair(reduced = false, sizeA = 1.3, sizeB = 3.5, speed = 100) {
   game.activeAsteroids.push(a, b);
   return {game, a, b, distance};
 }
-for (const reduced of [false, true]) {
-  const {game, a, b, distance} = pair(reduced, 1.3, 3.5, reduced ? 10 : 100);
+{
+  const {game, a, b, distance} = pair(1.3, 3.5, 100);
   const before = a.userData.courseVelocity.x * a.scale.x ** 3;
   assert.equal(game.collideAsteroids(), 1);
   assert.ok(a.userData.courseVelocity.x < 0 && b.userData.courseVelocity.x > 0, 'Small impactor rebounds and dislodges the larger stationary rock');
@@ -100,7 +100,7 @@ for (const state of ['setPaused', 'setRoundEnded', 'setCrashing']) {
   assert.equal(resolveRockImpact(a, b), null, 'Shared world travel cannot impart collision energy');
 }
 {
-  const {game, a} = pair(false, 3.5);
+  const {game, a} = pair(3.5);
   for (let i = 0; i < 11; i++) game.eventAsteroid().userData.impactFragment = true;
   assert.equal(game.fractureImpactAsteroid(a, new THREE.Vector3(1, 0, 0)), false, 'An unsplit body needs room for both resulting pieces');
   game.showerPool.find(rock => rock.userData.impactFragment).visible = false;
@@ -109,7 +109,7 @@ for (const state of ['setPaused', 'setRoundEnded', 'setCrashing']) {
 }
 // The seeded collision roll lands on either side of the fracture threshold.
 for (const [seed, splits] of [[871, false], [22646, true]]) {
-  const {game, a, b} = pair(false, 1.3, 3.5, 350); randomState.seed = seed;
+  const {game, a, b} = pair(1.3, 3.5, 350); randomState.seed = seed;
   const volume = a.scale.x ** 3 + b.scale.x ** 3;
   game.collideAsteroids();
   const visible = game.showerPool.filter(rock => rock.visible);
@@ -124,8 +124,8 @@ for (const [seed, splits] of [[871, false], [22646, true]]) {
 }
 console.log('PASS momentum transfer, rebound, swept contacts, lifecycle guards and occasional volume-conserving fracture without explosions');
 
-for (const reduced of [false, true]) {
-  const game = makeGame(reduced); game.setLevel(6); game.setupLevelFleet(); game.updateAsteroidShower(0);
+{
+  const game = makeGame(); game.setLevel(6); game.setupLevelFleet(); game.updateAsteroidShower(0);
   const piece = game.showerRocks.find(rock => rock.size > 1), parent = game.eventAsteroid();
   const origin = game.coursePlan().origin, center = piece.position.clone().add(origin);
   parent.scale.setScalar(1.3); parent.position.copy(center).add(new THREE.Vector3(-2, 0, 0));
@@ -139,8 +139,8 @@ for (const reduced of [false, true]) {
   assert.equal(fragment.worldFactor, .85); assert.equal(fragment.object.userData.collisionParts.length, 1);
   assert.deepEqual(game.explosions, []); assert.deepEqual(game.sounds, []);
 }
-for (const reduced of [false, true]) for (const level of full ? [6, 8, 11] : [6]) for (const fps of full ? [5, 60, 144] : [5]) {
-  const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
+for (const level of full ? [6, 8, 11] : [6]) for (const fps of full ? [5, 60, 144] : [5]) {
+  const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
   let contacts = 0;
   for (let frame = 1; frame <= 9 * fps; frame++) {
     game.setTime(frame / fps); game.activeAsteroids.length = 0;

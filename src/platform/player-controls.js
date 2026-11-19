@@ -69,10 +69,10 @@ export function createPlayerControls({ canvas, touchRoot, touchMode, aim, mode, 
   });
   window.addEventListener('keyup', event => { if (event.code === 'Space') spaceHeld = false; });
 
-  // Suppress native gestures across the game UI, except links and diagnostic report copying.
+  // Keep game gestures off native inputs, credit links and the copyable diagnostics.
   for (const name of ['contextmenu', 'auxclick', 'dblclick', 'dragstart', 'selectstart', 'wheel', 'gesturestart', 'gesturechange', 'gestureend']) {
     document.addEventListener(name, event => {
-      if (!event.target.closest('#audio-credits, #render-diagnostics')) event.preventDefault();
+      if (!event.target.closest('input, #audio-credits, #render-diagnostics')) event.preventDefault();
     }, { passive: false });
   }
   function ignorePointer(event, current) {

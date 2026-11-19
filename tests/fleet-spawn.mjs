@@ -8,9 +8,9 @@ import { createFleetVisuals, setShipOpacity } from '../src/fleet/visuals.js';
 test('formation needs no live flight; a reused arrival starts on the current heading with fresh collision and hit state', () => {
   const pilot = new PerspectiveCamera();
   pilot.position.set(5, -3, 12); pilot.rotation.y = .4;
-  const { createModel } = createShipModels(new Texture(), false);
-  const { updateShipHitFlash } = createFleetVisuals(pilot, false);
-  const { resetShip } = createFleetSpawn({ reducedMotion: false, random: (a, b) => (a + b) / 2, updateShipHitFlash });
+  const { createModel } = createShipModels(new Texture());
+  const { updateShipHitFlash } = createFleetVisuals(pilot);
+  const { resetShip } = createFleetSpawn({ random: (a, b) => (a + b) / 2, updateShipHitFlash });
   const ship = createModel(2, 0), data = ship.userData;
   const opening = { level: 1, openingSpeed: 400, formationSlot: 0 };
   resetShip(ship, opening);

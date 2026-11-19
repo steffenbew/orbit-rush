@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createSpaceBackground } from '../src/presentation/space-background.js';
 import * as THREE from '../assets/vendor/three.module.js';
 
-function makeSky(reducedMotion = false) {
+function makeSky() {
   let seed = 14767;
   const sample = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
@@ -13,7 +13,7 @@ function makeSky(reducedMotion = false) {
   globalThis.document = { createElement: () => ({ getContext: () => ({
     createRadialGradient: () => ({ addColorStop() {} }), fillRect() {}
   }) }) };
-  const sky = createSpaceBackground(scene, camera, reducedMotion, sample);
+  const sky = createSpaceBackground(scene, camera, sample);
   const starGeometry = sky.stars.geometry, middleGeometry = sky.middleStars.geometry, dustGeometry = sky.flightDust.geometry;
   return { ...sky, scene, camera, worldStep, starGeometry, middleGeometry, dustGeometry,
     starPositions: starGeometry.attributes.position.array, middlePositions: middleGeometry.attributes.position.array,
@@ -219,13 +219,3 @@ test('no disc/ring or directional density holes after five minutes of flight', {
   assert.equal(longFlight.starPositions, positions); assert.equal(longFlight.stars.geometry, geometry);
   assert.equal(longFlight.starGeometry.attributes.position.count, 3500, 'Do not allocate a growing star field');
 });
-
-const reduced = makeSky(true);
-reduced.setStarted(true); reduced.setPaused(false); reduced.worldStep.set(10, 5, 100);
-const reducedDust = reduced.dustPositions.slice(), reducedMiddle = reduced.middlePositions.slice(), reducedFar = reduced.starPositions.slice();
-reduced.updateSpaceBackground();
-assert.equal(reduced.flightDust.visible, false); assert.equal(reduced.middleStars.visible, false);
-assert.deepEqual(reduced.dustPositions, reducedDust); assert.deepEqual(reduced.middlePositions, reducedMiddle);
-assert.deepEqual(reduced.starPositions, reducedFar); assert.equal(reduced.starGeometry.attributes.position.version, 0);
-assert.equal(reduced.distantSky.visible, true);
-console.log('PASS reduced motion preserves the static sky and disables all travel parallax');

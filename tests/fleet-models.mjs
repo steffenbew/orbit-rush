@@ -4,7 +4,7 @@ import { Texture } from '../assets/vendor/three.module.js';
 import { createShipModels, shipTypes } from '../src/fleet/models.js';
 
 test('fleet models can be built without a scene, renderer or running simulation', () => {
-  const models = createShipModels(new Texture(), false);
+  const models = createShipModels(new Texture());
   for (const [index, type] of shipTypes.entries()) {
     const ship = models.createModel(index, index);
     assert.equal(ship.parent, null);
@@ -20,7 +20,7 @@ test('fleet models can be built without a scene, renderer or running simulation'
 });
 
 test('pooled asteroids reuse geometry and collision data, but own their hull material', () => {
-  const models = createShipModels(new Texture(), true);
+  const models = createShipModels(new Texture());
   const type = shipTypes.findIndex(type => type.asteroid);
   const original = models.createModel(4, type), copy = models.createModel(8, type, original);
   assert.equal(copy.children[0].geometry, original.children[0].geometry);

@@ -7,9 +7,8 @@ const camera = new THREE.PerspectiveCamera();
 camera.position.set(3, 2, -5);
 camera.rotation.set(.2, -.4, 1.3, 'YXZ');
 const ship = new THREE.Group();
-const normalView = createFlightView(camera, ship, false), reducedView = createFlightView(camera, ship, true);
+const flightView = createFlightView(camera, ship);
 function view(mode, inFlight, vertical = 0, dt = 0) {
-  const flightView = camera.fov === 70 ? reducedView : normalView;
   return flightView.update({ chase: inFlight && mode === 'chase', crashing: false, playerHullRotation: camera.quaternion, vertical }, dt);
 }
 
@@ -64,7 +63,7 @@ for (const fov of [70, 90]) {
     assert.ok(Math.abs(silhouette() - neutral) < .001, 'Centering smoothly returns the model to its flight orientation');
   }
 }
-console.log('PASS visible nose-up/down pitch, reduced motion, leveling and unchanged aim');
+console.log('PASS visible nose-up/down pitch motion, leveling and unchanged aim');
 
 // An off-center projected nose must not cost steering range or stretch the stick circle.
 const heading = new THREE.Vector2(.5, -.25), stick = new THREE.Vector2(), mouseTurn = new THREE.Vector2();

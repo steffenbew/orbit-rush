@@ -18,8 +18,8 @@ const section = (start, end) => {
   return source.slice(from, to);
 };
 for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]]) {
-  for (const reducedMotion of [false, true]) {
-    const intro = new Function('createIntro', 'createFleetSpawn', 'initialFleetTypes', 'createFleetVisuals', 'setShipOpacity', 'newRun', 'physics', 'createShipModels', 'shipTypes', 'THREE', 'innerWidth', 'innerHeight', 'reducedMotion', `
+  {
+    const intro = new Function('createIntro', 'createFleetSpawn', 'initialFleetTypes', 'createFleetVisuals', 'setShipOpacity', 'newRun', 'physics', 'createShipModels', 'shipTypes', 'THREE', 'innerWidth', 'innerHeight', `
       const scene = new THREE.Scene(), glow = new THREE.Texture();
       const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .03, 14000);
       const random = (a, b) => (a + b) / 2;
@@ -30,7 +30,7 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
       const flightMotion = new THREE.Vector3();
       return { ships, camera, step: dt => intro.update(dt, innerWidth, innerHeight, document.hidden),
         hide: () => { document.hidden = true; }, resume: () => { document.hidden = false; } };
-    `)(createIntro, createFleetSpawn, initialFleetTypes, createFleetVisuals, setShipOpacity, newRun, physics, createShipModels, shipTypes, THREE, width, height, reducedMotion);
+    `)(createIntro, createFleetSpawn, initialFleetTypes, createFleetVisuals, setShipOpacity, newRun, physics, createShipModels, shipTypes, THREE, width, height);
     const visible = intro.ships.filter(ship => ship.visible);
     assert.equal(visible.length, 4, 'Show all four ship classes on the home screen');
     assert.equal(new Set(visible.map(ship => ship.userData.type)).size, 4);
@@ -46,8 +46,8 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
     assert.equal(intro.ships.filter(ship => ship.userData.type.capital).length, 1);
     const opening = boss.position.clone(), rotation = boss.quaternion.clone();
     intro.step(2);
-    assert.equal(boss.position.equals(opening), reducedMotion);
-    assert.equal(boss.quaternion.equals(rotation), reducedMotion);
+    assert.equal(boss.position.equals(opening), false);
+    assert.equal(boss.quaternion.equals(rotation), false);
     assert.equal(boss.userData.fireCooldown, 2.8, 'The preview must not run boss attacks');
     intro.hide(); const hiddenPosition = boss.position.clone(); intro.step(2);
     assert.ok(boss.position.equals(hiddenPosition), 'Hidden tabs freeze the preview');
@@ -83,7 +83,7 @@ for (const [width, height] of [[1280, 720], [1920, 1080], [390, 844], [600, 800]
   }
 }
 console.log('PASS four-class home-screen fleet, boss visibility, boot safety, responsive placement and no intro attacks');
-console.log('PASS full gameplay scales, projected size hierarchy, reduced-motion and hidden-tab preview freezes');
+console.log('PASS full gameplay scales, projected size hierarchy, hidden-tab preview freezes');
 assert.match(source, /scene\.fog = new THREE\.FogExp2\('#030711', \.0003\)/);
 assert.match(section('  async function startGame(', "  document.querySelector('#start').addEventListener"), /scene\.fog\.density = \.00065;/,
   'The clearer menu fog must not change gameplay visibility');

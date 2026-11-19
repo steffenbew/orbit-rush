@@ -31,7 +31,7 @@ export function stickAimPixels(stick, mode, heading, width, height) {
 }
 
 // Only the chase camera and exterior model move here. The pilot camera stays at the hull.
-export function createFlightView(camera, playerShip, reducedMotion) {
+export function createFlightView(camera, playerShip) {
   const chaseCamera = camera.clone();
   let visualPitch = 0;
   function update({ chase, crashing, playerHullRotation, vertical }, dt) {
@@ -41,7 +41,7 @@ export function createFlightView(camera, playerShip, reducedMotion) {
     playerShip.quaternion.copy(crashing ? camera.quaternion : playerHullRotation);
     // Tip only the visible model. The hull, weapon aim and chase camera keep their flight orientation.
     if (!crashing) {
-      const pitch = vertical * ((reducedMotion ? 10 : 36) * Math.PI / 180);
+      const pitch = vertical * (36 * Math.PI / 180);
       visualPitch += (pitch - visualPitch) * (1 - Math.exp(-7 * dt));
       playerShip.rotateX(Math.PI / 30 + visualPitch); // Nose-up trim on the exterior model only.
     }
@@ -57,7 +57,7 @@ export function createFlightView(camera, playerShip, reducedMotion) {
     // Follow the ship's heading with the boom, but aim slightly short of it.
     // This lets climbs and turns move the ship across the view as well as tilt its nose.
     if (!crashing) {
-      const follow = reducedMotion ? .95 : .85;
+      const follow = .85;
       chaseCamera.rotation.x *= follow;
       chaseCamera.rotation.y *= follow;
     }

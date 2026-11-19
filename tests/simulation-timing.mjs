@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { activeFlightSource } from './helpers/app-source.mjs';
 import * as physics from '../src/flight/physics.js';
 import { advanceWeapons, createWeapons, requestShot } from '../src/weapons/rules.js';
-import { createFrameStats } from '../src/presentation/frame-stats.js';
 import { createSimulationClock } from '../src/flight/simulation-clock.js';
 import assert from 'node:assert/strict';
 
@@ -15,12 +14,13 @@ const section = (start, end) => {
   assert.ok(from >= 0 && to > from, `Missing source section: ${start}`);
   return source.slice(from, to);
 };
-const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('createFrameStats', 'createSimulationClock', 'advanceWeapons', 'createWeapons', 'requestShot', 'physics', 'THREE', 'reducedMotion', 'trainingTime', `
+const makeGame = (trainingTime = 0) => new Function('createSimulationClock', 'advanceWeapons', 'createWeapons', 'requestShot', 'physics', 'THREE', 'trainingTime', `
   let wallTime = 0, frameCallback, renders = 0, steps = 0;
-  const hud = {}, location = {search: '?test'};
-  const performance = { now: () => wallTime }, document = { hidden: false, querySelector: () => hud };
+  let frameStarts = 0, frameEnds = 0;
+  const devTools = {stats: {begin() { frameStarts++; }, end() { frameEnds++; }}};
+  const performance = { now: () => wallTime }, document = { hidden: false };
   const renderer = { setAnimationLoop: callback => { frameCallback = callback; } };
-  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const playerFlight = physics.createPlayerFlight();
   const { target, flightVelocity, flightMotion, flightTurn, flightOrientation } = playerFlight;
   target.set(.6, .2);
   const worldStep = new THREE.Vector3(), distance = new THREE.Vector3();
@@ -38,9 +38,9 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('crea
   let firingHeavy = false;
   const playSound = name => { if (name === 'shot') shots.push({heavy: firingHeavy, time: gameTime}); };
   const finishRound = () => { gameTime = courseStartTime + roundDuration; roundEnded = true; paused = true; };
-  ${section('  const frameStats =', '  const progressionTimeScale =')}
+  ${section('  const simulationClock =', '  const progressionTimeScale =')}
   ${activeFlightSource}
-  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, reducedMotion, progress);
+  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, progress);
   const courseWorldOffset = new THREE.Vector3();
   let courseStartTime = 0;
   const weapons = createWeapons();
@@ -61,7 +61,7 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('crea
   const renderFrame = () => { renders++; };
   ${section('  resetSimulationClock();\n  renderer.setAnimationLoop(', '} catch (error)')}
   return {
-    target, resetSimulationClock, hud,
+    target, resetSimulationClock, sampledFrames: () => [frameStarts, frameEnds],
     beginTraining: () => { tutorial.active = true; },
     frame: dt => { wallTime += dt * 1000; frameCallback(wallTime); },
     elapseWithoutFrame: dt => { wallTime += dt * 1000; },
@@ -71,7 +71,7 @@ const makeGame = (reducedMotion = false, trainingTime = 0) => new Function('crea
     state: () => ({gameTime, speed, velocity: flightVelocity.toArray(), turn: flightTurn.toArray(), orientation: flightOrientation.toArray(), distance: distance.toArray(),
       heat: weapons.heat, overheated: weapons.overheated, heavyEnergy: weapons.heavyCharge, shots, steps, renders, roundEnded, remainder: simulationClock.remainder})
   };
-`)(createFrameStats, createSimulationClock, advanceWeapons, createWeapons, requestShot, physics, THREE, reducedMotion, trainingTime);
+`)(createSimulationClock, advanceWeapons, createWeapons, requestShot, physics, THREE, trainingTime);
 
 function advance(game, duration, frameTimes) {
   let elapsed = 0, frame = 0;
@@ -87,10 +87,10 @@ function simulatedState(game) {
 }
 const schedules = [5, 10, 15, 20, 30, 60, 120, 144].map(fps => [1 / fps]);
 schedules.push([.008, .1, .024, .2, .005, .04]);
-for (const reducedMotion of [false, true]) {
+{
   let reference;
   for (const schedule of schedules) {
-    const game = makeGame(reducedMotion); game.fire(true, true);
+    const game = makeGame(); game.fire(true, true);
     advance(game, 2, schedule);
     game.target.set(-.6, -.4);
     advance(game, 2, schedule);
@@ -113,9 +113,7 @@ const monitor = makeGame();
 monitor.frame(0); monitor.frame(8);
 assert.equal(monitor.state().renders, 2);
 assert.equal(monitor.state().steps, 15);
-assert.equal(monitor.hud.textContent, '0.1 FPS · 8000 ms', 'Report elapsed render time, not bounded physics catch-up');
-monitor.resetSimulationClock();
-assert.equal(monitor.hud.textContent, '— FPS · — ms');
+assert.deepEqual(monitor.sampledFrames(), [2, 2], 'Stats.js measures each displayed frame once, not each catch-up tick');
 
 const training = makeGame(); training.beginTraining();
 advance(training, 46, [1 / 30]);
@@ -142,7 +140,7 @@ assert.deepEqual(simulatedState(stalled), simulatedState(quarter), 'A long stall
 assert.equal(stalled.state().steps, 15); assert.equal(stalled.state().renders, 1, 'Catch-up must draw only once');
 stalled.frame(1 / 60); assert.equal(stalled.state().steps, 16, 'Discard excess stall time, rather than draining it into later frames');
 for (const fps of [5, 10, 20, 60, 144]) for (const trainingTime of [0, 53.1, 180]) {
-  const game = makeGame(false, trainingTime);
+  const game = makeGame(trainingTime);
   advance(game, 44, [1 / fps]); assert.equal(game.state().roundEnded, false);
   advance(game, 1, [1 / fps]);
   assert.equal(game.state().roundEnded, true); assert.equal(game.state().gameTime, trainingTime + 45);

@@ -165,7 +165,6 @@ assert.ok(css.includes('.language-picker:has(input[value="de"]:checked) .languag
 assert.ok(intro.includes('<div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>'), 'Decorative dark text is clipped together with the mint background, without duplicate accessible labels');
 assert.ok(!css.includes('transition: color .25s'), 'Text contrast follows the pill position, never a word-wide fade');
 assert.ok(css.includes('transition: clip-path .45s cubic-bezier(.22, 1, .36, 1);'), 'Language movement settles without overshoot');
-assert.ok(css.includes('.language-selection { transition: none; }'), 'Language animation respects reduced motion');
 assert.ok(css.includes('.language-picker:disabled .language-selection { transition: none; }'), 'Automatic language selection during loading must not slide');
 console.log('PASS browser-language preselection on each load, manual switching, native pill controls and active-run guard');
 

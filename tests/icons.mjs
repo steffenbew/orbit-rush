@@ -33,7 +33,6 @@ assert.ok(!html.includes('logo-ring') && !html.includes('logo-letter'), 'Remove 
 assert.match(css, /#start:hover:not\(:disabled\) \{ transform: translate\(-50%, -50%\) scale\(1\.12\)/, 'Hover grows the play button without changing layout');
 assert.match(css, /transition: transform \.5s cubic-bezier\(\.2, 1\.5, \.35, 1\)/, 'Play hover gently overshoots and settles');
 assert.match(css, /#start:active:not\(:disabled\) \{ transform: translate\(-50%, -50%\) scale\(\.97\)/, 'Pressing Play gives a small tactile compression');
-assert.match(css, /prefers-reduced-motion: reduce\) \{ #start \{ transition: none;/, 'Respect reduced-motion preferences');
 assert.ok(!html.includes('RUSH.</span>'));
 const favicon = decodeURIComponent(html.match(/rel="icon" href="data:image\/svg\+xml,([^"]+)"/)[1]);
 const rocket = symbols.find(([, id]) => id === 'rocket')[4];

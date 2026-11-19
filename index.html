@@ -149,7 +149,9 @@
           <label><input type="radio" name="language" value="de"><span lang="de">Deutsch</span></label>
           <div class="language-selection" aria-hidden="true"><span lang="en">English</span><span lang="de">Deutsch</span></div>
         </fieldset>
-        <button id="silent-start" data-i18n="silentStart" disabled>Start without sound</button>
+        <div class="intro-secondary">
+          <button id="silent-start" data-i18n="silentStart" disabled>Start without sound</button>
+        </div>
       </div>
     </div>
   </section>
@@ -216,7 +218,7 @@
         <span class="label" data-i18n="level">Level</span><span id="level-label" class="number">1</span>
         <div id="retry-hud" class="retry-lives" role="img" aria-label="3 of 3 lives remaining"><div class="retry-icons" aria-hidden="true"><span>🧑‍🚀</span><span>🧑‍🚀</span><span>🧑‍🚀</span></div></div>
       </div>
-      <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Time remaining"><span class="label" data-i18n="time">Time</span><span id="performance-hud" aria-live="off" hidden data-i18n-title="frameStats" title="Rendered frames per second and average frame time, averaged over about one second. Not the simulation rate.">— FPS · — ms</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Level progress" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
+      <div id="round-clock" data-i18n-aria-label="remainingTime" aria-label="Time remaining"><span class="label" data-i18n="time">Time</span><span id="time-left" class="number" role="timer">00:45</span><div id="level-progress" role="progressbar" data-i18n-aria-label="levelProgress" aria-label="Level progress" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0"><span id="level-progress-fill"></span></div></div>
     </div>
     </div>
     <div id="flight-overview">

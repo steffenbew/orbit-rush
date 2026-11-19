@@ -3,9 +3,9 @@ import test from 'node:test';
 import { Vector3 } from '../assets/vendor/three.module.js';
 import { createCrossingAsteroids } from '../src/course/crossing-asteroids.js';
 
-function flybys(reducedMotion = false, arrivalDistance = 0) {
+function flybys(arrivalDistance = 0) {
   const flightMotion = new Vector3(0, 0, -100), forecasts = [];
-  const crossings = createCrossingAsteroids({ reducedMotion, flightMotion, levelFlightSpeed: () => 100, playerHullRadius: 26,
+  const crossings = createCrossingAsteroids({ flightMotion, levelFlightSpeed: () => 100, playerHullRadius: 26,
     createShip: () => ({visible: false, position: new Vector3(), userData: {previousPosition: new Vector3()}}),
     resetShip(rock, _initial, _slot, tierLimit) { rock.visible = true; rock.tierLimit = tierLimit; },
     spawn: { asteroidArrivalDistance: () => arrivalDistance, setAsteroidCrossing(rock) { rock.position.x += 12; } },
@@ -34,10 +34,10 @@ test('schedule from course start, skip missed intervals and reuse only invisible
 });
 
 test('wait for cruise recovery; an overspeed approach still starts beyond the fade boundary', () => {
-  const {crossings, flightMotion, forecasts} = flybys(true, 500);
+  const {crossings, flightMotion, forecasts} = flybys(500);
   flightMotion.z = -89; crossings.update(2, 0);
   assert.equal(crossings.rocks.length, 0);
   flightMotion.z = -200; crossings.update(2, 0);
   assert.deepEqual(forecasts, [389], 'Allow 500 distance plus 0.3 s at incoming speed, at no more than cruise speed');
-  assert.equal(crossings.rocks[0].tierLimit, 1);
+  assert.equal(crossings.rocks[0].tierLimit, 3);
 });

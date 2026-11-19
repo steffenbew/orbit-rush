@@ -1,6 +1,6 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 
-export function createFragments({ scene, reducedMotion, random, pick, viewFrustum, hasPassedCamera, crossesPlayer }) {
+export function createFragments({ scene, random, pick, viewFrustum, hasPassedCamera, crossesPlayer }) {
   const rocks = [], bounds = new THREE.Box3();
   const limit = 96;
   const asteroidFragmentShapes = Array.from({ length: 6 }, (_, variant) => {
@@ -24,7 +24,7 @@ export function createFragments({ scene, reducedMotion, random, pick, viewFrustu
   function shatter(ship) {
     const fragmentScale = ship.scale.x / 3.2;
     const available = limit - rocks.length;
-    const count = Math.min(available, reducedMotion ? 18 : Math.floor(random(40, 61)));
+    const count = Math.min(available, Math.floor(random(40, 61)));
     for (let i = 0; i < count; i++) {
       const shape = pick(asteroidFragmentShapes);
       const object = new THREE.Mesh(shape.geometry, new THREE.MeshStandardMaterial({
@@ -42,13 +42,13 @@ export function createFragments({ scene, reducedMotion, random, pick, viewFrustu
       object.userData = { collisionBox: shape.bounds, collisionParts: [shape], lastVisibleTime: -Infinity };
       const velocity = direction.multiplyScalar(random(65, 170));
       rocks.push({ object, vx: velocity.x, vy: velocity.y, vz: velocity.z,
-        age: 0, life: random(3, 5), spin: reducedMotion ? 0 : random(-5, 5) });
+        age: 0, life: random(3, 5), spin: random(-5, 5) });
       scene.add(object);
     }
   }
   function addDetached(object, velocity) {
     rocks.push({ object, vx: velocity.x, vy: velocity.y, vz: velocity.z, age: 0, life: 5,
-      worldFactor: .85, spin: reducedMotion ? 0 : random(-1, 1) });
+      worldFactor: .85, spin: random(-1, 1) });
     scene.add(object);
   }
   function visible(object) {

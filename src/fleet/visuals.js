@@ -7,9 +7,9 @@ export function setShipOpacity(ship, opacity) {
   });
 }
 
-export function createFleetVisuals(camera, reducedMotion) {
+export function createFleetVisuals(camera) {
   const visibleBox = new THREE.Box3();
-  const rockRangeSq = (reducedMotion ? 500 : 2800) ** 2;
+  const rockRangeSq = 2800 ** 2;
   function recordVisibleFleet(ships, frustum, gameTime) {
     for (const ship of ships) {
       const data = ship.userData;
@@ -24,17 +24,17 @@ export function createFleetVisuals(camera, reducedMotion) {
   }
   function updateEngineVisuals(ship) {
     const thrust = ship.userData.engineThrust;
-    const movement = reducedMotion ? .25 : 1;
+
     const visibility = (ship.userData.type.capital ? 1 : 1 - THREE.MathUtils.smoothstep(
-      ship.position.distanceTo(camera.position), reducedMotion ? 900 : 2600, reducedMotion ? 1200 : 3600)) * (ship.userData.arrivalOpacity ?? 1);
+      ship.position.distanceTo(camera.position), 2600, 3600)) * (ship.userData.arrivalOpacity ?? 1);
     for (const flame of ship.userData.flames) {
       const { core, plume, radius, baseSize } = flame.userData;
-      const size = baseSize * (1 + thrust * .9 * movement);
+      const size = baseSize * (1 + thrust * .9);
       flame.scale.set(size, size, 1);
       flame.material.opacity = (.4 + thrust * .6) * visibility;
       core.material.emissiveIntensity = 2.4 + thrust * 5 + Math.min(1, ship.userData.hitFlash / .22) * .25;
       const width = radius * (1.2 + thrust * .6);
-      const length = radius * (3 + thrust * (ship.userData.type.capital ? 8 : 12) * movement);
+      const length = radius * (3 + thrust * (ship.userData.type.capital ? 8 : 12));
       plume.scale.set(width, width, length);
       for (const ribbon of plume.children) ribbon.material.opacity = (.18 + thrust * .5) * visibility;
     }
@@ -42,7 +42,7 @@ export function createFleetVisuals(camera, reducedMotion) {
   const shipHitTint = new THREE.Color(0xff344f);
   function updateShipHitFlash(ship) {
     // A fading red tint over the original surface, not an opaque red silhouette.
-    const amount = THREE.MathUtils.clamp(ship.userData.hitFlash / .22, 0, 1) * (reducedMotion ? .16 : .28);
+    const amount = THREE.MathUtils.clamp(ship.userData.hitFlash / .22, 0, 1) * .28;
     if (!ship.userData.flashMaterials) {
       ship.userData.hull.emissive.copy(shipHitTint).multiplyScalar(amount * .5);
       updateEngineVisuals(ship);

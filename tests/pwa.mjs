@@ -14,7 +14,7 @@ const directory = mkdtempSync(join(tmpdir(), 'orbit release '));
 after(() => rmSync(directory, { recursive: true, force: true }));
 mkdirSync(join(directory, 'scripts'));
 symlinkSync(new URL('node_modules/', root), join(directory, 'node_modules'), 'dir');
-for (const file of ['src', 'assets', 'public', 'scripts/build.mjs', 'sw.js', '.htaccess', 'index.html']) {
+for (const file of ['src', 'studio', 'assets', 'public', 'scripts/build.mjs', 'sw.js', '.htaccess', 'index.html']) {
   cpSync(new URL(file, root), join(directory, file), { recursive: true });
 }
 const developmentSource = read('sw.js');
@@ -175,6 +175,13 @@ test('registration is secure-context-only and failure never breaks gameplay', as
   context.navigator = {};
   vm.runInNewContext(registrar, context);
   assert.equal(load, undefined);
+});
+
+test('production excludes the local level picker, Stats.js panel and Model Studio', () => {
+  for (const [path, body] of bodies) {
+    assert.doesNotMatch(path, /(?:^|\/)studio\//);
+    if (/\.(html|js|css)$/.test(path)) assert.doesNotMatch(body.toString(), /orbit-test-level|dev-stats|studio-link|performance-hud/);
+  }
 });
 
 test('emitted gameplay chunks, sounds, licenses and icons are available offline', async () => {

@@ -4,7 +4,7 @@ import { setShipOpacity } from './visuals.js';
 import { corridorHeightAt } from '../course/encounter-plan.js';
 
 export function createFleetArrivals({ ships, flightRings, camera, flightMotion, courseOrigin, courseWorldOffset,
-  reducedMotion, random, createShip, resetShip, constrainShipToBoundary, shipCruiseSpeed, flightDistanceAt,
+  random, createShip, resetShip, constrainShipToBoundary, shipCruiseSpeed, flightDistanceAt,
   levelFlightSpeed, firstCheckpointTime, roundDuration, progressionTimeScale }) {
   let spawnQueue = [], nextShipTime = 2 * progressionTimeScale, tutorialReinforcements = 0;
   let shipWaveReadyAt = 0, shipWaveRemaining = 0;
@@ -48,10 +48,10 @@ export function createFleetArrivals({ ships, flightRings, camera, flightMotion, 
     const ship = spawnQueue.splice(index, 1)[0];
     resetShip(ship);
     const data = ship.userData;
-    data.passingSpeed = Math.min(data.passingSpeed, reducedMotion ? 4 : 55);
-    ship.position.copy(camera.position).addScaledVector(data.cruiseDirection, reducedMotion ? 180 : 700)
-      .addScaledVector(data.courseRight, (countdownShipsSpawned % 2 ? 1 : -1) * (reducedMotion ? 35 : 140))
-      .addScaledVector(data.courseUp, reducedMotion ? 6 : 20);
+    data.passingSpeed = Math.min(data.passingSpeed, 55);
+    ship.position.copy(camera.position).addScaledVector(data.cruiseDirection, 700)
+      .addScaledVector(data.courseRight, (countdownShipsSpawned % 2 ? 1 : -1) * 140)
+      .addScaledVector(data.courseUp, 20);
     constrainShipToBoundary(ship);
     const offset = ship.position.clone().sub(camera.position);
     data.lane = offset.dot(data.courseRight); data.height = offset.dot(data.courseUp);
@@ -102,14 +102,14 @@ export function createFleetArrivals({ ships, flightRings, camera, flightMotion, 
         // Reveal the checkpoint shortly after the enemy's 1.2-second fade-in.
         gate.userData.fadeStart = gameTime + 1.4;
         // Preserve shooting distance on the shorter remaining approach, without spawning beyond the gate.
-        const fraction = Math.min(.8, (reducedMotion ? 160 : 650) / camera.position.distanceTo(gate.position));
+        const fraction = Math.min(.8, 650 / camera.position.distanceTo(gate.position));
         ship.position.copy(camera.position).lerp(gate.position, fraction)
-          .addScaledVector(data.courseRight, reducedMotion ? -18 : -60)
-          .addScaledVector(data.courseUp, reducedMotion ? 4 : 10);
+          .addScaledVector(data.courseRight, -60)
+          .addScaledVector(data.courseUp, 10);
       } else {
-        ship.position.copy(gate.position).addScaledVector(gate.userData.normal, reducedMotion ? 70 : 450)
-          .addScaledVector(data.courseRight, reducedMotion ? 50 : 180)
-          .addScaledVector(data.courseUp, reducedMotion ? 8 : 25);
+        ship.position.copy(gate.position).addScaledVector(gate.userData.normal, 450)
+          .addScaledVector(data.courseRight, 180)
+          .addScaledVector(data.courseUp, 25);
       }
       // This checkpoint-relative placement happens after resetShip's boundary check.
       constrainShipToBoundary(ship);
@@ -155,7 +155,7 @@ export function createFleetArrivals({ ships, flightRings, camera, flightMotion, 
     }
     const clearance = Math.min(...gates.map(gate => gate.userData.radius));
     const firstDistance = Math.min(gates[0].position.distanceTo(camera.position), flightDistanceAt(firstCheckpointTime));
-    const arrivalDistance = Math.max(reducedMotion ? 240 : 900, levelFlightSpeed((elapsed) / roundDuration) * .85 * 2.5);
+    const arrivalDistance = Math.max(900, levelFlightSpeed((elapsed) / roundDuration) * .85 * 2.5);
     activeShips.forEach((ship, index) => {
       resetShip(ship, true);
       // Loose lanes beside and above/below the gates, rather than a single-file procession.
@@ -179,12 +179,12 @@ export function createFleetArrivals({ ships, flightRings, camera, flightMotion, 
         const exit = points.find(point => point.z < origin.z - length);
         const entryPadding = Math.min(200, Math.max(0, (entry.z - origin.z) / 2));
         const exitPadding = exit ? Math.min(200, (origin.z - length - exit.z) / 2) : 200;
-        if (startDepth >= 0) start.y = origin.y + corridorHeightAt(startDepth, corridorPlan, reducedMotion);
+        if (startDepth >= 0) start.y = origin.y + corridorHeightAt(startDepth, corridorPlan);
         for (let step = -1; step <= 9; step++) {
           const depth = step < 0 ? -entryPadding : step > 8 ? length + exitPadding : length * step / 8;
           if (origin.z - depth >= start.z) continue;
           const x = THREE.MathUtils.lerp(entry.x, exit ? exit.x : entry.x, THREE.MathUtils.clamp(depth / length, 0, 1));
-          points.push(new THREE.Vector3(x - origin.x, corridorHeightAt(THREE.MathUtils.clamp(depth, 0, length), corridorPlan, reducedMotion), -depth)
+          points.push(new THREE.Vector3(x - origin.x, corridorHeightAt(THREE.MathUtils.clamp(depth, 0, length), corridorPlan), -depth)
             .applyQuaternion(rotation).add(origin));
         }
       }
@@ -198,13 +198,13 @@ export function createFleetArrivals({ ships, flightRings, camera, flightMotion, 
       const distance = distant ? arrivalDistance + (index * 1.8 + random(0, .4)) * spacing : firstDistance * (.15 + index * .07);
       const data = ship.userData;
       // A lingering companion and a quicker pass, not two ships pacing the player identically.
-      data.passingSpeed = random(index === 0 ? 25 : 70, index === 0 ? 45 : 95) * (reducedMotion ? .065 : 1);
+      data.passingSpeed = random(index === 0 ? 25 : 70, index === 0 ? 45 : 95);
       data.ringRoute = { curve, length, distance, distant, position: curve.getPointAt(distance / length), exit: curve.getTangentAt(1),
         cruiseSpeed: levelFlightSpeed(0) * .85,
         cruiseRatio: random(.94, 1.08), throttleAmount: index === 0 ? .18 : 0,
         throttlePhase: random(0, Math.PI * 2), throttleRate: Math.PI * 2 / random(6, 10) };
       setShipOpacity(ship, distant ? 0 : 1);
-      // Fit the complete hull even when turning through the smaller reduced-motion openings.
+      // Fit the complete hull even when turning through the openings.
       const bounds = data.collisionBox.getBoundingSphere(new THREE.Sphere());
       const hullRadius = bounds.radius + bounds.center.length();
       ship.scale.setScalar(Math.min(data.type.scale, clearance * .55 / hullRadius));

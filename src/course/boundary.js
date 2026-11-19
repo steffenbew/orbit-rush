@@ -1,15 +1,15 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 
 // Own the visible membrane and resolve the proposed world step against that same surface.
-export function createFlightBoundary({ scene, camera, reducedMotion, courseWorldOffset, flightMotion, playerHullRadius }) {
-  const flightBoundaryRadii = new THREE.Vector2(reducedMotion ? 600 : 1800, reducedMotion ? 360 : 1100);
+export function createFlightBoundary({ scene, camera, courseWorldOffset, flightMotion, playerHullRadius }) {
+  const flightBoundaryRadii = new THREE.Vector2(1800, 1100);
   const flightBoundaryOrigin = new THREE.Vector3(), flightBoundaryPrevious = new THREE.Vector3();
   const flightBoundaryLocal = new THREE.Vector3(), flightBoundaryAim = new THREE.Vector3();
   const flightBoundaryNormal = new THREE.Vector3(), flightBoundaryImpact = new THREE.Vector3();
   const flightBoundaryMaterial = new THREE.ShaderMaterial({
     uniforms: {
-      strength: { value: 0 }, phase: { value: 0 }, contact: { value: 0 }, motion: { value: reducedMotion ? 0 : 1 },
-      warningPoint: { value: new THREE.Vector3() }, patchSize: { value: reducedMotion ? 260 : 1100 }, gridScale: { value: new THREE.Vector2() }, gridOffset: { value: 0 },
+      strength: { value: 0 }, phase: { value: 0 }, contact: { value: 0 },
+      warningPoint: { value: new THREE.Vector3() }, patchSize: { value: 1100 }, gridScale: { value: new THREE.Vector2() }, gridOffset: { value: 0 },
       impactPoint: { value: new THREE.Vector3() }, impactNormal: { value: new THREE.Vector3(1, 0, 0) }, impactAge: { value: 10 }
     },
     vertexShader: `
@@ -25,7 +25,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
       }
     `,
     fragmentShader: `
-      uniform float strength, phase, contact, motion, patchSize, impactAge, gridOffset;
+      uniform float strength, phase, contact, patchSize, impactAge, gridOffset;
       uniform vec2 gridScale;
       uniform vec3 warningPoint, impactPoint, impactNormal;
       varying vec2 shieldUv;
@@ -53,7 +53,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
         float alpha = strength * fieldGlow * (0.025 + fresnel * 0.08 + sheen * 0.02
           + reveal * (edge * 0.10 + corona * 0.025));
         vec3 delta = shieldWorldPosition - impactPoint;
-        float impactScale = mix(60.0, 150.0, motion);
+        float impactScale = 150.0;
         float distanceToContact = length(delta) / impactScale;
         float impactGlow = contact * exp(-pow(distanceToContact / 0.35, 2.0));
         // Fast travelling waves disperse within about a second, without a lingering ripple.
@@ -65,16 +65,15 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
           float fade = 1.0 - smoothstep(0.08, 0.8, waveAge);
           ripple += step(0.0, waveAge) * band * fade * (1.0 - float(wave) * 0.23);
         }
-        ripple *= motion;
         vec2 impactUv = vec2(dot(delta, vec3(-impactNormal.y, impactNormal.x, 0.0)), delta.z) / impactScale;
         float angle = atan(impactUv.y, impactUv.x);
         float sparks = pow(max(0.0, sin(angle * 5.0 + 1.7)), 64.0)
           * exp(-pow((length(impactUv) - (0.08 + impactAge * 0.9) * (1.0 + 0.25 * sin(angle * 3.0 + 0.6))) / 0.012, 2.0))
-          * exp(-impactAge * 9.0) * contact * motion;
+          * exp(-impactAge * 9.0) * contact;
         alpha += impactGlow * (0.12 + edge * 0.075 + corona * 0.015)
           + ripple * (0.24 + edge * 0.14) + sparks * 0.35;
         vec3 color = mix(vec3(0.08, 0.6, 1.0), vec3(0.7, 1.0, 1.0), clamp(impactGlow + ripple + sparks, 0.0, 1.0));
-        gl_FragColor = vec4(color, alpha * (motion > 0.0 ? 1.0 : 0.55));
+        gl_FragColor = vec4(color, alpha);
       }
     `,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, toneMapped: false
@@ -95,7 +94,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
     flightBoundary.position.copy(flightBoundaryOrigin).add(courseWorldOffset);
     flightBoundary.position.z = camera.position.z;
     const circumference = 2 * Math.PI * Math.hypot(flightBoundaryRadii.x, flightBoundaryRadii.y) / Math.SQRT2;
-    const cellSize = reducedMotion ? 40 : 95;
+    const cellSize = 95;
     const uniforms = flightBoundaryMaterial.uniforms;
     uniforms.gridScale.value.set(Math.round(circumference / cellSize), length / cellSize);
     uniforms.strength.value = 0; uniforms.phase.value = 0; uniforms.contact.value = 0; uniforms.impactAge.value = 10;
@@ -115,7 +114,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
     shipBoundaryBounds.getSize(shipBoundaryLocal).multiplyScalar(.5);
     let hullRadius = Math.hypot(shipBoundaryLocal.x / flightBoundaryRadii.x, shipBoundaryLocal.y / flightBoundaryRadii.y);
     if (hullRadius >= .95) {
-      // A tilted dreadnought may not fit across the reduced-motion tunnel. Keep it lengthwise.
+      // A tilted dreadnought may not fit across the tunnel. Keep it lengthwise.
       ship.quaternion.identity(); data.baseRotation.identity();
       data.cruiseDirection.set(0, 0, -1); data.courseRight.set(1, 0, 0); data.courseUp.set(0, 1, 0);
       ship.updateMatrix();
@@ -192,7 +191,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
     const radius = Math.hypot(x, y), a = vx * vx + vy * vy, b = 2 * (x * vx + y * vy), c = radius * radius - 1;
     const impactTime = c >= 0 ? 0 : a > 1e-16 ? (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a) : Infinity;
     const clearance = (1 - radius) * Math.min(rx, ry);
-    const proximity = 1 - THREE.MathUtils.smoothstep(clearance, 0, reducedMotion ? 120 : 550);
+    const proximity = 1 - THREE.MathUtils.smoothstep(clearance, 0, 550);
     const predicted = 1 - THREE.MathUtils.smoothstep(impactTime, 0, 3);
     const impactAge = Math.min(10, gameTime - flightBoundaryImpactAt);
     const contact = 1 - THREE.MathUtils.smoothstep(impactAge, 0, .75);
@@ -201,7 +200,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
     uniforms.gridOffset.value = (flightBoundary.position.z - flightBoundaryOrigin.z - courseWorldOffset.z)
       / flightBoundary.scale.z * uniforms.gridScale.value.y;
     uniforms.strength.value += (intensity - uniforms.strength.value) * (1 - Math.exp(-8 * dt));
-    uniforms.phase.value = reducedMotion ? 0 : gameTime;
+    uniforms.phase.value = gameTime;
     uniforms.contact.value = contact; uniforms.impactAge.value = impactAge;
     uniforms.impactPoint.value.copy(flightBoundaryImpact).add(flightBoundaryOrigin).add(courseWorldOffset);
     flightBoundaryAim.copy(flightBoundaryLocal);
@@ -210,7 +209,7 @@ export function createFlightBoundary({ scene, camera, reducedMotion, courseWorld
     const aimRadius = Math.hypot(flightBoundaryAim.x / flightBoundaryRadii.x, flightBoundaryAim.y / flightBoundaryRadii.y);
     if (aimRadius > 1e-8) { flightBoundaryAim.x /= aimRadius; flightBoundaryAim.y /= aimRadius; }
     uniforms.warningPoint.value.copy(flightBoundaryAim).add(flightBoundaryOrigin).add(courseWorldOffset);
-    flightBoundary.visible = uniforms.strength.value > .005 || contact > .005 || (!reducedMotion && impactAge < 1.1);
+    flightBoundary.visible = uniforms.strength.value > .005 || contact > .005 || impactAge < 1.1;
   }
   return { mesh: flightBoundary, origin: flightBoundaryOrigin, radii: flightBoundaryRadii, normal: flightBoundaryNormal,
     reset: resetFlightBoundary, constrainPlayer, constrainShip: constrainShipToBoundary, update: updateFlightBoundary };

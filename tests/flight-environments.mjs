@@ -5,8 +5,8 @@ import { THREE, source, section, randomState, makeGame, makeFlightClock, assertS
 const full = process.env.ORBIT_TEST_FULL === '1';
 
 // Reinforcements enter from far ahead, never as nearby diagonal ambushes.
-for (const reducedMotion of [false, true]) {
-  const arrivals = makeGame(reducedMotion);
+{
+  const arrivals = makeGame();
   arrivals.camera.position.set(20, -10, 5);
   arrivals.flightOrientation.set(.2, -.4, 0, 'YXZ');
   arrivals.flightMotion.set(0, 0, -400).applyEuler(arrivals.flightOrientation);
@@ -14,7 +14,7 @@ for (const reducedMotion of [false, true]) {
     for (let sample = 0; sample < 30; sample++) {
       arrivals.resetShip(ship);
       const data = ship.userData;
-      assert.ok(ship.position.distanceTo(arrivals.camera.position) >= (reducedMotion ? 1200 : 3800) - 1e-8,
+      assert.ok(ship.position.distanceTo(arrivals.camera.position) >= 3800 - 1e-8,
         'Bringing angled arrivals inside the shield must preserve their distant fade');
       assert.ok(ship.position.z < arrivals.camera.position.z, 'Arrivals remain ahead along the protected course');
       assertShipInsideBoundary(arrivals, ship);
@@ -33,7 +33,7 @@ for (const reducedMotion of [false, true]) {
         assert.ok(flame.userData.plume.children.every(ribbon => ribbon.material.opacity === 0));
       }
       arrivals.camera.updateMatrixWorld();
-      ship.position.copy(arrivals.camera.position).addScaledVector(data.cruiseDirection, reducedMotion ? 1050 : 3100);
+      ship.position.copy(arrivals.camera.position).addScaledVector(data.cruiseDirection, 3100);
       assert.equal(arrivals.targetInfo(ship), null, 'Target brackets must not reveal still-fading arrivals');
       ship.position.copy(arrivals.camera.position).addScaledVector(data.cruiseDirection, 500);
       assert.ok(arrivals.targetInfo(ship), 'Nearby traffic must remain targetable');
@@ -45,15 +45,15 @@ for (const reducedMotion of [false, true]) {
   }
   const shader = { fragmentShader: THREE.ShaderLib.standard.fragmentShader };
   arrivals.fadeShipShader(shader);
-  assert.ok(shader.fragmentShader.includes(reducedMotion ? 'smoothstep(900.0, 1200.0' : 'smoothstep(2600.0, 3600.0'));
+  assert.ok(shader.fragmentShader.includes('smoothstep(2600.0, 3600.0'));
 }
 console.log('PASS distant forward arrivals, heading/translation, whole-model fades, hidden spawn glows and unchanged opening formation');
 
-for (const reducedMotion of [false, true]) {
+{
   for (const level of [1, 7]) for (const fps of full ? [5, 60, 144] : [5]) for (const aspect of [390 / 844, 16 / 9]) {
     // Compare the same traffic across frame rates, independent of earlier debris counts.
     randomState.seed = 12345;
-    const flight = makeGame(reducedMotion);
+    const flight = makeGame();
     flight.setLevel(level);
     flight.flightMotion.set(0, 0, -flight.levelFlightSpeed(0));
     flight.camera.aspect = aspect; flight.camera.updateProjectionMatrix();
@@ -71,31 +71,31 @@ for (const reducedMotion of [false, true]) {
         if (depth <= 180) continue; // Final passes intentionally stop lane correction.
         assert.ok(Math.abs(ship.position.x - data.lane) <= 60, 'Cruising should stay near its original lane, including inertial overshoot');
         assert.ok(Math.abs(ship.position.y - data.height) <= 27, 'Vertical course changes must stay gentle, including inertial overshoot');
-        assert.ok(Math.abs(data.courseVelocity.x) <= (reducedMotion ? 9 : 35));
+        assert.ok(Math.abs(data.courseVelocity.x) <= 35);
       }
     });
     for (let frame = 0; frame < fps * 40; frame++) {
       clock.frame(1 / fps);
       for (const ship of traffic) {
         const depth = -ship.position.z;
-        if (depth < (reducedMotion ? 900 : 2600) && !seenAt.has(ship)) seenAt.set(ship, time);
-        if (depth < (reducedMotion ? 350 : 1100) && !entered.has(ship)) {
+        if (depth < 2600 && !seenAt.has(ship)) seenAt.set(ship, time);
+        if (depth < 1100 && !entered.has(ship)) {
           entered.add(ship);
-          assert.ok(time - seenAt.get(ship) > 3 * (reducedMotion ? 1 : 1.15 / 1.86),
+          assert.ok(time - seenAt.get(ship) > 3 * (1.15 / 1.86),
             'Preserve the visible approach distance while traversing it at the faster cruise speed');
         }
       }
       if (entered.size === traffic.length) break;
     }
     assert.equal(entered.size, traffic.length,
-      `Distant arrivals must reach the playable area within a level (level=${level}, fps=${fps}, reduced=${reducedMotion}, aspect=${aspect})`);
+      `Distant arrivals must reach the playable area within a level (level=${level}, fps=${fps}, aspect=${aspect})`);
   }
 }
-console.log('PASS mostly straight, gradual approaches within the level, portrait/landscape and reduced motion');
+console.log('PASS mostly straight, gradual approaches within the level, portrait/landscape');
 
 
-for (const reducedMotion of [false, true]) {
-  const confined = makeGame(reducedMotion);
+{
+  const confined = makeGame();
   confined.setLevel(4); confined.setupLevelFleet();
   const traffic = [...confined.ships.slice(0, 3), confined.capital];
   for (const ship of traffic) for (const angle of [0, Math.PI / 4, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
@@ -121,8 +121,8 @@ for (const reducedMotion of [false, true]) {
 }
 console.log('PASS whole-hull fleet containment on every shield face, high-speed movement and shared world offsets');
 
-for (const reducedMotion of [false, true]) {
-  const confined = makeGame(reducedMotion);
+{
+  const confined = makeGame();
   confined.setLevel(4); confined.setupLevelFleet();
   confined.courseWorldOffset.set(100, -70, 600);
   for (const ship of [...confined.ships.slice(0, 3), confined.capital]) {
@@ -131,7 +131,7 @@ for (const reducedMotion of [false, true]) {
       confined.resetShip(ship);
       assertShipInsideBoundary(confined, ship);
       assert.ok(ship.userData.previousPosition.equals(ship.position), 'Constrain arrivals before recording collision history');
-      assert.ok(ship.position.distanceTo(confined.camera.position) >= (reducedMotion ? 1200 : 3800),
+      assert.ok(ship.position.distanceTo(confined.camera.position) >= 3800,
         'Even sharply turned arrivals stay beyond the fade, including the full-size dreadnought');
       for (let step = 0; step < 120; step++) {
         if (ship.userData.type.capital) confined.updateCapitalShip(ship, 1 / 60);
@@ -165,7 +165,7 @@ for (const reducedMotion of [false, true]) {
   confined.constrainShipToBoundary(rock);
   assert.ok(rock.position.equals(ship.position), 'Asteroid streams and corridors are not confined by the NPC shield');
 }
-console.log('PASS extreme-heading arrivals, sustained NPC maneuvers, reduced-motion dreadnought clearance and lifecycle isolation');
+console.log('PASS extreme-heading arrivals, sustained NPC maneuvers, dreadnought clearance and lifecycle isolation');
 
 const pacing = makeGame(); pacing.setLevel(4); pacing.setupLevelFleet();
 for (const [start, end] of [[10, 15], [28, 33]]) {
@@ -195,15 +195,15 @@ pacing.updateCapitalShip(pacing.capital, 1 / 60);
 assert.equal(pacing.enemyBolts.length, 0);
 console.log('PASS reinforcement breaks, existing-threat continuity, single arrivals and fair boss-volley resumption');
 
-for (const reducedMotion of [false, true]) {
-  const bends = makeGame(reducedMotion);
+{
+  const bends = makeGame();
   for (const level of full ? [1, 20] : [20]) for (const shape of [1, 2]) for (const sign of [-1, 1]) {
     bends.setLevel(level); bends.setupLevelFleet();
     const field = bends.shower(true, 2, shape, sign);
     assert.equal(Math.abs(bends.corridorCenter(0)), 0, 'Keep a straight, readable entry');
-    assert.ok(Math.abs(bends.corridorCenter(field.length * .5)) > field.gap * (reducedMotion ? .2 : .5));
+    assert.ok(Math.abs(bends.corridorCenter(field.length * .5)) > field.gap * .5);
     assert.ok(Math.abs(bends.corridorCenter(field.length) - (shape === 1 ? 0 : field.bend)) < 1e-8);
-    assert.ok(Math.abs(field.bend) <= field.gap * (reducedMotion ? .45 : 1.15) + 1e-8);
+    assert.ok(Math.abs(field.bend) <= field.gap * 1.15 + 1e-8);
     const inverse = field.rotation.clone().invert();
     for (let slice = 0; slice < 7; slice++) {
       if (slice) {
@@ -221,7 +221,6 @@ for (const reducedMotion of [false, true]) {
         if (rock.userData.corridorObstacle) {
           assert.ok(offset <= field.gap * .35 + 1e-7, 'Interior hazards must stay in the curved flight passage');
           assert.ok(Math.abs(local.x) + radius + 40 < field.width / 2, 'Natural groups leave lateral escape routes');
-          if (reducedMotion) assert.ok(offset + radius <= field.gap - 4 + 1e-7, 'Reduced-motion obstacles stay small');
         } else {
           assert.ok(offset - radius >= field.gap - 1e-7, 'Both curved walls must retain the full narrow passage');
         }
@@ -241,26 +240,28 @@ for (const reducedMotion of [false, true]) {
     bends.flightOrientation.set(0, 0, 0);
   }
 }
-console.log('PASS fixed arcing/offset corridors, coherent background geometry, full-length clearance and gentler reduced-motion bends');
+console.log('PASS fixed arcing/offset corridors, coherent background geometry, full-length clearance');
 
 const passageTiers = new Set(), passageScales = new Set();
-let passageCount = 0, centerThreats = 0, scatteredObstacles = 0, oversizedWalls = 0, slalomGroups = 0;
+let passageCount = 0, centerThreats = 0, scatteredObstacles = 0, slalomGroups = 0;
+let wallRocks = 0, oversizedWalls = 0;
 const laterLanes = new Set();
-for (const reducedMotion of [false, true]) for (const level of full ? [1, 4, 5, 20] : [1, 5]) for (const shape of full ? [0, 1, 2] : [1]) for (const strength of [0, 1, 2]) {
-  const hazards = makeGame(reducedMotion), speed = reducedMotion ? 40 : 400;
+for (const level of full ? [1, 4, 5, 20] : [1, 5]) for (const shape of full ? [0, 1, 2] : [1]) for (const strength of [0, 1, 2]) {
+  const hazards = makeGame(), speed = 400;
   hazards.flightMotion.set(0, 0, -speed);
   hazards.setLevel(level); hazards.setupLevelFleet();
   const field = hazards.shower(true, strength, shape);
   const approachSpeed = field.length / (field.end - field.entry);
   const lead = hazards.flightDistanceAt(field.entry);
   assert.ok(field.pool.every(rock => !rock.userData.corridorObstacle), 'Leave the first entry slice clear');
-  assert.equal(field.obstacleSpacing, Math.max(260, approachSpeed * (reducedMotion ? 3.6 : [2.2, 1.8, 1.5][strength]) * (level >= 5 ? .5 : 1)));
+  assert.equal(field.obstacleSpacing, Math.max(260, approachSpeed * [2.2, 1.8, 1.5][strength] * (level >= 5 ? .5 : 1)));
   for (const rock of field.pool.filter(rock => rock.visible)) {
     const baseScale = [.35, 1.3, 2.8][rock.userData.asteroidTier - 1];
     assert.ok(rock.scale.x >= baseScale * .75 && rock.scale.x <= baseScale * 1.35);
+    wallRocks++;
     if (rock.scale.x > 2.8) oversizedWalls++;
   }
-  const slalom = level >= 5 && !reducedMotion;
+  const slalom = level >= 5;
   let count = 0, boulders = 0, groups = 0, lastDepth = -Infinity;
   for (let travel = 100; travel <= lead + field.length + 300; travel += 100) {
     // These are fixed field rocks, not targeted reinforcements: the formation survives breathers.
@@ -294,22 +295,19 @@ for (const reducedMotion of [false, true]) for (const level of full ? [1, 4, 5, 
       assert.ok(-local.z - lastDepth >= (index > 0 ? 0 : field.obstacleSpacing * .9) - 1e-7, 'Keep shallow depth separation within groups and recovery room between them');
       lastDepth = -local.z;
       const offsetY = local.y - hazards.corridorCenter(-local.z);
-      const laneWidth = level >= 5 ? (reducedMotion ? 90 : 420) : (reducedMotion ? 30 : 100);
+      const laneWidth = level >= 5 ? 420 : 100;
       assert.ok(Math.abs(local.x) <= laneWidth, 'Keep obstacles inside the lateral corridor lanes');
-      if (level >= 5 && !reducedMotion) laterLanes.add(Math.abs(local.x) < 100 ? 0 : Math.sign(local.x));
+      if (level >= 5) laterLanes.add(Math.abs(local.x) < 100 ? 0 : Math.sign(local.x));
       assert.ok(Math.abs(offsetY) <= field.gap * .35 + 1e-7);
-      if (reducedMotion) assert.ok(Math.abs(offsetY) + radius <= field.gap - 4 + 1e-7);
-      else {
-        passageCount++; passageTiers.add(rock.userData.asteroidTier); passageScales.add(rock.scale.x.toFixed(2));
-        if (Math.abs(local.x) > 30) scatteredObstacles++;
-        if (hazards.crossesPlayer(rock, new THREE.Vector3(local.x, offsetY, -100), new THREE.Vector3(local.x, offsetY, 100))) centerThreats++;
-      }
+      passageCount++; passageTiers.add(rock.userData.asteroidTier); passageScales.add(rock.scale.x.toFixed(2));
+      if (Math.abs(local.x) > 30) scatteredObstacles++;
+      if (hazards.crossesPlayer(rock, new THREE.Vector3(local.x, offsetY, -100), new THREE.Vector3(local.x, offsetY, 100))) centerThreats++;
       assert.ok(rock.position.distanceTo(hazards.camera.position) >= lead - 100, 'No nearby pop-in: interior rocks get the same distant lead as the walls');
       assert.ok(rock.userData.previousPosition.equals(rock.position), 'Placement must not create a swept teleport');
       assert.ok(rock.userData.courseVelocity.equals(field.velocity), 'Interior rocks travel with the walls, never homing toward the pilot');
       assert.equal(rock.userData.health, Math.max(rock.userData.asteroidTier, Math.ceil(rock.scale.x)));
-      assert.ok(rock.userData.asteroidTier <= (reducedMotion ? 1 : 3));
-      assert.ok(radius <= (reducedMotion ? .35 : level >= 5 ? 5 : 2.8 * 1.2) * rock.userData.type.radius + 1e-8, 'Keep even the largest passage boulders dodgeable');
+      assert.ok(rock.userData.asteroidTier <= 3);
+      assert.ok(radius <= (level >= 5 ? 5 : 2.8 * 1.2) * rock.userData.type.radius + 1e-8, 'Keep even the largest passage boulders dodgeable');
       assert.ok(hazards.ships.includes(rock) && rock.userData.collisionParts.length > 0, 'Gap rocks must use the real shooting/collision pipeline');
       const position = rock.position.clone();
       hazards.updateShipCourse(rock, .3);
@@ -326,7 +324,7 @@ for (const reducedMotion of [false, true]) for (const level of full ? [1, 4, 5, 
   }
   // Each scheduled hazard can wait up to one full randomized wall-slice step.
   const fittingObstacles = field.length > field.spacing * 2.4 + field.obstacleSpacing * 1.2 ? 2 : field.length > field.spacing * 1.2 ? 1 : 0;
-  assert.ok(count >= fittingObstacles, `Place every obstacle that fits before the guaranteed finish: level=${level}, reduced=${reducedMotion}, shape=${shape}, strength=${strength}, count=${count}, expected=${fittingObstacles}, length=${field.length}, spacing=${field.spacing}, obstacles=${field.obstacleSpacing}`);
+  assert.ok(count >= fittingObstacles, `Place every obstacle that fits before the guaranteed finish: level=${level}, shape=${shape}, strength=${strength}, count=${count}, expected=${fittingObstacles}, length=${field.length}, spacing=${field.spacing}, obstacles=${field.obstacleSpacing}`);
   if (slalom) { assert.equal(groups, 3); assert.equal(count, 18, 'Three natural clusters replace random obstacles, without extras'); }
   assert.equal(boulders, slalom ? 2 : 0, 'Retain two landmark-sized boulders among the mixed-size clusters');
   assert.ok(field.pool.length <= hazards.maxShowerRocks, 'Clusters share the original bounded pool without an extra allowance');
@@ -340,20 +338,21 @@ for (const reducedMotion of [false, true]) for (const level of full ? [1, 4, 5, 
   assert.ok(free.pool.filter(rock => rock.visible).every(rock => !rock.userData.corridorObstacle), 'Pooled rocks must clear corridor roles when reused in free showers');
 }
 assert.deepEqual([...passageTiers].sort(), [1, 2, 3], 'Passage hazards must include small, medium and large rocks');
-assert.ok(passageScales.size > 30 && oversizedWalls > 20, 'Both the passage and walls need noticeable size variety');
+assert.ok(passageScales.size > 30, 'Passage hazards need noticeable size variety');
+assert.ok(oversizedWalls / wallRocks >= .2, `Expected at least 20% oversized wall rocks; found ${oversizedWalls}/${wallRocks}`);
 assert.ok(centerThreats > 0, 'Some natural obstacles still intersect the center lane');
 assert.ok(slalomGroups > 0, 'Later corridors actually generate loose clusters');
 assert.deepEqual([...laterLanes].sort(), [-1, 0, 1], 'Later obstacles span the left, middle and right of the passage, not a centerline queue');
 assert.ok(scatteredObstacles > passageCount * .15, 'Not every obstacle should line up in the central lane');
 console.log('PASS varied small/medium/large passage hazards, larger walls, real central threats, lateral dodges, distant lead, pause and reuse');
 
-for (const reducedMotion of [false, true]) for (const corridor of [false, true]) {
-  const motion = makeGame(reducedMotion);
+for (const corridor of [false, true]) {
+  const motion = makeGame();
   motion.setupLevelFleet(); motion.flightOrientation.set(.2, -.4, 0, 'YXZ');
   const inverse = new THREE.Quaternion(); // Field axes belong to the fixed course, not the player's turn.
   const field = motion.shower(corridor, 2);
   const stream = field.velocity.clone().applyQuaternion(inverse);
-  const streamSpeed = corridor ? 0 : Math.max(reducedMotion ? 50 : 220, motion.levelFlightSpeed(field.entry / 45) * .85 * .9);
+  const streamSpeed = corridor ? 0 : Math.max(220, motion.levelFlightSpeed(field.entry / 45) * .85 * .9);
   assert.ok(Math.abs(stream.length() - streamSpeed) < 1e-8);
   if (!corridor) {
     if (Math.abs(stream.x) > 1e-8) assert.ok(Math.hypot(stream.x, stream.y) > streamSpeed * .8, 'Side streams keep their strong transverse motion');
@@ -366,7 +365,7 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   for (let sample = 0; sample < 240; sample++) {
     const rock = motion.eventAsteroid(), data = rock.userData;
     const local = data.courseVelocity.clone().applyQuaternion(inverse);
-    const rotates = !reducedMotion && data.courseVelocity.lengthSq() > 25;
+    const rotates = data.courseVelocity.lengthSq() > 25;
     if (local.lengthSq() > 0) moving++;
     if (corridor) {
       assert.equal(data.courseVelocity.lengthSq(), 0, 'Corridor walls and obstacles must not inherit rain movement');
@@ -382,12 +381,12 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
       if (spin && rotates) spinSigns[axis * 2 + (spin > 0 ? 1 : 0)]++;
     }
     const spin = data.spin.length();
-    assert.ok(reducedMotion ? spin === 0 : spin >= .04 - 1e-8 && spin <= .6 + 1e-8,
+    assert.ok(spin >= .04 - 1e-8 && spin <= .6 + 1e-8,
       'Potential tumbling rates must remain varied across pool reuse');
     const rotation = rock.quaternion.clone();
-    moveRock(rock, 1, false, reducedMotion);
+    moveRock(rock, 1, false);
     assert.equal(!rock.quaternion.equals(rotation), rotates,
-      'Tumbling follows actual drift speed and respects reduced motion');
+      'Tumbling follows actual drift speed');
     if (rotates) {
       rotating++;
       assert.ok(spin > 0, 'Noticeably drifting rocks must also rotate');
@@ -402,18 +401,18 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   }
   assert.equal(moving, corridor ? 0 : 240, 'Only free showers stream; corridor rocks stay fixed');
   if (!corridor) assert.ok(Math.min(...speedRatios) < .95 && Math.max(...speedRatios) > 1.05, 'Retain subtle speed variation in free showers');
-  if (!reducedMotion && !corridor) {
+  if (!corridor) {
     assert.ok(slowMoving > rotating * .1 && fastMoving > rotating * .3,
       'Rotating rocks retain a noticeable mix of slow turns and faster tumbling');
     assert.ok(spinSigns.every(count => count > 40), 'Actively tumbling rocks need varied axes');
   }
 
-  const rock = field.pool.find(rock => rock.visible && (corridor || reducedMotion || rock.userData.courseVelocity.lengthSq() > 25));
+  const rock = field.pool.find(rock => rock.visible && (corridor || rock.userData.courseVelocity.lengthSq() > 25));
   const position = rock.position.clone(), rotation = rock.rotation.clone();
   let reference;
   for (const fps of [5, 30, 60, 144]) {
     rock.position.copy(position); rock.rotation.copy(rotation);
-    for (let frame = 0; frame < fps * 4; frame++) moveRock(rock, 1 / fps, false, reducedMotion);
+    for (let frame = 0; frame < fps * 4; frame++) moveRock(rock, 1 / fps, false);
     const expected = position.clone().addScaledVector(rock.userData.courseVelocity, 4);
     assert.ok(rock.position.distanceTo(expected) < 1e-8, 'The rendered rock must actually travel with its assigned velocity');
     if (!reference) reference = { position: rock.position.clone(), quaternion: rock.quaternion.clone() };
@@ -421,10 +420,10 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
       'Drift and tumbling must be frame-rate independent');
   }
   assert.equal(rock.quaternion.angleTo(new THREE.Quaternion().setFromEuler(rotation)) > 1e-4,
-    !reducedMotion && rock.userData.courseVelocity.lengthSq() > 25,
+    rock.userData.courseVelocity.lengthSq() > 25,
     'Actual tumbling requires noticeable drift, never camera-relative travel alone');
   const pausedPosition = rock.position.clone(), pausedRotation = rock.quaternion.clone();
-  moveRock(rock, 5, true, reducedMotion);
+  moveRock(rock, 5, true);
   assert.ok(rock.position.equals(pausedPosition) && rock.quaternion.equals(pausedRotation), 'Pause freezes drift and rotation together');
 
   motion.setupLevelFleet();
@@ -436,8 +435,8 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
   else assert.ok(reused.every(rock => rock.userData.courseVelocity.clone().normalize().dot(nextField.velocity.clone().normalize()) > 1 - 1e-12), 'Reused corridor rocks must join the new free-shower stream');
   for (const rock of reused) {
     const rotation = rock.quaternion.clone();
-    moveRock(rock, 1, false, reducedMotion);
-    assert.equal(!rock.quaternion.equals(rotation), !reducedMotion && rock.userData.courseVelocity.lengthSq() > 25,
+    moveRock(rock, 1, false);
+    assert.equal(!rock.quaternion.equals(rotation), rock.userData.courseVelocity.lengthSq() > 25,
       'Pool reuse must apply the new drift speed, not the previous field’s rotation behavior');
   }
 }
@@ -445,25 +444,25 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
 const game = makeGame();
 const driftRock = game.ships[4];
 driftRock.userData.spin.set(.1, -.2, .3);
-for (const reducedMotion of [false, true]) for (const paused of [false, true]) {
+for (const paused of [false, true]) {
   for (const fps of [5, 30, 60, 144]) for (const speed of [0, .1, 4.99, 5, 5.01, 12]) {
     for (const direction of [[1, 0, 0], [0, -1, 0], [0, 0, 1], [.6, .8, 0]]) {
       driftRock.position.set(0, 0, 0); driftRock.rotation.set(.2, -.3, .1);
       driftRock.userData.courseVelocity.set(...direction).multiplyScalar(speed);
       const rotation = driftRock.quaternion.clone();
-      for (let frame = 0; frame < fps * 4; frame++) moveRock(driftRock, 1 / fps, paused, reducedMotion);
-      assert.equal(!driftRock.quaternion.equals(rotation), speed > 5 && !paused && !reducedMotion,
+      for (let frame = 0; frame < fps * 4; frame++) moveRock(driftRock, 1 / fps, paused);
+      assert.equal(!driftRock.quaternion.equals(rotation), speed > 5 && !paused,
         'Rotation cutoff must include exactly 5 units/s, in every direction and at every frame rate');
       const expected = driftRock.userData.courseVelocity.clone().multiplyScalar(paused ? 0 : 4);
       assert.ok(driftRock.position.distanceTo(expected) < 1e-8, 'The rotation cutoff must not alter drift');
     }
   }
 }
-console.log('PASS coherent shower drift, subtle free-rock speed variation, individual tumbling, 5–144 FPS, reduced motion, pause and reuse');
+console.log('PASS coherent shower drift, subtle free-rock speed variation, individual tumbling, 5–144 FPS, pause and reuse');
 
 assert.match(source, /updateShipArrivals\(dt\);/, 'The simulation must pass elapsed time into shower movement');
-for (const reducedMotion of [false, true]) for (const corridor of [false, true]) for (const fps of full ? [5, 30, 60, 144] : [5]) {
-  const motion = makeGame(reducedMotion); motion.setupLevelFleet();
+for (const corridor of [false, true]) for (const fps of full ? [5, 30, 60, 144] : [5]) {
+  const motion = makeGame(); motion.setupLevelFleet();
   motion.flightOrientation.set(.2, -.4, 0, 'YXZ');
   const field = motion.shower(corridor, 2, corridor ? 1 : 0);
   const origin = field.origin.clone(), velocity = field.velocity.clone(), travel = new THREE.Vector3();
@@ -479,11 +478,11 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
     motion.updateShipArrivals(dt);
     for (const {rock} of tracked) {
       rock.position.addScaledVector(motion.worldStep, .85);
-      moveRock(rock, dt, false, reducedMotion);
+      moveRock(rock, dt, false);
     }
     if (frame === fps * 2 - 1) {
       if (corridor) assert.ok(field.origin.equals(origin), 'The corridor has no intrinsic movement');
-      else assert.ok(field.origin.distanceTo(origin) > (reducedMotion ? 15 : 60), 'Rain moves even without player travel');
+      else assert.ok(field.origin.distanceTo(origin) > 60, 'Rain moves even without player travel');
     }
     assert.ok(field.grit.position.equals(field.origin), 'Instanced rocks and their collision origin move together');
     assert.ok(field.velocity.equals(velocity), 'Later steering must not redirect the stream');
@@ -502,8 +501,8 @@ for (const reducedMotion of [false, true]) for (const corridor of [false, true])
 }
 console.log('PASS directional rain versus fixed corridor, steering independence, corridor gaps, pause and round end');
 
-for (const reducedMotion of [false, true]) {
-  const repairs = makeGame(reducedMotion); repairs.setupLevelFleet();
+{
+  const repairs = makeGame(); repairs.setupLevelFleet();
   repairs.ships.forEach(ship => { ship.visible = false; }); repairs.camera.updateMatrixWorld();
   const scheduleRepair = () => { randomState.seed = 12345; repairs.resetRepairPickup(); };
   repairs.setShield(50); scheduleRepair(); repairs.setTime(9.99);
@@ -554,10 +553,10 @@ console.log('PASS optional bounded shield repairs, swept collection, cap, pause/
 // Isolate scheduled crossings so ring/regular-fleet hits cannot hide a harmless threat schedule.
 const unattended = [], evasive = [];
 let totalCrossings = 0, totalDangerousCrossings = 0;
-for (const reducedMotion of [false, true]) for (const fps of full ? [5, 60, 144] : [5]) for (let trial = 0; trial < 4; trial++) {
+for (const fps of full ? [5, 60, 144] : [5]) for (let trial = 0; trial < 4; trial++) {
   for (const dodge of [false, true]) {
     randomState.seed = 8000 + trial;
-    const flight = makeGame(reducedMotion); flight.setupLevelFleet();
+    const flight = makeGame(); flight.setupLevelFleet();
     flight.flightMotion.set(0, 0, -flight.levelFlightSpeed(0));
     let ticks = 0, hits = 0, shownCrossings = 0, dangerousCrossings = 0, dodgeAt = Infinity;
     const spawns = new Map();
@@ -574,7 +573,7 @@ for (const reducedMotion of [false, true]) for (const fps of full ? [5, 60, 144]
         const previous = rock.position.clone();
         flight.updateShipCourse(rock, dt);
         rock.position.addScaledVector(flight.flightMotion, -.85 * dt);
-        moveRock(rock, dt, false, reducedMotion);
+        moveRock(rock, dt, false);
         if (!rock.userData.collisionHandled && rock.userData.lastVisibleTime > -Infinity
           && flight.crossesPlayer(rock, previous, rock.position)) {
           hits++; rock.userData.collisionHandled = true;

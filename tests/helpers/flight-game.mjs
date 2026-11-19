@@ -38,13 +38,13 @@ const section = (start, end) => {
 };
 const code = `
   const scene = new THREE.Scene(), glow = new THREE.Texture();
-  const camera = new THREE.PerspectiveCamera(reducedMotion ? 70 : 90, 16 / 9, .03, 14000);
+  const camera = new THREE.PerspectiveCamera(90, 16 / 9, 2, 14000);
   const viewCamera = camera;
-  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const playerFlight = physics.createPlayerFlight();
   const { target, flightMotion, flightDirection, flightOrientation, flightTurn, flightVelocity, flightViewOffset } = playerFlight;
   flightMotion.set(0, 0, -400);
   const worldStep = new THREE.Vector3();
-  const progressionTimeScale = 1.5, roundDuration = 45;
+  const progressionTimeScale = 1.5, roundDuration = 45, firstCheckpointTime = 5;
   let started = true, paused = false, roundEnded = false, crashing = false, gameTime = 0, difficulty = 0;
   const crashDrifting = false;
   let danger = false;
@@ -73,7 +73,7 @@ const code = `
   }
   return {
     playerFlight, scene, sounds, messages, ships, activeAsteroids, camera, flightMotion, flightOrientation, worldStep, explosions, hits, enemyBolts: capitalEncounter.bolts, target,
-    flightTurn, flightVelocity, forecastFlightPosition, flightDistanceAt, getAsteroidEncounters: () => getAsteroidEncounters(level, reducedMotion),
+    flightTurn, flightVelocity, forecastFlightPosition, flightDistanceAt, getAsteroidEncounters: () => getAsteroidEncounters(level),
     get encounterIndex() { return encounter.index; }, get corridorPlan() { return encounter.corridorPlan; },
     get showerVisible() { return showerGrit.visible; }, get warningHidden() { return showerWarning.hidden; },
     get warningText() { return showerWarning.innerHTML; }, get grit() { return showerGrit; },
@@ -91,13 +91,13 @@ const code = `
       direction: encounter.layout.direction.clone(), velocity: encounter.velocity.clone(), kind: encounter.kind, corridor: encounter.kind === 'corridor' }),
     ringCourse(corridor, shape = 0) {
       encounter.reset(level, [{ kind: corridor ? 'corridor' : 'shower', shape, strength: encounter.strength, direction: encounter.course,
-        prepare: 0, entry: 12, exit: 27, bend: reducedMotion ? .45 : 1.15 }], courseStartTime);
+        prepare: 0, entry: 12, exit: 27, bend: 1.15 }], courseStartTime);
       gameTime = 0; courseWorldOffset.set(0, 0, 0);
       resetFlightRing(); arrivals.resetRingShips(false, gameTime - courseStartTime, level, encounter.corridorPlan);
       return { origin: encounter.layout.origin.clone(), length: encounter.layout.length, gap: encounter.layout.gap };
     },
     setStarted: value => { started = value; },
-    resetShip, fadeShipShader: ships[0].userData.hull.onBeforeCompile, targetInfo: ship => targetInfo(ship, {camera, viewCamera, mouseAim, reducedMotion, width: innerWidth, height: innerHeight}),
+    resetShip, fadeShipShader: ships[0].userData.hull.onBeforeCompile, targetInfo: ship => targetInfo(ship, {camera, viewCamera, mouseAim, width: innerWidth, height: innerHeight}),
     updateShipCourse: traffic.updateShipCourse, avoidAsteroids: traffic.avoidAsteroids, updateCapitalShip, updateEnemyBolts, recordVisibleObjects,
     updateShipHitFlash, updateEngineThrust: traffic.updateEngineThrust, updateEngineVisuals, collideShipsWithAsteroids,
     clearEnemyBolts, updateFleet, setupLevelFleet, updateAsteroidShower, updateShipArrivals, queueShip,
@@ -119,7 +119,7 @@ const code = `
     setRoundEnded: value => { roundEnded = value; }, setCrashing: value => { crashing = value; },
     shower: (corridor, strength, shape = 0, direction = 1) => {
       encounter.reset(level, [{ kind: corridor ? 'corridor' : 'shower', shape, strength, direction: encounter.course,
-        prepare: 0, entry: 12, exit: 27, bend: direction * (reducedMotion ? .45 : 1.15) }], courseStartTime);
+        prepare: 0, entry: 12, exit: 27, bend: direction * 1.15 }], courseStartTime);
       const { start: showerStart, entry: showerEntry, end: showerEnd } = encounter.timing;
       gameTime = showerStart;
       courseWorldOffset.set(0, 0, flightDistanceAt(showerStart));
@@ -136,9 +136,9 @@ const randomState = {seed: 12345};
 const math = Object.create(Math);
 math.random = () => ((randomState.seed = (randomState.seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
 function buildGameFixture(sourceCode) {
-  const create = new Function('THREE', 'Math', 'random', 'reducedMotion', 'crossingDanger', 't', 'getAsteroidEncounters', 'createShipModels', 'shipTypes', 'createPlayerCollision', 'createAsteroidEncounter', 'physics', 'newRun', 'simulationStep', 'targetInfo', 'createFleetRoster', 'createFleetTraffic', 'createFleetVisuals', 'setShipOpacity', 'initialFleetTypes', 'planCheckpoints', 'createCheckpoints', 'createFlightBoundary', 'createCapitalEncounter', 'createShieldHud', 'hitFlashStrength', 'createFleetSpawn', 'createFleetArrivals', 'createFragments', 'createAsteroidImpacts', 'rockHitsShip', 'createRepairPickup', 'createFlightTutorial', 'createCrossingAsteroids', sourceCode);
-  return (reducedMotion = false, crossingDanger = null) => create(THREE, math,
-    (a, b) => a + math.random() * (b - a), reducedMotion, crossingDanger, t, getAsteroidEncounters, createShipModels, shipTypes, createPlayerCollision, createAsteroidEncounter, physics, newRun, simulationStep, targetInfo, createFleetRoster, createFleetTraffic, createFleetVisuals, setShipOpacity, initialFleetTypes, planCheckpoints, createCheckpoints, createFlightBoundary, createCapitalEncounter, createShieldHud, hitFlashStrength, createFleetSpawn, createFleetArrivals, createFragments, createAsteroidImpacts, rockHitsShip, createRepairPickup, createFlightTutorial, createCrossingAsteroids);
+  const create = new Function('THREE', 'Math', 'random', 'crossingDanger', 't', 'getAsteroidEncounters', 'createShipModels', 'shipTypes', 'createPlayerCollision', 'createAsteroidEncounter', 'physics', 'newRun', 'simulationStep', 'targetInfo', 'createFleetRoster', 'createFleetTraffic', 'createFleetVisuals', 'setShipOpacity', 'initialFleetTypes', 'planCheckpoints', 'createCheckpoints', 'createFlightBoundary', 'createCapitalEncounter', 'createShieldHud', 'hitFlashStrength', 'createFleetSpawn', 'createFleetArrivals', 'createFragments', 'createAsteroidImpacts', 'rockHitsShip', 'createRepairPickup', 'createFlightTutorial', 'createCrossingAsteroids', sourceCode);
+  return (crossingDanger = null) => create(THREE, math,
+    (a, b) => a + math.random() * (b - a), crossingDanger, t, getAsteroidEncounters, createShipModels, shipTypes, createPlayerCollision, createAsteroidEncounter, physics, newRun, simulationStep, targetInfo, createFleetRoster, createFleetTraffic, createFleetVisuals, setShipOpacity, initialFleetTypes, planCheckpoints, createCheckpoints, createFlightBoundary, createCapitalEncounter, createShieldHud, hitFlashStrength, createFleetSpawn, createFleetArrivals, createFragments, createAsteroidImpacts, rockHitsShip, createRepairPickup, createFlightTutorial, createCrossingAsteroids);
 }
 const makeGame = buildGameFixture(code);
 
@@ -168,8 +168,8 @@ function assertShipInsideBoundary(game, ship) {
   }
 }
 
-function moveRock(rock, dt, paused, reducedMotion) {
-  if (!paused) advanceShipMotion(rock, dt, reducedMotion);
+function moveRock(rock, dt, paused) {
+  if (!paused) advanceShipMotion(rock, dt);
 }
 
 export { THREE, t, source, section, code, randomState, math, buildGameFixture, makeGame, hazardInterval, makeFlightClock, assertShipInsideBoundary, moveRock };

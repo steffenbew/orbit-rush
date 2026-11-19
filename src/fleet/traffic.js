@@ -2,11 +2,11 @@ import * as THREE from '../../assets/vendor/three.module.js';
 import { setShipOpacity } from './visuals.js';
 
 // Intrinsic movement only. Player travel translates the whole world separately.
-export function advanceShipMotion(ship, dt, reducedMotion) {
+export function advanceShipMotion(ship, dt) {
   const data = ship.userData;
   ship.position.addScaledVector(data.courseVelocity, dt);
   // Ignore player travel: stationary or barely drifting rocks (≤5 units/s) do not tumble.
-  if (data.type.asteroid && !reducedMotion && data.courseVelocity.lengthSq() > 25) {
+  if (data.type.asteroid && data.courseVelocity.lengthSq() > 25) {
     ship.rotation.x += data.spin.x * dt;
     ship.rotation.y += data.spin.y * dt;
     ship.rotation.z += data.spin.z * dt;
@@ -14,7 +14,7 @@ export function advanceShipMotion(ship, dt, reducedMotion) {
   data.hitFlash = Math.max(0, data.hitFlash - dt);
 }
 
-export function createFleetTraffic({ camera, flightMotion, reducedMotion, random, isFlightActive, constrainShipToBoundary }) {
+export function createFleetTraffic({ camera, flightMotion, random, isFlightActive, constrainShipToBoundary }) {
   function updateEngineThrust(ship, previousForwardSpeed, dt) {
     if (dt === 0) return;
     const data = ship.userData;
@@ -50,14 +50,14 @@ export function createFleetTraffic({ camera, flightMotion, reducedMotion, random
       if (escape.lengthSq() < 1) escape.copy(data.courseRight).multiplyScalar(data.slot % 2 ? 1 : -1);
       avoidance.addScaledVector(escape.normalize(), (1 - time / lookAhead) * strength);
     }
-    desired.add(avoidance.clampLength(0, 1).multiplyScalar((reducedMotion ? 25 : 170) * data.dodgeSkill));
+    desired.add(avoidance.clampLength(0, 1).multiplyScalar(170 * data.dodgeSkill));
   }
   function shipCruiseSpeed(ship, forwardSpeed, throttle) {
     const depth = ship.position.clone().sub(camera.position).dot(ship.userData.cruiseDirection);
     // Close the gap quickly at range, then limit relative speed for a readable shooting window.
     // Throttle still varies the pace, but cannot leave a target permanently pulling away.
     const passingSpeed = ship.userData.passingSpeed * THREE.MathUtils.clamp(2 - throttle, .65, 1.7);
-    const approach = THREE.MathUtils.smoothstep(depth, reducedMotion ? 120 : 900, reducedMotion ? 400 : 2400);
+    const approach = THREE.MathUtils.smoothstep(depth, 900, 2400);
     return Math.max(0, forwardSpeed - THREE.MathUtils.lerp(passingSpeed, forwardSpeed * .9, approach));
   }
   const ringShipPoint = new THREE.Vector3(), ringShipForward = new THREE.Vector3(0, 0, -1);
@@ -91,7 +91,7 @@ export function createFleetTraffic({ camera, flightMotion, reducedMotion, random
     data.courseAge += dt;
     if (data.tutorialTarget) {
       // A short, gentle approach near the flight path, not a sweep across the screen.
-      const duration = reducedMotion ? 3 : 2.4;
+      const duration = 2.4;
       const before = THREE.MathUtils.smoothstep(data.courseAge - dt, 0, duration);
       const after = THREE.MathUtils.smoothstep(data.courseAge, 0, duration);
       data.courseVelocity.copy(flightMotion).multiplyScalar(.85)
@@ -118,15 +118,15 @@ export function createFleetTraffic({ camera, flightMotion, reducedMotion, random
     }
     const offset = ship.position.clone().sub(camera.position);
     const depth = offset.dot(data.cruiseDirection);
-    const motion = reducedMotion ? .25 : 1;
+
     const phase = data.courseAge * data.maneuverRate + data.maneuverPhase;
-    const lateralLimit = reducedMotion ? 9 : 35;
+    const lateralLimit = 35;
     const forwardSpeed = Math.max(0, flightMotion.dot(data.cruiseDirection)) * .85;
     const desired = data.cruiseDirection.clone().multiplyScalar(shipCruiseSpeed(ship, forwardSpeed, data.throttle));
     // Stop lane tracking near the player: the final pass remains avoidable.
     if (depth > 180) {
-      const lane = data.lane + Math.sin(phase) * 50 * motion;
-      const height = data.height + Math.sin(phase * .73 + 1) * 22 * motion;
+      const lane = data.lane + Math.sin(phase) * 50;
+      const height = data.height + Math.sin(phase * .73 + 1) * 22;
       desired.addScaledVector(data.courseRight, THREE.MathUtils.clamp((lane - offset.dot(data.courseRight)) * .5, -lateralLimit, lateralLimit))
         .addScaledVector(data.courseUp, THREE.MathUtils.clamp((height - offset.dot(data.courseUp)) * .4, -lateralLimit * .6, lateralLimit * .6));
     }
@@ -134,7 +134,7 @@ export function createFleetTraffic({ camera, flightMotion, reducedMotion, random
     const previousForwardSpeed = data.courseVelocity.dot(data.cruiseDirection);
     data.courseVelocity.lerp(desired, 1 - Math.exp(-1.5 * dt));
     updateEngineThrust(ship, previousForwardSpeed, dt);
-    const bank = -data.courseVelocity.dot(data.courseRight) / (reducedMotion ? 600 : 320);
+    const bank = -data.courseVelocity.dot(data.courseRight) / 320;
     ship.quaternion.copy(data.baseRotation).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, THREE.MathUtils.clamp(bank, -.3, .3))));
   }
 
@@ -151,7 +151,7 @@ export function createFleetTraffic({ camera, flightMotion, reducedMotion, random
   function moveShip(ship, dt, worldStep, moving) {
     ship.position.addScaledVector(worldStep, .85);
     if (!moving) return;
-    advanceShipMotion(ship, dt, reducedMotion);
+    advanceShipMotion(ship, dt);
     if (!ship.userData.type.asteroid) constrainShipToBoundary(ship);
   }
   return { activeAsteroids, snapshotFleet, moveShip, updateShipCourse, updateRingShipCourse, avoidAsteroids, shipCruiseSpeed, updateEngineThrust };

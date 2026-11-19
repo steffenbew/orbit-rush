@@ -9,41 +9,41 @@ const layout = game => game.fieldGroups.map(group => ({position: group.position.
   tunnel: group.tunnel && {center: group.tunnel.center.toArray(), direction: group.tunnel.direction.toArray(), radius: group.tunnel.radius},
   pockets: group.pockets.map(pocket => ({center: pocket.center.toArray(), spread: pocket.spread.toArray(),
     weight: pocket.weight, sizePower: pocket.sizePower, sizeScale: pocket.sizeScale}))}));
-for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 8, 9, 11, 12, 17, 20, 100] : [1, 2, 9]) for (const seed of full ? [123, 456, 789] : [123]) {
+for (const level of full ? [1, 2, 3, 4, 5, 8, 9, 11, 12, 17, 20, 100] : [1, 2, 9]) for (const seed of full ? [123, 456, 789] : [123]) {
   randomState.seed = seed;
-  const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.camera.updateMatrixWorld();
+  const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.camera.updateMatrixWorld();
   for (const event of game.getAsteroidEncounters().filter(event => event.kind === 'field')) {
     game.showerPool.forEach(rock => { rock.visible = false; });
     // Inspect this field in isolation, without the scheduler selecting another phase first.
     game.grit.visible = true;
     game.selectAsteroidEncounter(event); game.setTime(event.prepare); game.worldStep.set(0, 0, 0); game.updateAsteroidShower(0);
-    const planned = layout(game), origin = game.coursePlan().origin, scale = reduced ? .35 : 1;
+    const planned = layout(game), origin = game.coursePlan().origin;
     const rocks = game.fieldGroups.flatMap(group => group.rocks), debris = game.fieldDebris;
     const diffuse = game.fieldGroups[0].diffuse;
     assert.ok(game.fieldGroups.length >= 1 && game.fieldGroups.length <= 3);
     assert.equal(game.grit.count, debris.length);
-    if (level === 1 && !reduced) {
+    if (level === 1) {
       assert.ok(debris.length <= 140 && rocks.length <= 9, 'The first field uses fewer pieces, not a compressed wall');
       const fullReach = Math.min(900, game.coursePlan().length * .3);
       assert.ok(Math.abs(game.fieldImpacts[0].drift.length() - fullReach * .65) < 1e-7, 'Shorten introductory debris reach by 35% without enlarging its rocks');
     }
-    assert.ok(debris.length >= (reduced ? 12 : 90) && debris.length <= 300, `A continuous debris volume: level=${level}, reduced=${reduced}, count=${debris.length}`);
-    assert.ok(rocks.length >= (reduced ? 2 : 4) && rocks.length <= 27, 'Detailed chunks are distributed across the wider field');
-    const sizes = rocks.map(rock => rock.scale.x / scale);
+    assert.ok(debris.length >= 90 && debris.length <= 300, `A continuous debris volume: level=${level}, count=${debris.length}`);
+    assert.ok(rocks.length >= 4 && rocks.length <= 27, 'Detailed chunks are distributed across the wider field');
+    const sizes = rocks.map(rock => rock.scale.x);
     assert.ok(sizes.every(size => size >= (diffuse ? .45 : 1.1) - 1e-7 && size <= (diffuse ? 4.6 : 3.78) + 1e-7), 'Directional sizes stay unchanged; settled fields gain contrast without monoliths');
     assert.ok(rocks.some(rock => rock.userData.asteroidTier === 3));
     if (diffuse) {
       assert.ok(sizes.filter(size => size > 2.8 + 1e-7).length <= 2, 'Only the surviving core and one optional larger remnant dominate');
       assert.ok(game.fieldGroups[0].pockets.length >= 3 && game.fieldGroups[0].pockets.length <= 5);
     } else assert.ok(rocks.some(rock => rock.userData.asteroidTier === 2));
-    const small = debris.filter(piece => piece.size <= (reduced ? 2 : 6)).length;
+    const small = debris.filter(piece => piece.size <= 6).length;
     if (!diffuse) {
-      assert.ok(small / debris.length >= .3 && small / debris.length <= (reduced ? 1 : .8), 'Directional fragment spectrum stays unchanged');
-      assert.ok(debris.some(piece => piece.size < (reduced ? .7 : 1.5)) && debris.some(piece => piece.size > (reduced ? 1 : 15)), 'Both tiny chips and substantial fragments are present');
+      assert.ok(small / debris.length >= .3 && small / debris.length <= .8, 'Directional fragment spectrum stays unchanged');
+      assert.ok(debris.some(piece => piece.size < 1.5) && debris.some(piece => piece.size > 15), 'Both tiny chips and substantial fragments are present');
     }
-    assert.ok(debris.every(piece => piece.size <= (reduced ? 7 : 26)), 'Fragment sizes stay inside the existing collision broadphase limits');
+    assert.ok(debris.every(piece => piece.size <= 26), 'Fragment sizes stay inside the existing collision broadphase limits');
     const extent = game.grit.boundingBox.getSize(new THREE.Vector3());
-    assert.ok(Math.max(extent.x, extent.y, extent.z) > (reduced ? 60 : 300) && Math.max(extent.x, extent.y) < (reduced ? 600 : 2400), 'Rotated debris keeps a moderate three-dimensional footprint');
+    assert.ok(Math.max(extent.x, extent.y, extent.z) > 300 && Math.max(extent.x, extent.y) < 2400, 'Rotated debris keeps a moderate three-dimensional footprint');
     assert.ok(extent.z < game.coursePlan().length, 'The impact remains inside its encounter');
     assert.equal(diffuse, level > 1 && (level + Math.floor(event.entry / 16)) % 3 === 2, 'Both young and aged fields follow a retry-stable plan');
     assert.equal(game.fieldImpacts.length, diffuse || game.fieldGroups[0].shape === 0 ? 1 : 2);
@@ -62,13 +62,13 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 
     if (diffuse) {
       const impact = game.fieldImpacts[0];
       const distances = debris.map(piece => piece.position.distanceTo(impact.source));
-      assert.ok(Math.max(...distances) > (reduced ? 90 : impact.drift.length() * .55), `Keep the wider footprint despite local bunching: ${JSON.stringify({level,reduced,seed,max:Math.max(...distances),reach:impact.drift.length()})}`);
+      assert.ok(Math.max(...distances) > (impact.drift.length() * .55), `Keep the wider footprint despite local bunching: ${JSON.stringify({level,seed,max:Math.max(...distances),reach:impact.drift.length()})}`);
       for (const axis of [impact.u, impact.v, impact.drift.clone().normalize()]) {
         const projections = debris.map(piece => piece.position.clone().sub(impact.source).dot(axis));
         assert.ok(Math.max(...projections) - Math.min(...projections) > impact.drift.length() * .15, 'Pockets retain depth on every axis without requiring symmetric populations');
       }
     } else {
-      assert.ok(nearFilaments / debris.length > (reduced ? .3 : .45), `Uneven strands: ${JSON.stringify({level,reduced,entry:event.entry,nearFilaments,total:debris.length})}`);
+      assert.ok(nearFilaments / debris.length > .45, `Uneven strands: ${JSON.stringify({level,entry:event.entry,nearFilaments,total:debris.length})}`);
     }
     if (game.fieldImpacts.length === 2) {
       const [first, second] = game.fieldImpacts;
@@ -79,7 +79,7 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 
     const bodies = [];
     for (const rock of rocks) {
       assert.equal(rock.userData.courseVelocity.lengthSq(), 0);
-      assert.equal(rock.userData.health, Math.max(rock.userData.asteroidTier, Math.ceil(rock.scale.x / scale)), 'Durability follows size, not a three-hit cap');
+      assert.equal(rock.userData.health, Math.max(rock.userData.asteroidTier, Math.ceil(rock.scale.x)), 'Durability follows size, not a three-hit cap');
       assert.equal(rock.userData.maxHealth, rock.userData.health);
       const sphere = rock.userData.collisionBox.getBoundingSphere(new THREE.Sphere());
       bodies.push({point: rock.position.clone().sub(origin), radius: (sphere.radius + sphere.center.length()) * rock.scale.x});
@@ -89,7 +89,7 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 
     bodies.push(...debris.map(piece => ({point: piece.position, radius: piece.size * 1.7})));
     let closestDebrisMargin = Infinity;
     for (let index = 0; index < bodies.length; index++) {
-      const {point, radius} = bodies[index], margin = reduced ? 14 : 40;
+      const {point, radius} = bodies[index], margin = 40;
       for (const gate of game.flightRings) assert.ok(point.clone().add(origin).distanceTo(gate.position) >= radius + gate.userData.radius * 1.5 + 26 - 1e-7,
         'Checkpoint openings, approaches and glow stay clear');
       for (let i = 1; i < game.fieldRoute.length; i++) {
@@ -103,19 +103,17 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 
         const width = tunnel.radius * (1 + .1 * Math.sin(along / (tunnel.radius * 2) + game.fieldGroups[0].angle));
         assert.ok(offset.lengthSq() - along * along >= (width + radius * 1.05) ** 2 - 1e-7, 'The old passage clears complete boulders and instanced fragments');
       }
-      for (let other = 0; other < index; other++) assert.ok(point.distanceTo(bodies[other].point) >= radius + bodies[other].radius + (diffuse ? 1 : 4) * scale - 1e-7,
+      for (let other = 0; other < index; other++) assert.ok(point.distanceTo(bodies[other].point) >= radius + bodies[other].radius + (diffuse ? 1 : 4) - 1e-7,
         'Close neighbours are allowed, but complete collision hulls never overlap');
     }
-    if (!reduced) {
-      if ([2, 3].includes(level)) assert.ok(game.fieldGroups.some(group => group.blocking), 'The introductory and level-three fields require an evasive route');
-      for (const group of game.fieldGroups.filter(group => group.blocking)) {
-        const anchor = group.rocks[0], center = group.position.clone().add(origin);
-        assert.ok(game.crossesPlayer(anchor, center.clone().add(new THREE.Vector3(0, 0, -300)), center.clone().add(new THREE.Vector3(0, 0, 300)), 0, center),
-          'Dense remnants physically block the direct course');
-      }
+    if ([2, 3].includes(level)) assert.ok(game.fieldGroups.some(group => group.blocking), 'The introductory and level-three fields require an evasive route');
+    for (const group of game.fieldGroups.filter(group => group.blocking)) {
+      const anchor = group.rocks[0], center = group.position.clone().add(origin);
+      assert.ok(game.crossesPlayer(anchor, center.clone().add(new THREE.Vector3(0, 0, -300)), center.clone().add(new THREE.Vector3(0, 0, 300)), 0, center),
+        'Dense remnants physically block the direct course');
     }
-    if (!reduced && level === 2) assert.ok(closestDebrisMargin < 100, 'Fragments still approach the narrow escape route');
-    if (!reduced && level === 9) assert.ok(game.fieldGroups.some(group => group.axis === 'y'));
+    if (level === 2) assert.ok(closestDebrisMargin < 100, 'Fragments still approach the narrow escape route');
+    if (level === 9) assert.ok(game.fieldGroups.some(group => group.axis === 'y'));
     const detail = debris.slice(0, 10).map(piece => [...piece.position.toArray(), piece.size]);
     rocks.forEach(rock => { rock.visible = false; }); game.selectAsteroidEncounter(event); game.updateAsteroidShower(0);
     assert.deepEqual(layout(game), planned, 'Retries retain the cloud shape, dense remnants and reserved channels');
@@ -125,13 +123,13 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 
 }
 console.log('PASS debris volumes, contrasting settled sizes, separated bodies, clear channels/checkpoints and fixed retry layouts');
 
-for (const reduced of [false, true]) for (const level of full ? [1, 2, 3, 4, 5, 7, 8, 9, 20] : [2, 4]) {
-  const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
+for (const level of full ? [1, 2, 3, 4, 5, 7, 8, 9, 20] : [2, 4]) {
+  const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
   const landmark = game.fieldBoulder;
   if (level === 1 || level === 3 || level % 4 === 0) { assert.equal(landmark, null, 'No extra opening boulders in boss fights, the tutorial or the corridor-first level'); continue; }
   const [opening, next] = game.getAsteroidEncounters(), {rock, time} = landmark;
   assert.ok(time >= opening.exit + 3 && time <= next.entry - 3, 'A single larger remnant occupies the quiet gap, not a new field');
-  assert.equal(rock.scale.x, 5 * (reduced ? .35 : 1));
+  assert.equal(rock.scale.x, 5);
   assert.equal(rock.userData.health, 5); assert.equal(rock.userData.maxHealth, 5, 'Largest current boulders take five hits in either motion mode');
   assert.equal(rock.userData.courseVelocity.lengthSq(), 0);
   assert.ok(!game.fieldGroups.some(group => group.rocks.includes(rock)), 'The cloud handoff does not wait for the later standalone boulder');
@@ -152,10 +150,10 @@ console.log('PASS occasional larger gap boulders, stable retries, stationary mot
 // the same layout at three display rates repeats those ticks; simulation-timing tests batching.
 const seedsAndFps = full ? [[12, 5], [34, 60], [56, 144]] : [[12, 5]];
 let traversals = 0;
-for (const reduced of [false, true]) for (const level of full ? [1, 2, 5, 6, 7, 8, 9, 11, 17, 20] : [2, 9]) for (const [seed, fps] of seedsAndFps) {
+for (const level of full ? [1, 2, 5, 6, 7, 8, 9, 11, 17, 20] : [2, 9]) for (const [seed, fps] of seedsAndFps) {
   traversals++;
   randomState.seed = seed;
-  const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
+  const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.flightMotion.set(0, 0, 0);
   game.setTime(0); game.updateAsteroidShower(0);
   const origin = game.coursePlan().origin.clone();
   const route = game.fieldRoute.length ? game.fieldRoute.map(point => point.clone().add(origin)) : game.flightRings.map(gate => gate.position.clone());
@@ -167,19 +165,19 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 5, 6, 7, 
     if (game.encounterIndex !== 0 && !checkingGap) return;
     time += dt; game.setTime(time);
     // Anticipate bends instead of overshooting each waypoint and demanding a cleared swath around that mistake.
-    const ahead = reduced ? 0 : game.levelFlightSpeed(time / 45) * .85 * .6;
+    const ahead = game.levelFlightSpeed(time / 45) * .85 * .6;
     const z = game.camera.position.z - game.courseWorldOffset.z - ahead;
     const next = route.findIndex(point => point.z < z), index = next < 0 ? route.length - 1 : next;
     const aim = route[index].clone();
-    if (!reduced && index > 0) {
+    if (index > 0) {
       const before = route[index - 1];
       aim.copy(before).lerp(route[index], THREE.MathUtils.clamp((before.z - z) / (before.z - route[index].z), 0, 1));
     }
     const delta = aim.add(game.courseWorldOffset).sub(game.camera.position);
-    const yaw = -Math.atan2(delta.x, -delta.z), pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z)), motion = reduced ? .5 : 1;
+    const yaw = -Math.atan2(delta.x, -delta.z), pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
     const error = Math.atan2(Math.sin(yaw - game.flightOrientation.y), Math.cos(yaw - game.flightOrientation.y));
-    game.target.set(THREE.MathUtils.clamp(-(error * 4 - game.flightTurn.x * .8) / (.9 * motion), -1, 1),
-      THREE.MathUtils.clamp(((pitch - game.flightOrientation.x) * 4 - game.flightTurn.y * .8) / (.65 * motion), -1, 1));
+    game.target.set(THREE.MathUtils.clamp(-(error * 4 - game.flightTurn.x * .8) / .9, -1, 1),
+      THREE.MathUtils.clamp(((pitch - game.flightOrientation.x) * 4 - game.flightTurn.y * .8) / .65, -1, 1));
     clock.move(dt, time / 45); game.worldStep.copy(game.flightMotion).multiplyScalar(-dt);
     game.courseWorldOffset.addScaledVector(game.worldStep, .85); game.updateFlightRing(); game.camera.updateMatrixWorld();
     for (const rock of checkingGap ? [landmark.rock] : rocks) {
@@ -197,17 +195,17 @@ for (const reduced of [false, true]) for (const level of full ? [1, 2, 5, 6, 7, 
   while (time < nextEvent.entry && game.encounterIndex === 0) clock.frame(1 / fps);
   assert.ok(rocks.length > 0, 'The field was encountered before the shower');
   assert.equal(game.encounterIndex, 1, 'The whole cloud clears before the next encounter');
-  assert.ok(nextEvent.entry - time >= 4, `Preserve approach time: level=${level}, reduced=${reduced}, lead=${nextEvent.entry - time}`);
+  assert.ok(nextEvent.entry - time >= 4, `Preserve approach time: level=${level}, lead=${nextEvent.entry - time}`);
   // Continue through the isolated gap boulder without introducing the next shower's random traffic.
   if (landmark) { checkingGap = true; while (time < landmark.time + 2) clock.frame(1 / fps); }
-  assert.equal(hits, 0, `Navigate detailed chunks and gap boulders without shooting: level=${level}, reduced=${reduced}, seed=${seed}, fps=${fps}`);
-  assert.equal(game.hits.length, 0, `Navigate instanced debris without shooting: level=${level}, reduced=${reduced}, seed=${seed}, fps=${fps}`);
+  assert.equal(hits, 0, `Navigate detailed chunks and gap boulders without shooting: level=${level}, seed=${seed}, fps=${fps}`);
+  assert.equal(game.hits.length, 0, `Navigate instanced debris without shooting: level=${level}, seed=${seed}, fps=${fps}`);
   assert.ok(!game.sounds.includes('checkpointMiss'));
 }
 console.log(`PASS ${traversals} non-shooting traversals through the complete cloud, real inertia and safe phase handoffs`);
 
-for (const reduced of [false, true]) {
-  const game = makeGame(reduced); game.setupLevelFleet(); game.updateAsteroidShower(0);
+{
+  const game = makeGame(); game.setupLevelFleet(); game.updateAsteroidShower(0);
   const [introduction, firstShower] = game.getAsteroidEncounters();
   assert.deepEqual([introduction.prepare, introduction.entry, introduction.exit], [6, 12, 17]);
   assert.deepEqual([firstShower.kind, firstShower.prepare, firstShower.entry, firstShower.exit, firstShower.strength], ['shower', 18, 24, 32, 0]);

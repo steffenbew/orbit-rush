@@ -6,7 +6,7 @@ import { playerLaserSpeed } from '../src/weapons/rules.js';
 
 test('a lock survives brief aim slips, sounds once, and never transfers to a recycled hull', () => {
   const camera = new THREE.PerspectiveCamera(90, 1, .1, 1000);
-  const view = { camera, viewCamera: camera, width: 1000, height: 1000, mouseAim: new THREE.Vector2(), reducedMotion: false };
+  const view = { camera, viewCamera: camera, width: 1000, height: 1000, mouseAim: new THREE.Vector2() };
   const ship = new THREE.Group();
   Object.assign(ship.userData, { type: {radius: 3}, health: 1, spawn: 1, arrivalOpacity: 1 });
   ship.position.z = -100;

@@ -1,7 +1,7 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 
 // Preview the actual fleet; only the ornamental belt gets new meshes.
-export function createIntro({ scene, camera, ships, reducedMotion, introPlay, orbitHover }) {
+export function createIntro({ scene, camera, ships, introPlay, orbitHover }) {
   const introFormation = [
     { ship: ships[0], x: -.76, y: .70, mobileX: -.60, mobileY: .76, depth: 220, yaw: .35, pitch: .92 },
     { ship: ships[1], x: .74, y: .70, mobileX: .56, mobileY: .76, depth: 430, yaw: .35, pitch: .65, mobilePitch: .75 },
@@ -27,33 +27,42 @@ export function createIntro({ scene, camera, ships, reducedMotion, introPlay, or
         Math.sin(time * .14 + index * 2) * .14);
     });
   }
-  // Decorative only: share the existing rock geometries, never the gameplay fleet or shaders.
+  const belt = createIntroBelt({ camera, geometries: [4, 7].map(slot => ships[slot].children[0].geometry) });
+  scene.add(belt.mesh);
+  function update(dt, width, height, hidden) {
+    if (hidden) return;
+    introTime += dt;
+    updateIntroShips(introTime, width);
+    const hovering = orbitHover.matches && !introPlay.disabled && introPlay.matches(':hover');
+    belt.update(dt, width, height, hovering);
+  }
+  return { update, hide() { belt.mesh.visible = false; } };
+}
+
+// Only two rock geometries are needed to preview the decorative belt, not the full fleet.
+export function createIntroBelt({ camera, geometries, sample = Math.random }) {
   const introAsteroids = new THREE.Group();
   const introRockMaterial = new THREE.MeshStandardMaterial({ color: 0xb6ada0,
     roughness: 1, metalness: .04, flatShading: true, vertexColors: true });
   const introRockCount = 60;
   const introRockSizes = Array.from({ length: introRockCount }, (_, index) =>
-    index % 10 === 0 ? 22 + Math.random() * 10 : 7 + Math.random() ** 1.5 * 13);
+    index % 10 === 0 ? 22 + sample() * 10 : 7 + sample() ** 1.5 * 13);
   const introRockPhases = Array.from({ length: introRockCount }, (_, index) =>
-    (index + Math.random() * .7) * Math.PI * 2 / introRockCount);
-  const introRockOffsets = Array.from({ length: introRockCount }, () => .84 + Math.random() * .32);
-  const introRockSpeeds = Array.from({ length: introRockCount }, () => .9 + Math.random() * .2);
+    (index + sample() * .7) * Math.PI * 2 / introRockCount);
+  const introRockOffsets = Array.from({ length: introRockCount }, () => .84 + sample() * .32);
+  const introRockSpeeds = Array.from({ length: introRockCount }, () => .9 + sample() * .2);
   const introRockSpins = Array.from({ length: introRockCount }, () =>
-    new THREE.Vector3((Math.random() - .5) * .22, (Math.random() - .5) * .26, (Math.random() - .5) * .16));
+    new THREE.Vector3((sample() - .5) * .22, (sample() - .5) * .26, (sample() - .5) * .16));
   for (let index = 0; index < introRockCount; index++) {
-    introAsteroids.add(new THREE.Mesh(ships[index % 2 ? 7 : 4].children[0].geometry, introRockMaterial.clone()));
+    introAsteroids.add(new THREE.Mesh(geometries[index % geometries.length], introRockMaterial.clone()));
   }
-  scene.add(introAsteroids);
   const orbitTilt = -24 * Math.PI / 180;
   let orbitPhase = 0, orbitSpeed = Math.PI * 2 / 90, orbitTime = 0;
-  function updateIntroOrbit(dt, width, height) {
-    if (!reducedMotion) {
-      const hovering = orbitHover.matches && !introPlay.disabled && introPlay.matches(':hover');
-      const targetSpeed = Math.PI * 2 / (hovering ? 45 : 90);
-      orbitSpeed += (targetSpeed - orbitSpeed) * (1 - Math.exp(-2 * dt));
-      orbitPhase += orbitSpeed * dt;
-      orbitTime += dt;
-    }
+  function update(dt, width, height, hovering = false) {
+    const targetSpeed = Math.PI * 2 / (hovering ? 45 : 90);
+    orbitSpeed += (targetSpeed - orbitSpeed) * (1 - Math.exp(-2 * dt));
+    orbitPhase += orbitSpeed * dt;
+    orbitTime += dt;
     const diameter = Math.min(width * .98, height * 1.2, 1040);
     const basePixelScale = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 260 / height;
     introAsteroids.children.forEach((rock, index) => {
@@ -74,11 +83,5 @@ export function createIntro({ scene, camera, ships, reducedMotion, introPlay, or
       rock.rotation.set(index * .7 + orbitTime * spin.x, index * .9 + orbitTime * spin.y, index * .4 + orbitTime * spin.z);
     });
   }
-  function update(dt, width, height, hidden) {
-    if (hidden) return;
-    if (!reducedMotion) introTime += dt;
-    updateIntroShips(introTime, width);
-    updateIntroOrbit(dt, width, height);
-  }
-  return { update, hide() { introAsteroids.visible = false; } };
+  return { mesh: introAsteroids, update };
 }

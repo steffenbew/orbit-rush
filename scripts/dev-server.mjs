@@ -42,7 +42,7 @@ async function startServer(port) {
       optimizeDeps: { noDiscovery: true },
       server: {
         host: '127.0.0.1', port, strictPort: !!process.env.PORT,
-        fs: { allow: ['index.html', 'src', 'assets', 'sw.js', 'public'] },
+        fs: { allow: ['index.html', 'studio', 'src', 'assets', 'sw.js', 'public'] },
         watch: { ignored: ['**/.run/**', '**/dist/**'] }
       }
     });
@@ -97,7 +97,7 @@ async function main() {
     server = await startServer(+port);
   } catch (error) { control.close(); throw error; }
   url = `http://localhost:${server.port}`;
-  console.log(`Orbit Rush (${mode}): ${url}\nStop with Ctrl+C or ./run stop.`);
+  console.log(`Orbit Rush (${mode}): ${url}${mode === 'start' ? `\nModel Studio: ${url}/studio/` : ''}\nStop with Ctrl+C or ./run stop.`);
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, shutdown);
 }
 function listen(server, ...args) {

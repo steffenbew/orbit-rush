@@ -17,7 +17,7 @@ function section(start, end) {
   assert.ok(from >= 0 && to > from);
   return source.slice(from, to);
 }
-const makeGame = (reducedMotion = false) => new Function('hitFlashStrength', 'createFlightTutorial', 'planEncounterLayout', 'corridorHeightAt', 'planCheckpoints', 'createCheckpoints', 'physics', 'THREE', 't', 'getAsteroidEncounters', 'reducedMotion', `
+const makeGame = () => new Function('hitFlashStrength', 'createFlightTutorial', 'planEncounterLayout', 'corridorHeightAt', 'planCheckpoints', 'createCheckpoints', 'physics', 'THREE', 't', 'getAsteroidEncounters', `
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(90, 16 / 9, .03, 14000);
   const viewCamera = camera;
   const sounds = [], crashes = [], messages = [], elements = new Map(), storage = new Map();
@@ -42,8 +42,8 @@ const makeGame = (reducedMotion = false) => new Function('hitFlashStrength', 'cr
   const completeTutorialStep = action => tutorial.complete(action, gameTime);
   let gameTime = 0, difficulty = 0, level = 1, shield = 100, shieldHitTime = 0, shieldHitStrength = 1;
   let score = 0, best = 0, speed = 0;
-  const simulationStep = 1 / 60, roundDuration = 45;
-  const playerFlight = physics.createPlayerFlight(reducedMotion);
+  const simulationStep = 1 / 60, roundDuration = 45, firstCheckpointTime = 5;
+  const playerFlight = physics.createPlayerFlight();
   const { target, flightMotion, flightTurn, flightOrientation, flightTilt } = playerFlight;
   const worldStep = new THREE.Vector3();
   let showerCorridor = false, showerEntry = 12, showerEnd = 27, showerShape = 0;
@@ -51,16 +51,16 @@ const makeGame = (reducedMotion = false) => new Function('hitFlashStrength', 'cr
   const encounter = { get corridorPlan() { return corridorPlan; } };
   const random = (a, b) => (a + b) / 2;
   ${activeFlightSource}
-  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, reducedMotion, progress);
-  const flightDistanceAt = time => physics.flightDistanceAt(time, { level, reducedMotion, roundDuration, simulationStep });
-  ${section('  const firstCheckpointTime =', '  let capitalShip =')}
+  const levelFlightSpeed = progress => physics.levelFlightSpeed(level, progress);
+  const flightDistanceAt = time => physics.flightDistanceAt(time, { level, roundDuration, simulationStep });
+  ${section('  const courseWorldOffset =', '  let capitalShip =')}
   function planAsteroidShower() {
     activeLayout = planEncounterLayout({ kind: showerCorridor ? 'corridor' : 'shower', direction: 0, strength: 1,
       shape: showerShape, bend: 1, prepare: 0, entry: showerEntry, exit: showerEnd },
-      { courseOrigin, level, reducedMotion, roundDuration, levelFlightSpeed, flightDistanceAt, maxShowerRocks: 144 });
+      { courseOrigin, level, roundDuration, levelFlightSpeed, flightDistanceAt, maxShowerRocks: 144 });
     corridorPlan = showerCorridor ? activeLayout : null;
   }
-  const corridorCenter = (distance, plan = activeLayout) => corridorHeightAt(distance, plan, reducedMotion);
+  const corridorCenter = (distance, plan = activeLayout) => corridorHeightAt(distance, plan);
   ${section('  function damageShield(', '  function updateShieldAnimation(')}
   ${section('  const checkpoints =', '  const arrivals =')}
   planAsteroidShower(); resetFlightRing();
@@ -86,7 +86,7 @@ const makeGame = (reducedMotion = false) => new Function('hitFlashStrength', 'cr
       if ('level' in options) {
         level = options.level;
         // Use the real corridor timing; the level-two slalom assumes its late corridor.
-        const corridor = getAsteroidEncounters(level, reducedMotion).find(event => event.kind === 'corridor');
+        const corridor = getAsteroidEncounters(level).find(event => event.kind === 'corridor');
         showerEntry = corridor?.entry ?? 12; showerEnd = corridor?.exit ?? 27;
       }
       if ('shape' in options) showerShape = options.shape;
@@ -105,11 +105,11 @@ const makeGame = (reducedMotion = false) => new Function('hitFlashStrength', 'cr
       updateFlightRing(); camera.updateMatrixWorld(); renderFlightRingFeedback();
     }
   };
-`)(hitFlashStrength, createFlightTutorial, planEncounterLayout, corridorHeightAt, planCheckpoints, createCheckpoints, physics, THREE, t, getAsteroidEncounters, reducedMotion);
+`)(hitFlashStrength, createFlightTutorial, planEncounterLayout, corridorHeightAt, planCheckpoints, createCheckpoints, physics, THREE, t, getAsteroidEncounters);
 
 
-for (const reducedMotion of [false, true]) for (const level of [1, 4, 10]) {
-  const game = makeGame(reducedMotion);
+for (const level of [1, 4, 10]) {
+  const game = makeGame();
   game.configure({level}); game.resetFlightRing();
   game.renderFlightRingFeedback();
   assert.equal(game.messages.length, 0, 'No checkpoint rules banner at level start');
@@ -137,7 +137,7 @@ for (const reducedMotion of [false, true]) for (const level of [1, 4, 10]) {
   game.core.onBeforeCompile(coreShader);
   assert.equal(coreShader.uniforms.ringPhase, game.halo.uniforms.phase, 'Core and corona use the same surface animation');
   game.rings.forEach(gate => {
-    assert.equal(gate.scale.x, reducedMotion ? 14 : 80, 'Small fixed checkpoint sizes, independent of speed and wider spacing');
+    assert.equal(gate.scale.x, 80, 'Small fixed checkpoint sizes, independent of speed and wider spacing');
     assert.equal(gate.userData.radius, gate.scale.x, 'Crossing aperture matches the smaller visible checkpoint');
   });
   assert.ok(game.halo.fragmentShader.includes('cos(angle - phase)'), 'Keep the rotating energy highlight');
@@ -165,9 +165,9 @@ function isolateGate(game, x = 0, z = -100, radius = 120) {
   gate.userData.normal.set(0, 0, 1); gate.position.copy(game.camera.position).add(new THREE.Vector3(x, 0, z));
   return gate;
 }
-for (const reducedMotion of [false, true]) for (const kind of ['start', 'course', 'approach', 'finish']) {
+for (const kind of ['start', 'course', 'approach', 'finish']) {
   for (const initialShield of [40, 97, 100]) {
-    const game = makeGame(reducedMotion), gate = isolateGate(game, 0, -10);
+    const game = makeGame(), gate = isolateGate(game, 0, -10);
     gate.userData.kind = kind;
     game.configure({shield: initialShield, score: 600, best: 600});
     game.flightMotion.set(0, 0, -200); game.move(.1);
@@ -185,8 +185,8 @@ for (const reducedMotion of [false, true]) for (const kind of ['start', 'course'
     assert.equal(game.messages.length, 1);
   }
 }
-for (const reducedMotion of [false, true]) {
-  const game = makeGame(reducedMotion);
+{
+  const game = makeGame();
   game.configure({shield: 60, training: true});
   isolateGate(game, 200, -10);
   game.flightMotion.set(0, 0, -200); game.move(.1);
@@ -203,9 +203,9 @@ for (const reducedMotion of [false, true]) {
 }
 console.log('PASS +5 checkpoint shield, cap and actual-heal feedback, no repeat healing and no tutorial healing');
 
-for (const reducedMotion of [false, true]) {
-  const game = makeGame(reducedMotion), gate = isolateGate(game);
-  const near = reducedMotion ? 400 : 2600, far = reducedMotion ? 700 : 3600;
+{
+  const game = makeGame(), gate = isolateGate(game);
+  const near = 2600, far = 3600;
   gate.position.set(0, 0, -near); game.updateFlightRing();
   assert.equal(gate.children[0].material.opacity, 0, 'Even nearby checkpoints softly activate instead of popping in');
   game.configure({time: .2}); game.updateFlightRing();
@@ -217,7 +217,7 @@ for (const reducedMotion of [false, true]) {
   for (const distance of [far + 100, far, far - .01, (near + far) / 2, near + .01, near, near - 100]) {
     gate.position.set(0, 0, -distance); game.updateFlightRing();
     const expected = 1 - THREE.MathUtils.smoothstep(distance, near, far);
-    assert.ok(Math.abs(gate.children[0].material.opacity - expected * (reducedMotion ? 1 : .9 + .1 * Math.sin(2.7))) < 1e-12);
+    assert.ok(Math.abs(gate.children[0].material.opacity - expected * (.9 + .1 * Math.sin(2.7))) < 1e-12);
     assert.equal(gate.children[1].material.uniforms.brightness.value, expected, 'Fade the entire halo, not just its core');
     assert.ok(expected >= previousOpacity && expected >= 0 && expected <= 1);
     assert.equal(gate.visible, true); assert.equal(gate.userData.resolved, false, 'Distance fading must not disable gate logic');
@@ -266,15 +266,15 @@ assert.equal(lethal.state().shield, 0); assert.equal(lethal.crashes.length, 1);
 assert.equal(lethal.wash.style.opacity, '0');
 console.log('PASS rotated and swept diagonal crossings at 5–144 FPS, one reward/penalty per gate and lethal misses');
 
-for (const reducedMotion of [false, true]) {
-  const game = makeGame(reducedMotion), gate = isolateGate(game, 0, -20);
+{
+  const game = makeGame(), gate = isolateGate(game, 0, -20);
   game.flightMotion.set(0, 0, -200); game.move(.02);
   assert.ok(Number(game.wash.style.opacity) > 0, 'Tint starts while entering the gate');
   assert.equal(game.sounds.length, 0);
   game.move(.1); assert.equal(gate.visible, false);
   assert.equal(gate.userData.passedAt, game.state().time, 'Successful crossings timestamp the ship-wave trigger');
   assert.deepEqual(game.messages.at(-1), {message: `${t('shieldFull')} · ${t('ringPassed')}`, negative: false}, 'Keep successful checkpoint feedback');
-  assert.equal(Number(game.wash.style.opacity), reducedMotion ? .25 : 1);
+  assert.equal(Number(game.wash.style.opacity), 1);
   game.move(.2); assert.ok(Number(game.wash.style.opacity) > 0);
   game.move(.2); assert.equal(game.wash.style.opacity, '0');
   const geometry = gate.children[0].geometry, allocated = game.scene.children.length;
@@ -297,7 +297,7 @@ miss.resetFlightRing(); assert.equal(miss.state().shield, 90); assert.equal(miss
 miss.renderFlightRingFeedback(); assert.equal(miss.messages.length, messageCount, 'Reset must not introduce a rules banner');
 miss.configure({time: 60}); miss.resetFlightRing(true); miss.renderFlightRingFeedback();
 assert.equal(miss.messages.length, messageCount, 'No rules banner after the tutorial either');
-console.log('PASS cyan crossing wash, red miss, brief fades, reduced motion, paused feedback and bounded reuse');
+console.log('PASS cyan crossing wash, red miss, brief fades, paused feedback and bounded reuse');
 
 for (const mode of [{started: false}, {paused: true}, {ended: true}, {crashing: true}]) {
   const game = makeGame(), position = game.rings[0].position.clone();
@@ -306,8 +306,8 @@ for (const mode of [{started: false}, {paused: true}, {ended: true}, {crashing: 
   game.renderFlightRingFeedback(); assert.equal(game.guide.hidden, true);
   if (mode.ended || mode.crashing) assert.ok(game.rings.every(gate => !gate.visible));
 }
-for (const reducedMotion of [false, true]) for (const shape of [0, 1, 2]) {
-  const corridor = makeGame(reducedMotion); corridor.configure({corridor: true, shape});
+for (const shape of [0, 1, 2]) {
+  const corridor = makeGame(); corridor.configure({corridor: true, shape});
   corridor.planAsteroidShower(); corridor.resetFlightRing();
   assert.equal(corridor.rings.filter(gate => gate.visible).length, 5, 'Redistribute intermediate checkpoints rather than dropping them in corridor levels');
   assert.ok(corridor.field().length > 0);
@@ -323,7 +323,7 @@ for (const reducedMotion of [false, true]) for (const shape of [0, 1, 2]) {
   corridor.rings.slice(1).forEach((gate, index) => {
     assert.ok(corridor.rings[index].position.z - gate.position.z >= gate.userData.radius * 3, 'Keep gates ordered and their glows separated');
   });
-  assert.equal(corridor.field().gap, reducedMotion ? 30 : 45, 'Strength-1 passage stays navigable without unbounded level-based narrowing');
+  assert.equal(corridor.field().gap, 45, 'Strength-1 passage stays navigable without unbounded level-based narrowing');
 }
 const guide = makeGame(); guide.configure({time: 1});
 guide.camera.rotation.y = Math.PI; guide.camera.updateMatrixWorld(); guide.renderFlightRingFeedback();
@@ -342,8 +342,8 @@ assert.ok(source.includes('    resetFlightRing();'));
 console.log('PASS lifecycle guards, no gates in any corridor shape, original passage height and off-screen course guide');
 
 // Leave five seconds of finish margin, including an already-moving tutorial handoff.
-for (const reducedMotion of [false, true]) for (const level of [1, 4, 10, 40]) for (const cruising of [false, true]) {
-  const game = makeGame(reducedMotion); game.configure({level}); game.resetFlightRing();
+for (const level of [1, 4, 10, 40]) for (const cruising of [false, true]) {
+  const game = makeGame(); game.configure({level}); game.resetFlightRing();
   const finish = game.rings.at(-1);
   game.rings.slice(0, -1).forEach(gate => { gate.visible = false; gate.userData.resolved = true; });
   if (cruising) game.flightMotion.set(0, 0, -game.levelFlightSpeed(0));
@@ -352,27 +352,27 @@ for (const reducedMotion of [false, true]) for (const level of [1, 4, 10, 40]) f
   assert.equal(game.state().score, 0);
   const remaining = 45 - game.state().time;
   assert.ok(remaining >= 4.5 && remaining <= 5.5,
-    `Finish timing: reduced=${reducedMotion}, level=${level}, cruising=${cruising}, remaining=${remaining}`);
+    `Finish timing: level=${level}, cruising=${cruising}, remaining=${remaining}`);
 }
 console.log('PASS final checkpoint with five seconds to spare at all cruise speeds, from rest and after training');
 
 // A simple heading controller must be able to follow the actual fixed course within the round.
-for (const reducedMotion of [false, true]) for (const level of [1, 2, 3, 4, 5, 7, 8, 12, 40, 100]) for (const shape of [0, 1, 2]) {
-  const game = makeGame(reducedMotion);
+for (const level of [1, 2, 3, 4, 5, 7, 8, 12, 40, 100]) for (const shape of [0, 1, 2]) {
+  const game = makeGame();
   game.configure({level, corridor: true, shape}); game.planAsteroidShower(); game.resetFlightRing();
   const availableGates = game.rings.filter(gate => gate.visible).length;
   while (game.state().time < 45 && game.rings.some(gate => !gate.userData.resolved)) {
     const next = game.rings.find(gate => !gate.userData.resolved), delta = next.position.clone().sub(game.camera.position);
     const yaw = -Math.atan2(delta.x, -delta.z), pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
     const yawError = Math.atan2(Math.sin(yaw - game.flightOrientation.y), Math.cos(yaw - game.flightOrientation.y));
-    const motion = reducedMotion ? .5 : 1;
+
     game.target.set(
-      THREE.MathUtils.clamp(-(yawError * 2 - game.flightTurn.x * .8) / (.9 * motion), -1, 1),
-      THREE.MathUtils.clamp(((pitch - game.flightOrientation.x) * 2 - game.flightTurn.y * .8) / (.65 * motion), -1, 1)
+      THREE.MathUtils.clamp(-(yawError * 2 - game.flightTurn.x * .8) / .9, -1, 1),
+      THREE.MathUtils.clamp(((pitch - game.flightOrientation.x) * 2 - game.flightTurn.y * .8) / .65, -1, 1)
     );
     game.fly(1 / 60);
   }
-  assert.deepEqual(game.sounds, Array(availableGates).fill('checkpoint'), `Entire course must be flyable: level=${level}, shape=${shape}, reduced=${reducedMotion}`);
+  assert.deepEqual(game.sounds, Array(availableGates).fill('checkpoint'), `Entire course must be flyable: level=${level}, shape=${shape}`);
   assert.equal(game.state().score, 0, 'Even an entire checkpoint course awards no score');
   assert.equal(game.state().shield, 100);
   assert.ok(45 - game.state().time >= 4 && 45 - game.state().time <= 5.5, 'Corridor routes also leave comfortable finish margin');

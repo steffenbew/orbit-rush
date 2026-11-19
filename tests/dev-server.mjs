@@ -18,10 +18,11 @@ after(() => {
 });
 function checkout(name) {
   const root = join(directory, name);
-  for (const path of ['scripts', 'src/presentation', 'dist/assets']) mkdirSync(join(root, path), { recursive: true });
+  for (const path of ['scripts', 'src/presentation', 'studio', 'dist/assets']) mkdirSync(join(root, path), { recursive: true });
   for (const path of ['run', 'scripts/dev-server.mjs']) copyFileSync(new URL('../' + path, import.meta.url), join(root, path));
   writeFileSync(join(root, 'index.html'), '<head><link rel="stylesheet" href="/src/presentation/game.css"></head><script type="module" src="/src/module.js"></script>');
   writeFileSync(join(root, 'src/presentation/game.css'), 'body { color: red; }');
+  writeFileSync(join(root, 'studio/index.html'), '<title>Studio</title>');
   writeFileSync(join(root, 'src/module.js'), 'export const n = 1;');
   writeFileSync(join(root, 'dist/index.html'), 'Built');
   writeFileSync(join(root, 'dist/assets/module-a1b2c3d4.js'), 'export const n = 2;');
@@ -47,6 +48,8 @@ test('source and preview serve the right files and stop independently across che
   assert.match(await (await fetch(source.url)).text(), /\/@vite\/client/);
   assert.ok(!(await fetch(source.url + '/scripts/dev-server.mjs')).ok);
   assert.equal((await fetch(source.url + '/.run/')).status, 404);
+  assert.match(await (await fetch(source.url + '/studio/')).text(), /<title>Studio<\/title>/);
+  assert.equal((await fetch(preview.url + '/studio/')).status, 404);
   assert.equal(await (await fetch(preview.url)).text(), 'Built');
   assert.equal((await fetch(preview.url)).headers.get('cache-control'), 'no-cache');
   assert.match((await fetch(preview.url + '/assets/module-a1b2c3d4.js')).headers.get('cache-control'), /immutable/);

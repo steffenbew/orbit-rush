@@ -1,7 +1,7 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 
 // Visual particles only. Solid, damaging rock fragments live in course/fragments.js.
-export function createExplosions({ scene, camera, glow, reducedMotion, random, pick, onBlast }) {
+export function createExplosions({ scene, camera, glow, random, pick, onBlast }) {
   let particles = [];
   const particleView = new THREE.Vector3();
   const shockwaves = [];
@@ -27,7 +27,7 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
   const emojis = ['🥰', '🌈', '⭐', '💖', '🌸', '🦋', '✨'];
   function dust(ship) {
     const fragmentScale = ship.scale.x / 3.2;
-    for (let i = 0; i < (reducedMotion ? 12 : 32); i++) {
+    for (let i = 0; i < 32; i++) {
       const object = new THREE.Sprite(new THREE.SpriteMaterial({
         map: glow, color: pick([0x9c8d7b, 0xc3af8b, 0x70675f]),
         transparent: true, depthWrite: false, opacity: .5
@@ -46,10 +46,10 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
     // The destroyer's finale is always enormous, never dependent on the rare bonus roll.
     const destruction = count >= 65 && !crashBurst;
     const spectacular = destruction && !capital && random(0, 1) < .02;
-    const explosionSize = sizeFactor * (capital ? (reducedMotion ? 2.1 : 3.2)
+    const explosionSize = sizeFactor * (capital ? 3.2
       : destruction ? (spectacular ? 2.8 : random(.65, 1.35)) : 1);
-    const particleCount = capital ? (reducedMotion ? 28 : 180) : Math.round(count * Math.sqrt(explosionSize));
-    const motion = (capital || crashBurst) && reducedMotion ? .25 : 1;
+    const particleCount = capital ? 180 : Math.round(count * Math.sqrt(explosionSize));
+
     const lifetime = capital ? 1.8 : 1;
     // Real destructions, including nearby ship/asteroid accidents, carry a blast.
     // Ordinary hit sparks and the separate player-crash sequence do not.
@@ -62,12 +62,12 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
       fireball.position.copy(position);
       scene.add(ring, fireball);
       shockwaves.push({ ring, fireball, age: 0, crashBurst,
-        size: (crashBurst ? (reducedMotion ? .3 : 1.8) : 1.5) * explosionSize,
+        size: (crashBurst ? 1.8 : 1.5) * explosionSize,
         life: crashBurst ? .8 : capital ? 2.6 : 1.1 });
     }
     for (let i = 0; i < particleCount; i++) {
       const kind = i % 5 === 0 ? 'smoke' : i % 3 === 0 ? 'spark' : 'fire';
-      const scale = crashBurst ? (reducedMotion ? .25 : .4) : count >= 65 ? 1.5 * explosionSize : 1;
+      const scale = crashBurst ? .4 : count >= 65 ? 1.5 * explosionSize : 1;
       const spread = capital ? 18 : 4;
       const object = new THREE.Sprite(new THREE.SpriteMaterial({
         map: glow, color: kind === 'smoke' ? 0x443b36 : 0xffe5a0,
@@ -79,16 +79,16 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
       const baseSize = scale * (kind === 'spark' ? random(1, 3) : random(8, 22));
       object.scale.setScalar(baseSize);
       const direction = new THREE.Vector3().randomDirection();
-      const velocity = scale * motion * (kind === 'spark' ? random(90, 190) : kind === 'smoke' ? random(12, 35) : random(40, 100));
+      const velocity = scale * (kind === 'spark' ? random(90, 190) : kind === 'smoke' ? random(12, 35) : random(40, 100));
       particles.push({ object, kind, baseSize, vx: direction.x * velocity, vy: direction.y * velocity,
         vz: direction.z * velocity, age: 0,
         life: lifetime * (kind === 'smoke' ? random(1, 1.8) : kind === 'spark' ? random(.25, .65) : random(.4, .95)),
-        spin: capital && reducedMotion ? 0 : random(-2, 2) });
+        spin: random(-2, 2) });
       scene.add(object);
     }
     if (!asteroid && (count >= 65 || crashBurst)) {
       const scale = (crashBurst ? .25 : 1) * explosionSize;
-      const debrisCount = crashBurst ? (reducedMotion ? 3 : 7) : reducedMotion ? 5 : capital ? 48 : Math.min(36, Math.round(16 * explosionSize));
+      const debrisCount = crashBurst ? 7 : capital ? 48 : Math.min(36, Math.round(16 * explosionSize));
       for (let i = 0; i < debrisCount; i++) {
         const object = new THREE.Mesh(debrisGeometry, new THREE.MeshStandardMaterial({
           color: 0x4b3028, metalness: .6, roughness: .65,
@@ -97,9 +97,9 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
         object.position.copy(position);
         object.scale.set(random(.7, 2.5) * scale, random(.4, 1.4) * scale, random(1, 3.5) * scale);
         object.rotation.set(random(-Math.PI, Math.PI), random(-Math.PI, Math.PI), random(-Math.PI, Math.PI));
-        const velocity = new THREE.Vector3().randomDirection().multiplyScalar(random(100, 230) * scale * motion);
+        const velocity = new THREE.Vector3().randomDirection().multiplyScalar(random(100, 230) * scale);
         particles.push({ object, kind: 'debris', vx: velocity.x, vy: velocity.y, vz: velocity.z,
-          age: 0, life: random(1.1, 2) * lifetime, spin: reducedMotion ? 0 : random(-10, 10) });
+          age: 0, life: random(1.1, 2) * lifetime, spin: random(-10, 10) });
         scene.add(object);
       }
     }
@@ -126,7 +126,7 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
   }
   function crashBurst(impact, flightMotion) {
     const firstParticle = particles.length;
-    explode(impact, reducedMotion ? 12 : 120, true);
+    explode(impact, 120, true);
     // Particles receive the full world step, so inherit the full flight velocity too.
     for (let i = firstParticle; i < particles.length; i++) {
       particles[i].vx += flightMotion.x;
@@ -141,13 +141,11 @@ export function createExplosions({ scene, camera, glow, reducedMotion, random, p
       // The brief hull blast travels with us; the surrounding world keeps moving.
       if (!wave.crashBurst) for (const object of [wave.ring, wave.fireball]) object.position.add(worldStep);
       const age = wave.age * (1.1 / wave.life);
-      const quietCrash = wave.crashBurst && reducedMotion;
-      const expansion = quietCrash ? 0 : age;
-      wave.ring.scale.setScalar((5 + expansion * 140) * wave.size);
-      wave.ring.material.opacity = (quietCrash ? .15 : .45) * Math.max(0, 1 - age / 1.1);
-      wave.fireball.scale.setScalar((40 + expansion * 110) * wave.size);
+      wave.ring.scale.setScalar((5 + age * 140) * wave.size);
+      wave.ring.material.opacity = .45 * Math.max(0, 1 - age / 1.1);
+      wave.fireball.scale.setScalar((40 + age * 110) * wave.size);
       wave.fireball.material.color.setRGB(1, Math.max(.12, .65 - age), .025);
-      wave.fireball.material.opacity = (quietCrash ? .3 : 1) * Math.max(0, 1 - age / .7);
+      wave.fireball.material.opacity = Math.max(0, 1 - age / .7);
       if (wave.age > wave.life) {
         scene.remove(wave.ring, wave.fireball);
         wave.ring.material.dispose(); wave.fireball.material.dispose();

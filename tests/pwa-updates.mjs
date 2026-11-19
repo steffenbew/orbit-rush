@@ -135,7 +135,7 @@ function checkpointGame() {
     let level = 1, score = 0, kills = 0, retries = 3, shield = 100, levelCheckpoint = {score: 0, kills: 0};
     let celebrating = false, tutorialCompleted = false, bestAtLevelStart = 0, soundEnabled = true, language = 'de';
     let started = false, crashing = false, roundEnded = false, updateRestored = false;
-    const renderDiagnostics = {failed: false}, reducedMotion = false, calls = [], elements = new Map();
+    const renderDiagnostics = {failed: false}, calls = [], elements = new Map();
     const document = {body: {classList: {add() {}}}, querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, {disabled: false, hidden: false, setAttribute() {}});
       return elements.get(selector);

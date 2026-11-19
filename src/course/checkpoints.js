@@ -1,10 +1,10 @@
 import * as THREE from '../../assets/vendor/three.module.js';
 
 // Plan local gate positions before translating the course into the moving world.
-export function planCheckpoints({ level, reducedMotion, firstCheckpointTime, roundDuration, flightDistanceAt, levelFlightSpeed,
+export function planCheckpoints({ level, firstCheckpointTime, roundDuration, flightDistanceAt, levelFlightSpeed,
   openingComplete, corridorPlan, originZ, exitHeightAtCorridor }) {
   // Five fixed checkpoints; redistribute intermediate gates around, never inside, a corridor.
-  const radius = reducedMotion ? 14 : 80;
+  const radius = 80;
   let depths = [firstCheckpointTime, 12, 22, 32, roundDuration - 5].map(flightDistanceAt);
   let approachDepth, exitDepth;
   if (corridorPlan) {
@@ -51,7 +51,7 @@ export function planCheckpoints({ level, reducedMotion, firstCheckpointTime, rou
 }
 
 // A crossing is reported once. A lethal miss stops further contacts in that tick.
-export function createCheckpoints({ scene, camera, reducedMotion, flightRingWash, flightRingGuide, onCrossing }) {
+export function createCheckpoints({ scene, camera, flightRingWash, flightRingGuide, onCrossing }) {
   const flightRing = new THREE.Group();
   flightRing.userData.flightRing = true;
   const flightRingCore = new THREE.MeshBasicMaterial({ color: 0xc0faff, transparent: true,
@@ -106,7 +106,7 @@ export function createCheckpoints({ scene, camera, reducedMotion, flightRingWash
         transformed.z *= 1.0 + grain * .12;
       `);
     };
-    gate.userData = { flightRing: true, normal: new THREE.Vector3(), previous: new THREE.Vector3(), radius: reducedMotion ? 14 : 80 };
+    gate.userData = { flightRing: true, normal: new THREE.Vector3(), previous: new THREE.Vector3(), radius: 80 };
     gate.visible = false;
     scene.add(gate);
     return gate;
@@ -115,7 +115,7 @@ export function createCheckpoints({ scene, camera, reducedMotion, flightRingWash
   let flightRingWashUntil = 0, flightRingWashStrength = 0;
   function flightRingOpacity(gate, gameTime) {
     return (1 - THREE.MathUtils.smoothstep(gate.position.distanceTo(camera.position),
-      reducedMotion ? 400 : 2600, reducedMotion ? 700 : 3600))
+      2600, 3600))
       * THREE.MathUtils.smoothstep(gameTime - gate.userData.fadeStart, 0, .4);
   }
   function reset(plan, courseOrigin, courseWorldOffset, gameTime, openingComplete) {
@@ -142,7 +142,7 @@ export function createCheckpoints({ scene, camera, reducedMotion, flightRingWash
     flightRingWash.classList.remove('missed');
   }
   function render(gameTime, active, finished, viewCamera, width, height) {
-    flightRingWash.style.opacity = String(active ? flightRingWashStrength * (reducedMotion ? .25 : 1) : 0);
+    flightRingWash.style.opacity = String(active ? flightRingWashStrength : 0);
     flightRingGuide.hidden = true;
     if (finished) flightRings.forEach(gate => { gate.visible = false; });
     const next = flightRings.find(gate => !gate.userData.resolved);
@@ -175,10 +175,10 @@ export function createCheckpoints({ scene, camera, reducedMotion, flightRingWash
       if (data.resolved || stopped) continue;
       const halo = gate.children[1].material;
       const brightness = (gate === next ? 1 : .3) * flightRingOpacity(gate, gameTime);
-      gate.children[0].material.opacity = brightness * (reducedMotion ? 1 : .9 + .1 * Math.sin(gameTime * 2.7));
+      gate.children[0].material.opacity = brightness * (.9 + .1 * Math.sin(gameTime * 2.7));
       halo.uniforms.brightness.value = brightness;
-      halo.uniforms.pulse.value = reducedMotion ? 1 : 1 + .12 * Math.sin(gameTime * 2.7);
-      halo.uniforms.phase.value = reducedMotion ? 0 : gameTime * .5;
+      halo.uniforms.pulse.value = 1 + .12 * Math.sin(gameTime * 2.7);
+      halo.uniforms.phase.value = gameTime * .5;
       const before = flightRingCrossing.copy(data.previous).sub(camera.position).dot(data.normal);
       const after = flightRingCrossing.copy(gate.position).sub(camera.position).dot(data.normal);
       const closingSpeed = -flightMotion.dot(data.normal) * .85;
@@ -188,7 +188,7 @@ export function createCheckpoints({ scene, camera, reducedMotion, flightRingWash
         if (flightRingCrossing.length() <= data.radius) {
           flightRingWashStrength = 1 - timeToPlane / .2;
           flightRingWash.classList.remove('missed');
-          halo.uniforms.pulse.value += reducedMotion ? 0 : flightRingWashStrength;
+          halo.uniforms.pulse.value += flightRingWashStrength;
         }
       }
       if (before < 0 && after >= 0) {

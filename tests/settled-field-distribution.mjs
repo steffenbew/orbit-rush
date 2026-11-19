@@ -2,12 +2,12 @@
 import assert from 'node:assert/strict';
 import { makeGame, randomState } from './helpers/flight-game.mjs';
 
-for (const reduced of [false, true]) {
+{
   const gaps = [], localSizeRatios = [], populationRatios = [], sizes = [], slots = [];
   for (const level of [2, 5, 8, 11, 17, 20]) for (const seed of [123, 456, 789]) {
     randomState.seed = seed;
-    const game = makeGame(reduced); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
-    const group = game.fieldGroups[0], pieces = game.fieldDebris, scale = reduced ? .35 : 1;
+    const game = makeGame(); game.setLevel(level); game.setupLevelFleet(); game.updateAsteroidShower(0);
+    const group = game.fieldGroups[0], pieces = game.fieldDebris;
     assert.equal(group.diffuse, true);
     assert.ok(pieces.some(piece => piece.pocket === -1), 'Some isolated pieces remain outside the pockets');
     assert.ok(pieces.filter(piece => piece.pocket >= 0).length > pieces.length / 2, 'Most debris belongs to local pockets, not a uniform filler');
@@ -26,8 +26,8 @@ for (const reduced of [false, true]) {
     pieces.forEach((piece, index) => {
       const nearest = Math.min(...pieces.filter((_, other) => other !== index)
         .map(other => piece.position.distanceTo(other.position) - (piece.size + other.size) * 1.7));
-      assert.ok(nearest >= scale - 1e-7, 'Tight groups still have disjoint conservative hulls');
-      gaps.push(nearest / scale);
+      assert.ok(nearest >= 1 - 1e-7, 'Tight groups still have disjoint conservative hulls');
+      gaps.push(nearest);
       sizes.push(Math.log(piece.size)); slots.push(index % 10);
     });
   }
@@ -46,4 +46,4 @@ for (const reduced of [false, true]) {
     * sizes.reduce((sum, value) => sum + (value - meanSize) ** 2, 0));
   assert.ok(Math.abs(correlation) < .2, 'No repeating ten-piece small-to-large size sequence');
 }
-console.log('PASS uneven settled spacing, unequal local populations and size families, isolated outliers and no periodic size quotas in both motion modes');
+console.log('PASS uneven settled spacing, unequal local populations and size families, isolated outliers and no periodic size quotas');
