@@ -34,6 +34,26 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
   const domeGlass = new THREE.MeshStandardMaterial({ color: 0x23508a, emissive: 0x060f23, metalness: .25, roughness: .16 });
   const saucerGeometry = new THREE.CylinderGeometry(7, 14.5, 2.4, 40);
   const rimGeometry = new THREE.TorusGeometry(saucerGeometry.parameters.radiusBottom, .28, 6, saucerGeometry.parameters.radialSegments);
+  // One blunt armored profile, full size for the carrier and compressed for its aft pods.
+  const carrierOutline = new THREE.Shape();
+  carrierOutline.moveTo(-3.2, -19); carrierOutline.lineTo(3.2, -19);
+  carrierOutline.lineTo(6.6, -10); carrierOutline.lineTo(6.6, 13);
+  carrierOutline.lineTo(-6.6, 13); carrierOutline.lineTo(-6.6, -10); carrierOutline.closePath();
+  const carrierArmor = new THREE.ExtrudeGeometry(carrierOutline, {
+    depth: 4.6, bevelEnabled: true, bevelSize: .7, bevelThickness: .7, bevelSegments: 1, steps: 1
+  });
+  carrierArmor.translate(0, 0, -2.3);
+  carrierArmor.rotateX(Math.PI / 2);
+  // A wide command bridge with a narrower roof and a raked forward window.
+  const carrierGlass = new THREE.MeshStandardMaterial({ color: 0x466784, emissive: 0x091421, metalness: .25, roughness: .16 });
+  const carrierBridge = new THREE.BoxGeometry(9.6, 4, 8);
+  const bridgeVertices = carrierBridge.getAttribute('position');
+  for (let i = 0; i < bridgeVertices.count; i++) {
+    if (bridgeVertices.getY(i) < 0) continue;
+    bridgeVertices.setX(i, bridgeVertices.getX(i) * .75);
+    bridgeVertices.setZ(i, bridgeVertices.getZ(i) < 0 ? -2 : 3);
+  }
+  carrierBridge.computeVertexNormals();
   const sweptShape = new THREE.Shape();
   sweptShape.moveTo(2, -11); sweptShape.lineTo(12, 10);
   sweptShape.lineTo(4, 6); sweptShape.lineTo(2, 3); sweptShape.closePath();
@@ -76,7 +96,7 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
     ship.add(part);
     return part;
   }
-  function engine(ship, x, y, z, radius, accent, haloScale = 6) {
+  function engine(ship, x, y, z, radius, accent, haloScale) {
     const casing = meshPart(ship, engineGeometry, dark, [x, y, z], [radius, 4, radius]);
     casing.rotation.x = Math.PI / 2;
     // Engine cores have their own material: boosting must not brighten wing trim.
@@ -137,23 +157,19 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
   }
 
   function buildCarrier(ship, hull, accent) {
-    meshPart(ship, unitBox, hull, [0, 0, 0], [11, 6, 27]);
-    const prow = meshPart(ship, noseGeometry, hull, [0, 0, -16], [4.5, 8, 2.5]);
-    prow.rotation.x = -Math.PI / 2;
-    meshPart(ship, unitBox, dark, [0, 3, -1], [7, 1.5, 19]);
-    meshPart(ship, unitBox, hull, [0, 6, 6], [7, 5, 7]);
-    meshPart(ship, unitBox, glass, [0, 7, 2.4], [6, 1.5, .3]);
+    meshPart(ship, carrierArmor, hull, [0, 0, 0], [1, 1, 1]);
+    // Inset the flight deck into the hull, following the bow's clipped corners.
+    meshPart(ship, carrierArmor, dark, [0, 3, -3.2], [.64, .035, .65]);
+    meshPart(ship, carrierBridge, hull, [0, 4.95, 6], [1, 1, 1]);
+    const viewport = meshPart(ship, unitBox, carrierGlass, [0, 5.95, 3.5], [6.8, 1, .16]);
+    viewport.rotation.x = Math.atan(2 / 4);
     for (const sign of [-1, 1]) {
       meshPart(ship, unitBox, dark, [sign * 9, 0, 2], [12, 2.5, 5]);
-      meshPart(ship, unitBox, hull, [sign * 13, 0, 2], [6, 6, 24]);
-      meshPart(ship, unitBox, accent, [sign * 13, 3.1, 2], [1, .15, 19]);
-      for (let j = 0; j < 5; j++) {
-        meshPart(ship, unitBox, silver, [sign * 4.6, .8, -9 + j * 4], [.3, 2, 2.4]);
-        meshPart(ship, unitBox, accent, [sign * 4.8, .8, -9 + j * 4], [.15, .45, 1.3]);
-      }
-      engine(ship, sign * 13, 0, 15, 2.4, accent);
+      meshPart(ship, carrierArmor, hull, [sign * 13, 0, 6.6], [.44, .9, .54]);
+      meshPart(ship, unitBox, accent, [sign * 13, 2.72, 5], [1, .15, 14]);
+      engine(ship, sign * 13, 0, 15, 2.4, accent, 4.8);
     }
-    engine(ship, 0, 0, 15, 2.3, accent);
+    engine(ship, 0, 0, 15, 2.3, accent, 4.8);
   }
 
   function buildDreadnought(ship, hull) {
