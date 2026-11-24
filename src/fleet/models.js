@@ -31,8 +31,9 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
   enginePlumeGeometry.translate(0, .5, 0);
   enginePlumeGeometry.rotateX(Math.PI / 2);
   const noseGeometry = new THREE.ConeGeometry(1, 1, 6);
+  const domeGlass = new THREE.MeshStandardMaterial({ color: 0x23508a, emissive: 0x060f23, metalness: .25, roughness: .16 });
   const saucerGeometry = new THREE.CylinderGeometry(7, 14.5, 2.4, 40);
-  const rimGeometry = new THREE.TorusGeometry(14.2, .28, 6, 48);
+  const rimGeometry = new THREE.TorusGeometry(saucerGeometry.parameters.radiusBottom, .28, 6, saucerGeometry.parameters.radialSegments);
   const sweptShape = new THREE.Shape();
   sweptShape.moveTo(2, -11); sweptShape.lineTo(12, 10);
   sweptShape.lineTo(4, 6); sweptShape.lineTo(2, 3); sweptShape.closePath();
@@ -117,16 +118,22 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
     meshPart(ship, saucerGeometry, hull, [0, 0, 0], [1, 1, 1]);
     const underside = meshPart(ship, saucerGeometry, dark, [0, -1.5, 0], [.95, .4, .95]);
     underside.rotation.z = Math.PI;
-    meshPart(ship, sphere, glass, [0, 1.8, 0], [5, 1.8, 5]);
+    meshPart(ship, sphere, domeGlass, [0, 1.8, 0], [5, 1.8, 5]);
     const rim = new THREE.Mesh(rimGeometry, accent);
     rim.rotation.x = Math.PI / 2;
-    rim.position.y = -.2;
+    rim.position.y = -saucerGeometry.parameters.height / 2;
     ship.add(rim);
+    const { height, radiusTop, radiusBottom } = saucerGeometry.parameters;
+    const lightRadius = 11.5;
+    const deckSlope = height / (radiusBottom - radiusTop);
+    const deckY = height / 2 - (lightRadius - radiusTop) * deckSlope;
     for (let j = 0; j < 12; j++) {
       const angle = j / 12 * Math.PI * 2;
-      meshPart(ship, unitBox, accent, [Math.cos(angle) * 11.5, .9, Math.sin(angle) * 11.5], [.8, .25, .8]);
+      const light = meshPart(ship, unitBox, accent,
+        [Math.cos(angle) * lightRadius, deckY, Math.sin(angle) * lightRadius], [.8, .1, .8]);
+      light.rotation.set(0, -angle, -Math.atan(deckSlope));
     }
-    for (const x of [-5, 5]) engine(ship, x, -1.8, 6, 1.3, accent);
+    for (const x of [-5, 5]) engine(ship, x, -1.8, 6, 1.3, accent, 4.5);
   }
 
   function buildCarrier(ship, hull, accent) {
