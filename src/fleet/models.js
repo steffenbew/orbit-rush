@@ -13,7 +13,7 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
   // Three original silhouettes: swept interceptor, luminous saucer, armored carrier.
   const dark = new THREE.MeshStandardMaterial({ color: 0x131c30, metalness: .65, roughness: .45 });
   const silver = new THREE.MeshStandardMaterial({ color: 0x8795a8, metalness: .7, roughness: .3 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x63dfff, emissive: 0x167da0, emissiveIntensity: 1.2, metalness: .6, roughness: .12 });
+  const dreadnoughtGlass = new THREE.MeshStandardMaterial({ color: 0x9eb9c9, emissive: 0x192b38, metalness: .25, roughness: .18 });
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   const sphere = new THREE.SphereGeometry(1, 24, 16);
   const canopyGlass = new THREE.MeshStandardMaterial({ color: 0x18778b, emissive: 0x04242b, metalness: .25, roughness: .2 });
@@ -208,7 +208,7 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
     meshPart(ship, tower, hull, [0, 23, 28], [1, 1, 1]);
     meshPart(ship, unitBox, dark, [0, 31, 28], [36, 1.5, 11]);
     meshPart(ship, unitBox, hull, [0, 33, 28], [34, 4, 10]);
-    meshPart(ship, unitBox, glass, [0, 33, 33.2], [29, 1, .4]);
+    meshPart(ship, unitBox, dreadnoughtGlass, [0, 33, 33.2], [29, 1, .4]);
     for (const sign of [-1, 1]) {
       meshPart(ship, unitBox, dark, [sign * 11, 36, 28], [3, 2, 3]);
       meshPart(ship, sphere, silver, [sign * 11, 39, 28], [2.8, 2.8, 2.8]);
@@ -232,17 +232,19 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
       }
     }
     ship.userData.muzzles = [];
-    const muzzleMaterial = new THREE.SpriteMaterial({ map: glow, color: 0xff5544, blending: THREE.AdditiveBlending, depthWrite: false });
+    // Alpha-blend the warning so it stays red even over the additive engine glow.
+    const muzzleMaterial = new THREE.SpriteMaterial({ map: glow, color: 0xff342e, fog: false, depthWrite: false });
     for (const sign of [-1, 1]) {
       // Rear turrets sit above the engine bank and fire backward, toward the player.
       meshPart(ship, unitBox, dark, [sign * 29, 9, 40], [12, 7, 12]);
-      meshPart(ship, unitBox, hull, [sign * 29, 13, 41], [10, 5, 10]);
+      meshPart(ship, unitBox, dark, [sign * 29, 13, 41], [10, 5, 10]);
       for (const side of [-1, 1]) {
         const barrel = meshPart(ship, engineGeometry, silver, [sign * 29 + side * 2.4, 13, 51], [.8, 16, .8]);
         barrel.rotation.x = Math.PI / 2;
       }
       const muzzle = new THREE.Sprite(muzzleMaterial);
       muzzle.position.set(sign * 29, 13, 60);
+      muzzle.renderOrder = 1;
       ship.add(muzzle);
       ship.userData.muzzles.push(muzzle);
     }

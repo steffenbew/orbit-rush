@@ -75,7 +75,9 @@ export function createCapitalEncounter({ scene, glow, camera, flightMotion, flig
     else ship.userData.fireCooldown = Math.max(.7, ship.userData.fireCooldown);
     const charge = canFire ? THREE.MathUtils.clamp(1 - ship.userData.fireCooldown / .7, 0, 1) : 0;
     ship.userData.gunsCharging = charge > 0;
-    for (const muzzle of ship.userData.muzzles) muzzle.scale.setScalar(3 + charge * 10);
+    // Open the warning quickly, then keep it growing until the volley releases.
+    const warningSize = 3 + 22 * Math.sqrt(charge);
+    for (const muzzle of ship.userData.muzzles) muzzle.scale.setScalar(warningSize);
     if (!canFire || ship.userData.fireCooldown > 0) return;
     ship.userData.fireCooldown = 3.4;
     ship.userData.gunsCharging = false;
