@@ -14,8 +14,9 @@ upload() {
 }
 # Never --delete: open pages can still need files from a previous release.
 upload assets .htaccess
-upload icons licenses manifest.webmanifest CREDITS.md
+upload app-icons licenses manifest.webmanifest CREDITS.md
 upload index.html
+node ../scripts/verify-release.mjs "$url/"
 upload sw.js
 
 curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \

@@ -31,7 +31,7 @@ function build() {
   return { script, release, bodies, entry, css };
 }
 const first = build();
-const finderFiles = ['.DS_Store', 'icons/.DS_Store'];
+const finderFiles = ['.DS_Store', 'app-icons/.DS_Store'];
 for (const path of finderFiles) writeFileSync(join(directory, 'public', path), 'local Finder metadata');
 const repeat = build();
 writeFileSync(join(directory, 'src/presentation/game.css'), '\n:root { --orbit-css-update: 1; }\n', { flag: 'a' });
@@ -192,7 +192,7 @@ test('emitted gameplay chunks, sounds, licenses and icons are available offline'
     const [name, extension] = file.split('.');
     assert.ok(paths.some(path => path.startsWith('assets/' + name + '-') && path.endsWith('.' + extension)), file);
   }
-  for (const file of [...manifest.icons.map(icon => icon.src), 'icons/apple-touch-icon.png',
+  for (const file of [...manifest.icons.map(icon => icon.src), 'app-icons/apple-touch-icon.png',
     ...readdirSync(new URL('public/licenses/', root)).filter(name => name !== '.DS_Store').map(name => 'licenses/' + name)]) assert.ok(paths.includes(file), file);
   await sw.lifecycle('install');
   assert.equal(sw.stores.get(sw.name).size, sw.files.length);
@@ -393,13 +393,13 @@ test('build is reproducible, self-contained and detects changes to assets and wo
   assert.ok(music && second.bodies.has(music), 'Unchanged audio keeps its immutable URL');
   const engine = [...first.bodies.keys()].filter(path => path.startsWith('assets/three.module-'));
   assert.ok(engine.length && engine.every(path => second.bodies.has(path)), 'Unchanged engine keeps its URLs');
-  assert.deepEqual(readdirSync(join(directory, 'dist')).sort(), ['.htaccess', 'CREDITS.md', 'assets', 'icons', 'index.html', 'licenses', 'manifest.webmanifest', 'sw.js']);
+  assert.deepEqual(readdirSync(join(directory, 'dist')).sort(), ['.htaccess', 'CREDITS.md', 'app-icons', 'assets', 'index.html', 'licenses', 'manifest.webmanifest', 'sw.js']);
   assert.ok(!second.bodies.has(first.css), 'A fresh build does not precache obsolete chunks');
   for (const [path, bytes] of second.bodies) assert.equal(second.release.integrity[path], integrity(bytes));
   writeFileSync(join(directory, 'sw.js'), developmentSource + '\n// strategy changed\n');
   assert.notEqual(build().release.id, second.release.id);
   const deploy = read('scripts/deploy.sh');
-  const stages = ['node scripts/build.mjs', 'cd dist', 'upload assets .htaccess', 'upload icons licenses manifest.webmanifest', 'upload index.html', 'upload sw.js'];
+  const stages = ['node scripts/build.mjs', 'cd dist', 'upload assets .htaccess', 'upload app-icons licenses manifest.webmanifest', 'upload index.html', 'node ../scripts/verify-release.mjs', 'upload sw.js'];
   let previous = -1;
   for (const stage of stages) {
     assert.ok(deploy.indexOf(stage) > previous, stage);

@@ -44,5 +44,5 @@ NASA's observations of [DART's ejecta cone and filaments](https://science.nasa.g
 
 ## Icons and rendering
 
-- [Phosphor Icons](https://phosphoricons.com/), [`@phosphor-icons/core` 2.1.1](https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz), Regular. The HUD uses locally embedded SVG paths; the rocket also appears in the favicon and [app icons](icons/icon-512.png). [MIT license](licenses/PHOSPHOR-LICENSE.txt).
+- [Phosphor Icons](https://phosphoricons.com/), [`@phosphor-icons/core` 2.1.1](https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz), Regular. The HUD uses locally embedded SVG paths; the rocket also appears in the favicon and [app icons](app-icons/icon-512.png). [MIT license](licenses/PHOSPHOR-LICENSE.txt).
 - [Three.js](https://threejs.org/) 0.170.0, vendored from [jsDelivr](https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js) and bundled for production. [MIT license](licenses/THREE-LICENSE.txt).

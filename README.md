@@ -102,7 +102,7 @@ A CSS-only update in a local Chrome comparison transferred 125 kB instead of 2.7
 
 Publish **the contents of `dist/`**, including `.htaccess`. On non-Apache hosts, set `Cache-Control: public, max-age=31536000, immutable` for Vite’s hashed files under `assets/` and `no-cache` for the root HTML, manifest and worker. No Node process, Python, or application backend runs in production.
 
-[`scripts/deploy.sh`](scripts/deploy.sh) requires SSH access to `steffenbew.com`, `rsync` and `curl`. It publishes immutable files first, then root metadata, HTML and finally `sw.js`. It does not delete previous bundles: already-open tabs may still need them.
+[`scripts/deploy.sh`](scripts/deploy.sh) requires SSH access to `steffenbew.com`, `rsync` and `curl`. It publishes immutable files first, then metadata and HTML. Before publishing `sw.js`, it fetches every public file in the new offline manifest and verifies its SHA-256 digest. App icons live under `/app-icons/` because the production host reserves `/icons/`. It does not delete previous bundles: already-open tabs may still need them.
 
 ## Install, play offline and update
 
