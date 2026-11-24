@@ -16,6 +16,16 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
   const glass = new THREE.MeshStandardMaterial({ color: 0x63dfff, emissive: 0x167da0, emissiveIntensity: 1.2, metalness: .6, roughness: .12 });
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   const sphere = new THREE.SphereGeometry(1, 24, 16);
+  const canopyGlass = new THREE.MeshStandardMaterial({ color: 0x18778b, emissive: 0x04242b, metalness: .25, roughness: .2 });
+  const canopyGeometry = sphere.clone();
+  canopyGeometry.rotateX(Math.PI / 2);
+  const canopyVertices = canopyGeometry.getAttribute('position');
+  for (let i = 0; i < canopyVertices.count; i++) {
+    const z = canopyVertices.getZ(i);
+    // Narrow the forward tip and follow the rising deck toward the shoulders.
+    canopyVertices.setXYZ(i, canopyVertices.getX(i) * (1 + .6 * z), canopyVertices.getY(i) + .6 * z, z);
+  }
+  canopyGeometry.computeVertexNormals();
   const engineGeometry = new THREE.CylinderGeometry(1, 1.2, 1, 12);
   const enginePlumeGeometry = new THREE.PlaneGeometry(1, 1);
   enginePlumeGeometry.translate(0, .5, 0);
@@ -28,6 +38,13 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
   sweptShape.lineTo(4, 6); sweptShape.lineTo(2, 3); sweptShape.closePath();
   const sweptGeometry = new THREE.ExtrudeGeometry(sweptShape, { depth: .6, bevelEnabled: true, bevelSize: .2, bevelThickness: .15, bevelSegments: 1, steps: 1 });
   sweptGeometry.rotateX(Math.PI / 2);
+  // Fin side profile: aft along the first axis, height above the casing along the second.
+  const finProfile = new THREE.Shape();
+  finProfile.moveTo(-3, 0); finProfile.lineTo(1.15, 3.7);
+  finProfile.lineTo(2.45, 3.7); finProfile.lineTo(1.6, 0); finProfile.closePath();
+  const finGeometry = new THREE.ExtrudeGeometry(finProfile, { depth: .42, bevelEnabled: false });
+  finGeometry.translate(0, 0, -.21);
+  finGeometry.rotateY(-Math.PI / 2);
   function fadeAsteroidShader(shader) {
     if (!distanceFade) return;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
@@ -58,7 +75,7 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
     ship.add(part);
     return part;
   }
-  function engine(ship, x, y, z, radius, accent) {
+  function engine(ship, x, y, z, radius, accent, haloScale = 6) {
     const casing = meshPart(ship, engineGeometry, dark, [x, y, z], [radius, 4, radius]);
     casing.rotation.x = Math.PI / 2;
     // Engine cores have their own material: boosting must not brighten wing trim.
@@ -76,7 +93,7 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
       ribbon.userData.engineExhaust = true;
       plume.add(ribbon);
     }
-    flame.userData = { core, plume, radius, baseSize: radius * (ship.userData.type.capital ? 3.8 : 6) };
+    flame.userData = { core, plume, radius, baseSize: radius * haloScale };
     ship.add(flame, plume);
     ship.userData.flames.push(flame);
   }
@@ -90,11 +107,11 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
       wing.scale.x = sign;
       ship.add(wing);
       meshPart(ship, unitBox, accent, [sign * 8.5, .24, 7], [3, .22, .6]);
-      const fin = meshPart(ship, unitBox, dark, [sign * 4, 2.7, 6], [.5, 5, 4]);
+      const fin = meshPart(ship, finGeometry, dark, [sign * 3, .55, 7.9], [1, 1, 1]);
       fin.rotation.z = sign * -.3;
-      engine(ship, sign * 3, 0, 8, 1.25, accent);
+      engine(ship, sign * 3, 0, 8, 1.25, accent, 4.2);
     }
-    meshPart(ship, sphere, glass, [0, 1.7, -4], [1.2, 1, 5]);
+    meshPart(ship, canopyGeometry, canopyGlass, [0, 1.15, -4], [1.15, 1, 4.8]);
   }
   function buildSaucer(ship, hull, accent) {
     meshPart(ship, saucerGeometry, hull, [0, 0, 0], [1, 1, 1]);
@@ -212,7 +229,7 @@ export function createShipModels(glow, { distanceFade = true } = {}) {
     const engineRim = new THREE.TorusGeometry(1, .14, 8, 24);
     const drives = [[-27, -1, 5.5], [0, -1, 6.5], [27, -1, 5.5], [-13, -6, 2.2], [13, -6, 2.2], [-13, 5, 2.2], [13, 5, 2.2]];
     for (const [x, y, radius] of drives) {
-      engine(ship, x, y, 51, radius, engineAccent);
+      engine(ship, x, y, 51, radius, engineAccent, 3.8);
       meshPart(ship, engineRim, silver, [x, y, 53.5], [radius, radius, radius * .5]);
     }
   }
